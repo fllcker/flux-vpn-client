@@ -7,7 +7,6 @@ import '../../core_abstraction/core_engine.dart';
 import '../../core_abstraction/engine_manager_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../engines/xray/xray_engine_windows.dart';
-import '../servers/vless_link_parser.dart';
 import 'connection_state.dart';
 
 final connectionControllerProvider =
@@ -15,10 +14,10 @@ final connectionControllerProvider =
   ConnectionController.new,
 );
 
-/// Первый сквозной сценарий из PLAN.md ("Ближайшие шаги", п.4): вставить
-/// vless:// ссылку → распарсить → подключиться через XrayEngineWindows →
-/// увидеть статус. Один активный движок с фиксированным id — выбор
-/// сервера/групп ещё не реализован.
+/// Первый сквозной сценарий из PLAN.md ("Ближайшие шаги", п.4): выбрать
+/// сервер → подключиться через XrayEngineWindows → увидеть статус. Один
+/// активный движок с фиксированным id — переключение между несколькими
+/// одновременными подключениями ещё не реализовано.
 class ConnectionController extends Notifier<ConnectionUiState> {
   static const _engineId = 'primary';
 
@@ -31,15 +30,7 @@ class ConnectionController extends Notifier<ConnectionUiState> {
     return const ConnectionIdle();
   }
 
-  Future<void> connect(String link) async {
-    final ParsedVlessLink parsed;
-    try {
-      parsed = parseVlessLink(link);
-    } on VlessLinkFormatException catch (e) {
-      state = ConnectionError(e.message);
-      return;
-    }
-
+  Future<void> connectToServer(ServerLeaf leaf) async {
     state = const ConnectionConnecting();
 
     final engineManager = ref.read(engineManagerProvider);
@@ -58,7 +49,7 @@ class ConnectionController extends Notifier<ConnectionUiState> {
     _statusSub = engine.statusStream.listen((status) {
       switch (status) {
         case EngineStatus.connected:
-          state = ConnectionConnected(serverName: parsed.name);
+          state = ConnectionConnected(serverName: leaf.name);
         case EngineStatus.error:
           state = const ConnectionError('xray-core завершился с ошибкой');
         case EngineStatus.stopped:
@@ -69,22 +60,7 @@ class ConnectionController extends Notifier<ConnectionUiState> {
       }
     });
 
-    final config = CoreConfig(
-      schemaVersion: 1,
-      standaloneNodes: [
-        ServerLeaf(
-          id: 'link',
-          name: parsed.name,
-          variants: [
-            ConnectionVariant(
-              id: 'default',
-              label: parsed.name,
-              config: parsed.config,
-            ),
-          ],
-        ),
-      ],
-    );
+    final config = CoreConfig(standaloneNodes: [leaf]);
 
     try {
       await engine.start(config);
@@ -94,6 +70,7 @@ class ConnectionController extends Notifier<ConnectionUiState> {
   }
 
   Future<void> disconnect() async {
+    state = const ConnectionStopping();
     await _engine?.stop();
     state = const ConnectionIdle();
   }

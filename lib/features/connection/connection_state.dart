@@ -15,6 +15,10 @@ class ConnectionConnected extends ConnectionUiState {
   const ConnectionConnected({required this.serverName});
 }
 
+class ConnectionStopping extends ConnectionUiState {
+  const ConnectionStopping();
+}
+
 class ConnectionError extends ConnectionUiState {
   final String message;
   const ConnectionError(this.message);

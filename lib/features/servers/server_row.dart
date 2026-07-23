@@ -1,16 +1,18 @@
 import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
-import 'fake_server.dart';
+import 'server_icon.dart';
 
 class ServerRow extends StatefulWidget {
-  final FakeServer server;
+  final String name;
+  final String? icon;
   final bool selected;
   final VoidCallback onTap;
 
   const ServerRow({
     super.key,
-    required this.server,
+    required this.name,
+    required this.icon,
     required this.selected,
     required this.onTap,
   });
@@ -21,12 +23,6 @@ class ServerRow extends StatefulWidget {
 
 class _ServerRowState extends State<ServerRow> {
   bool _hovered = false;
-
-  Color _pingColor(ShadColorScheme scheme, int pingMs) {
-    if (pingMs < 80) return const Color(0xFF4ADE80);
-    if (pingMs < 160) return const Color(0xFFFACC15);
-    return const Color(0xFFF87171);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,28 +63,14 @@ class _ServerRowState extends State<ServerRow> {
                 ),
               ),
               const SizedBox(width: 10),
-              Text(widget.server.icon, style: const TextStyle(fontSize: 18)),
+              ServerIcon(icon: widget.icon, size: 26),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  widget.server.name,
+                  widget.name,
                   style: theme.textTheme.small,
                   overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                width: 6,
-                height: 6,
-                margin: const EdgeInsets.only(right: 6),
-                decoration: BoxDecoration(
-                  color: _pingColor(scheme, widget.server.pingMs),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              Text(
-                '${widget.server.pingMs} мс',
-                style: theme.textTheme.muted.copyWith(fontSize: 12),
               ),
             ],
           ),

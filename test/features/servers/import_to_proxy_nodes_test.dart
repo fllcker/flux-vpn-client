@@ -15,12 +15,19 @@ void main() {
         name: 'Poland',
         config: VlessConfig(address: 'pl1.example.com', port: 443, uuid: 'u2'),
       ),
+      const ImportedServer(
+        name: 'DE Basic - Germany 2',
+        config: VlessConfig(address: 'de2.example.com', port: 443, uuid: 'u3'),
+      ),
     ];
 
     final leaves = importedServersToLeaves(servers);
 
-    expect(leaves, hasLength(2));
+    expect(leaves, hasLength(3));
     expect(leaves[0].name, 'Germany #1');
+    expect(leaves[0].icon, isNull);
+    expect(leaves[2].name, 'Basic - Germany 2');
+    expect(leaves[2].icon, '🇩🇪');
     expect(leaves[0].variants, hasLength(1));
     expect(leaves[0].selection, isA<ManualVariantSelection>());
     expect(

@@ -41,6 +41,18 @@ dependencies:
   # Генерация id для узлов Magic JSON (ProxyNode/ConnectionVariant/...)
   uuid: ^4.6.0
 
+  # Скачивание тела подписки по URL
+  http: ^1.6.0
+
+  # Растровые флаги — Windows не умеет рисовать flag-эмодзи как картинку
+  # (Segoe UI Emoji их не поддерживает), поэтому эмодзи-флаг из иконки
+  # рендерим этим пакетом вместо голого текста.
+  country_flags: ^4.1.2
+
+  # Фреймлесс-окно на Windows + кастомный тайтлбар вместо системного (см.
+  # PLAN.md, "UI-стек")
+  window_manager: ^0.5.2
+
   # Основной UI-кит (см. PLAN.md, "UI-стек") — вместо стокового Material/Fluent.
   # Реэкспортирует lucide_icons_flutter — те же иконки, что на сайте shadcn/ui.
   shadcn_ui: ^0.55.0

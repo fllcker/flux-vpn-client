@@ -102,8 +102,7 @@ class XrayEngineWindows implements CoreEngine {
     ];
     for (final root in roots) {
       final leaf = _firstLeaf(root);
-      final variant = leaf == null ? null : _activeVariant(leaf);
-      if (variant?.config case final VlessConfig vless) {
+      if (leaf?.activeVariant?.config case final VlessConfig vless) {
         return vless;
       }
     }
@@ -117,18 +116,6 @@ class XrayEngineWindows implements CoreEngine {
           .map(_firstLeaf)
           .firstWhere((leaf) => leaf != null, orElse: () => null),
     };
-  }
-
-  ConnectionVariant? _activeVariant(ServerLeaf leaf) {
-    if (leaf.variants.isEmpty) return null;
-    final selection = leaf.selection;
-    if (selection is ManualVariantSelection) {
-      return leaf.variants.firstWhere(
-        (v) => v.id == selection.variantId,
-        orElse: () => leaf.variants.first,
-      );
-    }
-    return leaf.variants.first;
   }
 }
 

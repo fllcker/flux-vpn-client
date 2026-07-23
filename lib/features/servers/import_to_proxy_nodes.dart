@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
 
 import '../../core_abstraction/proxy_node.dart';
+import 'derive_server_icon.dart';
 import 'import_result.dart';
 
 const _uuid = Uuid();
@@ -13,9 +14,11 @@ const _uuid = Uuid();
 List<ServerLeaf> importedServersToLeaves(List<ImportedServer> servers) {
   return servers.map((server) {
     final variantId = _uuid.v4();
+    final derived = deriveServerIcon(server.name);
     return ServerLeaf(
       id: _uuid.v4(),
-      name: server.name,
+      name: derived.name,
+      icon: derived.icon,
       variants: [
         ConnectionVariant(
           id: variantId,

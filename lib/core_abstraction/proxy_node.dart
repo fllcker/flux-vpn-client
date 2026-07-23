@@ -105,6 +105,21 @@ class ServerLeaf extends ProxyNode {
     this.selection = const AutoVariantSelection(),
   });
 
+  /// Активный вариант подключения по [selection]: конкретный — если
+  /// [ManualVariantSelection], иначе первый (авто-выбор по задержке — см.
+  /// PLAN.md — пока не реализован).
+  ConnectionVariant? get activeVariant {
+    if (variants.isEmpty) return null;
+    final selection = this.selection;
+    if (selection is ManualVariantSelection) {
+      return variants.firstWhere(
+        (v) => v.id == selection.variantId,
+        orElse: () => variants.first,
+      );
+    }
+    return variants.first;
+  }
+
   factory ServerLeaf.fromJson(Map<String, dynamic> json) {
     return ServerLeaf(
       id: json['id'] as String,
