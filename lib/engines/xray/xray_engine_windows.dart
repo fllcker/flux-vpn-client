@@ -131,3 +131,11 @@ class XrayEngineWindows implements CoreEngine {
     return leaf.variants.first;
   }
 }
+
+/// Путь к `xray.exe`, полученному через `scripts/fetch_xray.ps1` (см.
+/// assets/xray/SOURCE.md). При запуске через `flutter run`/собранный .exe
+/// рабочая директория — корень проекта/каталог с приложением, где рядом
+/// лежит `assets/`; итоговая упаковка бинарника при сборке релиза — открытый
+/// вопрос из PLAN.md.
+String defaultXrayExecutablePath() =>
+    '${Directory.current.path}/assets/xray/xray.exe';
