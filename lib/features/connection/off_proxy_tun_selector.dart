@@ -3,9 +3,9 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 
 enum ConnectSelection { off, proxy, tun }
 
-/// Трёхпозиционный переключатель режима подключения. TUN пока задизейблен
-/// — не реализован в XrayEngineWindows (см. PLAN.md, "Режимы подключения",
-/// Вариант A).
+/// Трёхпозиционный переключатель режима подключения (см. PLAN.md, "Режимы
+/// подключения"). TUN требует прав администратора — запрос повышения прав
+/// обрабатывается на уровне ConnectPanel, не здесь.
 class OffProxyTunSelector extends StatelessWidget {
   final ConnectSelection value;
   final bool busy;
@@ -46,8 +46,9 @@ class OffProxyTunSelector extends StatelessWidget {
           ),
           _Segment(
             selected: value == ConnectSelection.tun,
-            enabled: false,
+            enabled: !busy,
             label: 'TUN',
+            activeColor: const Color(0xFF60A5FA),
             onTap: () => onChanged(ConnectSelection.tun),
           ),
         ],

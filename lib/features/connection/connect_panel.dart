@@ -1,8 +1,12 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:window_manager/window_manager.dart';
 
+import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config_provider.dart';
+import '../../core_abstraction/proxy_node.dart';
+import '../../engines/xray/windows_elevation.dart';
 import '../servers/flatten_leaves.dart';
 import '../servers/selected_server_provider.dart';
 import '../servers/server_icon.dart';
@@ -25,7 +29,6 @@ class ConnectPanel extends ConsumerWidget {
         ? null
         : leaves.where((l) => l.id == selectedId).firstOrNull;
     final connectionState = ref.watch(connectionControllerProvider);
-    final connected = connectionState is ConnectionConnected;
     final busy =
         connectionState is ConnectionConnecting ||
         connectionState is ConnectionStopping;
@@ -38,6 +41,12 @@ class ConnectPanel extends ConsumerWidget {
         ),
       );
     }
+
+    final selection = switch (connectionState) {
+      ConnectionConnected(mode: ConnectionMode.proxy) => ConnectSelection.proxy,
+      ConnectionConnected(mode: ConnectionMode.tun) => ConnectSelection.tun,
+      _ => ConnectSelection.off,
+    };
 
     return Center(
       child: ConstrainedBox(
@@ -52,28 +61,76 @@ class ConnectPanel extends ConsumerWidget {
             _StatusText(state: connectionState),
             const SizedBox(height: 24),
             OffProxyTunSelector(
-              value: connected
-                  ? ConnectSelection.proxy
-                  : ConnectSelection.off,
+              value: selection,
               busy: busy,
-              onChanged: (selection) {
-                final controller = ref.read(
-                  connectionControllerProvider.notifier,
-                );
-                switch (selection) {
-                  case ConnectSelection.off:
-                    controller.disconnect();
-                  case ConnectSelection.proxy:
-                    controller.connectToServer(selectedLeaf);
-                  case ConnectSelection.tun:
-                    break;
-                }
-              },
+              onChanged: (selection) => _onSelectionChanged(
+                context,
+                ref,
+                selectedLeaf,
+                selection,
+              ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _onSelectionChanged(
+    BuildContext context,
+    WidgetRef ref,
+    ServerLeaf leaf,
+    ConnectSelection selection,
+  ) async {
+    final controller = ref.read(connectionControllerProvider.notifier);
+    switch (selection) {
+      case ConnectSelection.off:
+        await controller.disconnect();
+      case ConnectSelection.proxy:
+        await controller.connectToServer(leaf, mode: ConnectionMode.proxy);
+      case ConnectSelection.tun:
+        if (isRunningElevated()) {
+          await controller.connectToServer(leaf, mode: ConnectionMode.tun);
+          return;
+        }
+        if (!context.mounted) return;
+        await _promptElevateForTun(context, ref);
+    }
+  }
+
+  Future<void> _promptElevateForTun(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showShadDialog<bool>(
+      context: context,
+      builder: (context) => ShadDialog.alert(
+        title: const Text('Нужны права администратора'),
+        description: const Text(
+          'Режим TUN требует прав администратора. Перезапустить '
+          'приложение с повышенными правами?',
+        ),
+        actions: [
+          ShadButton.outline(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Отмена'),
+          ),
+          ShadButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Перезапустить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Гасим текущее подключение (снимает системный прокси и т.п.) перед
+    // перезапуском — иначе пока стартует повышенная копия, старая остаётся
+    // подключённой в фоне до убийства через Job Object.
+    await ref.read(connectionControllerProvider.notifier).disconnect();
+
+    final launched = relaunchElevated();
+    if (launched) {
+      await windowManager.close();
+    }
   }
 }
 

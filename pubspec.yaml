@@ -60,6 +60,12 @@ dependencies:
   # Запись системного прокси Windows в реестр (см. windows_system_proxy.dart)
   win32_registry: ^3.0.3
 
+  # Прямые вызовы Win32 API — Job Object для дочернего xray.exe и запрос
+  # прав администратора для TUN (см. child_process_job.dart,
+  # windows_elevation.dart)
+  win32: ^6.3.0
+  ffi: ^2.1.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config.dart';
 import '../../core_abstraction/core_engine.dart';
 import '../../core_abstraction/engine_manager_provider.dart';
@@ -30,7 +31,10 @@ class ConnectionController extends Notifier<ConnectionUiState> {
     return const ConnectionIdle();
   }
 
-  Future<void> connectToServer(ServerLeaf leaf) async {
+  Future<void> connectToServer(
+    ServerLeaf leaf, {
+    ConnectionMode mode = ConnectionMode.proxy,
+  }) async {
     state = const ConnectionConnecting();
 
     final engineManager = ref.read(engineManagerProvider);
@@ -52,6 +56,7 @@ class ConnectionController extends Notifier<ConnectionUiState> {
           state = ConnectionConnected(
             serverName: leaf.name,
             connectedAt: DateTime.now(),
+            mode: mode,
           );
         case EngineStatus.error:
           state = const ConnectionError('xray-core завершился с ошибкой');
@@ -66,7 +71,7 @@ class ConnectionController extends Notifier<ConnectionUiState> {
     final config = CoreConfig(standaloneNodes: [leaf]);
 
     try {
-      await engine.start(config);
+      await engine.start(config, mode: mode);
     } catch (e) {
       state = ConnectionError('$e');
     }

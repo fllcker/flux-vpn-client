@@ -1,3 +1,5 @@
+import '../../core_abstraction/connection_session.dart';
+
 sealed class ConnectionUiState {
   const ConnectionUiState();
 }
@@ -13,9 +15,11 @@ class ConnectionConnecting extends ConnectionUiState {
 class ConnectionConnected extends ConnectionUiState {
   final String serverName;
   final DateTime connectedAt;
+  final ConnectionMode mode;
   const ConnectionConnected({
     required this.serverName,
     required this.connectedAt,
+    required this.mode,
   });
 }
 

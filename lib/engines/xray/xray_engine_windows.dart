@@ -2,17 +2,21 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config.dart';
 import '../../core_abstraction/core_engine.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/server_config.dart';
+import 'child_process_job.dart';
+import 'windows_elevation.dart';
 import 'windows_system_proxy.dart';
 import 'xray_config_mapper.dart';
 
 /// Windows-реализация [CoreEngine] для xray-core: управляет `xray.exe` как
 /// подпроцессом — см. PLAN.md, "Ядро №1: xray-core" → "Стратегия для
-/// Windows". Реализован только Proxy-режим (Вариант B: локальный
-/// SOCKS/HTTP на localhost); TUN-режим (Вариант A) — следующая задача.
+/// Windows". Поддерживает оба режима: Proxy (Вариант B — системный
+/// SOCKS/HTTP) и TUN (Вариант A — весь трафик через `wintun`, требует прав
+/// администратора).
 class XrayEngineWindows implements CoreEngine {
   XrayEngineWindows({
     required this.id,
@@ -33,6 +37,7 @@ class XrayEngineWindows implements CoreEngine {
 
   Process? _process;
   File? _configFile;
+  ConnectionMode? _activeMode;
 
   final _statusController = StreamController<EngineStatus>.broadcast();
   final _statsController = StreamController<EngineStats>.broadcast();
@@ -44,8 +49,18 @@ class XrayEngineWindows implements CoreEngine {
   Stream<EngineStats> get statsStream => _statsController.stream;
 
   @override
-  Future<void> start(CoreConfig config) async {
+  Future<void> start(
+    CoreConfig config, {
+    ConnectionMode mode = ConnectionMode.proxy,
+  }) async {
     _statusController.add(EngineStatus.starting);
+
+    if (mode == ConnectionMode.tun && !isRunningElevated()) {
+      _statusController.add(EngineStatus.error);
+      throw StateError(
+        'TUN-режим требует прав администратора — приложение запущено без них',
+      );
+    }
 
     final server = _firstVlessServer(config);
     if (server == null) {
@@ -53,11 +68,12 @@ class XrayEngineWindows implements CoreEngine {
       throw StateError('CoreConfig has no VLESS server to connect to');
     }
 
-    final xrayConfig = buildXrayConfig(
-      server,
-      socksPort: socksPort,
-      httpPort: httpPort,
-    );
+    final xrayConfig = switch (mode) {
+      ConnectionMode.proxy =>
+        buildXrayConfig(server, socksPort: socksPort, httpPort: httpPort),
+      ConnectionMode.tun => buildXrayTunConfig(server),
+    };
+    _activeMode = mode;
 
     final configFile = await File(
       '${Directory.systemTemp.path}/vpn_client_xray_$id.json',
@@ -70,27 +86,31 @@ class XrayEngineWindows implements CoreEngine {
       configFile.path,
     ]);
     _process = process;
+    tieChildProcessLifetimeToApp(process);
 
     unawaited(
       process.exitCode.then((_) {
         // Процесс мог упасть сам по себе (не через stop()) — прокси всё
         // равно нужно снять, иначе пользователь тихо теряет интернет.
-        disableWindowsSystemProxy();
+        if (_activeMode == ConnectionMode.proxy) disableWindowsSystemProxy();
         _statusController.add(EngineStatus.stopped);
       }),
     );
 
-    enableWindowsSystemProxy(httpPort: httpPort);
+    if (mode == ConnectionMode.proxy) {
+      enableWindowsSystemProxy(httpPort: httpPort);
+    }
     _statusController.add(EngineStatus.connected);
   }
 
   @override
   Future<void> stop() async {
     _statusController.add(EngineStatus.stopping);
-    disableWindowsSystemProxy();
+    if (_activeMode == ConnectionMode.proxy) disableWindowsSystemProxy();
     _process?.kill();
     await _process?.exitCode;
     _process = null;
+    _activeMode = null;
     await _configFile?.delete();
     _configFile = null;
     _statusController.add(EngineStatus.stopped);
