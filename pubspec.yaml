@@ -38,7 +38,8 @@ dependencies:
   # State management, связывает UI с CoreEngine/EngineManager
   flutter_riverpod: ^3.3.2
 
-  # Основной UI-кит (см. PLAN.md, "UI-стек") — вместо стокового Material/Fluent
+  # Основной UI-кит (см. PLAN.md, "UI-стек") — вместо стокового Material/Fluent.
+  # Реэкспортирует lucide_icons_flutter — те же иконки, что на сайте shadcn/ui.
   shadcn_ui: ^0.55.0
 
 dev_dependencies:
