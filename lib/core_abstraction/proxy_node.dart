@@ -120,6 +120,15 @@ class ServerLeaf extends ProxyNode {
     return variants.first;
   }
 
+  ServerLeaf withSelection(VariantSelection selection) => ServerLeaf(
+    id: id,
+    name: name,
+    icon: icon,
+    hidden: hidden,
+    variants: variants,
+    selection: selection,
+  );
+
   factory ServerLeaf.fromJson(Map<String, dynamic> json) {
     return ServerLeaf(
       id: json['id'] as String,
@@ -144,6 +153,27 @@ class ServerLeaf extends ProxyNode {
     'hidden': hidden,
     'variants': variants.map((v) => v.toJson()).toList(),
     'selection': selection.toJson(),
+  };
+}
+
+/// Ищет [ServerLeaf] с [leafId] в дереве и возвращает копию дерева с его
+/// [ServerLeaf.selection], заменённым на выбор [variantId]. Остальные узлы
+/// возвращаются как есть.
+ProxyNode replaceLeafSelection(ProxyNode node, String leafId, String variantId) {
+  return switch (node) {
+    ServerLeaf leaf when leaf.id == leafId =>
+      leaf.withSelection(ManualVariantSelection(variantId)),
+    ServerLeaf leaf => leaf,
+    ServerGroup group => ServerGroup(
+      id: group.id,
+      name: group.name,
+      icon: group.icon,
+      hidden: group.hidden,
+      strategy: group.strategy,
+      children: group.children
+          .map((c) => replaceLeafSelection(c, leafId, variantId))
+          .toList(),
+    ),
   };
 }
 

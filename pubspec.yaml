@@ -57,6 +57,9 @@ dependencies:
   # Реэкспортирует lucide_icons_flutter — те же иконки, что на сайте shadcn/ui.
   shadcn_ui: ^0.55.0
 
+  # Запись системного прокси Windows в реестр (см. windows_system_proxy.dart)
+  win32_registry: ^3.0.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

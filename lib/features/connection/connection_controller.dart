@@ -49,7 +49,10 @@ class ConnectionController extends Notifier<ConnectionUiState> {
     _statusSub = engine.statusStream.listen((status) {
       switch (status) {
         case EngineStatus.connected:
-          state = ConnectionConnected(serverName: leaf.name);
+          state = ConnectionConnected(
+            serverName: leaf.name,
+            connectedAt: DateTime.now(),
+          );
         case EngineStatus.error:
           state = const ConnectionError('xray-core завершился с ошибкой');
         case EngineStatus.stopped:

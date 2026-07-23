@@ -37,4 +37,38 @@ void main() {
     // id-ы не должны совпадать между разными серверами
     expect(leaves[0].id, isNot(leaves[1].id));
   });
+
+  test('groups entries with the same address into one leaf with variants', () {
+    final servers = [
+      const ImportedServer(
+        name: 'DE Basic - Germany 1',
+        config: VlessConfig(
+          address: 'de1.example.com',
+          port: 443,
+          uuid: 'u1',
+          network: VlessNetwork.tcp,
+          security: VlessSecurity.reality,
+        ),
+      ),
+      const ImportedServer(
+        name: 'DE Basic - Germany 1 (xhttp)',
+        config: VlessConfig(
+          address: 'de1.example.com',
+          port: 2053,
+          uuid: 'u1',
+          network: VlessNetwork.xhttp,
+          security: VlessSecurity.reality,
+        ),
+      ),
+    ];
+
+    final leaves = importedServersToLeaves(servers);
+
+    expect(leaves, hasLength(1));
+    expect(leaves.single.name, 'Basic - Germany 1');
+    expect(leaves.single.icon, '🇩🇪');
+    expect(leaves.single.variants, hasLength(2));
+    expect(leaves.single.variants[0].label, 'TCP Reality');
+    expect(leaves.single.variants[1].label, 'XHTTP Reality');
+  });
 }

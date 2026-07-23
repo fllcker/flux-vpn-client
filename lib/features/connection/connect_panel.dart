@@ -8,6 +8,7 @@ import '../servers/selected_server_provider.dart';
 import '../servers/server_icon.dart';
 import 'connection_controller.dart';
 import 'connection_state.dart';
+import 'connection_timer.dart';
 import 'off_proxy_tun_selector.dart';
 
 class ConnectPanel extends ConsumerWidget {
@@ -82,12 +83,16 @@ class _StatusText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (state case ConnectionConnected(connectedAt: final connectedAt)) {
+      return ConnectionTimer(connectedAt: connectedAt);
+    }
+
     final text = switch (state) {
       ConnectionIdle() => 'Отключено',
       ConnectionConnecting() => 'Подключение...',
-      ConnectionConnected() => 'Подключено',
       ConnectionStopping() => 'Отключение...',
       ConnectionError(message: final message) => 'Ошибка: $message',
+      ConnectionConnected() => '', // обработано выше
     };
     return Text(text, style: ShadTheme.of(context).textTheme.muted);
   }

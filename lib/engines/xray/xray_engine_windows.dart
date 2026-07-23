@@ -6,6 +6,7 @@ import '../../core_abstraction/core_config.dart';
 import '../../core_abstraction/core_engine.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/server_config.dart';
+import 'windows_system_proxy.dart';
 import 'xray_config_mapper.dart';
 
 /// Windows-реализация [CoreEngine] для xray-core: управляет `xray.exe` как
@@ -71,15 +72,22 @@ class XrayEngineWindows implements CoreEngine {
     _process = process;
 
     unawaited(
-      process.exitCode.then((_) => _statusController.add(EngineStatus.stopped)),
+      process.exitCode.then((_) {
+        // Процесс мог упасть сам по себе (не через stop()) — прокси всё
+        // равно нужно снять, иначе пользователь тихо теряет интернет.
+        disableWindowsSystemProxy();
+        _statusController.add(EngineStatus.stopped);
+      }),
     );
 
+    enableWindowsSystemProxy(httpPort: httpPort);
     _statusController.add(EngineStatus.connected);
   }
 
   @override
   Future<void> stop() async {
     _statusController.add(EngineStatus.stopping);
+    disableWindowsSystemProxy();
     _process?.kill();
     await _process?.exitCode;
     _process = null;

@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/subscription.dart';
 import 'base64_subscription_parser.dart';
+import 'group_leaves_by_name.dart';
 import 'import_result.dart';
 import 'import_to_proxy_nodes.dart';
 import 'vless_link_parser.dart';
@@ -91,7 +92,11 @@ Future<LinkImportResult> importLink(String rawInput) async {
     name: name,
     url: link,
     lastRefreshedAt: DateTime.now(),
-    root: ServerGroup(id: _uuid.v4(), name: name, children: leaves),
+    root: ServerGroup(
+      id: _uuid.v4(),
+      name: name,
+      children: groupLeavesByName(leaves),
+    ),
   );
 
   return SubscriptionImportResultOk(subscription, parsed.skipped);

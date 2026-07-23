@@ -5,6 +5,9 @@ import 'package:window_manager/window_manager.dart';
 
 import 'app/app_title_bar.dart';
 import 'features/connection/connection_screen.dart';
+import 'features/servers/import_subscription_sheet.dart';
+
+final _navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,20 +19,43 @@ void main() async {
     center: true,
     titleBarStyle: TitleBarStyle.hidden,
   );
+
+  runApp(ProviderScope(child: VpnClientApp(navigatorKey: _navigatorKey)));
+
   windowManager.waitUntilReadyToShow(windowOptions, () async {
+    await _warmUpOverlays();
     await windowManager.show();
     await windowManager.focus();
   });
+}
 
-  runApp(const ProviderScope(child: VpnClientApp()));
+/// Первый показ любого ShadSheet/оверлея заметно лагает (шрифты/лэйаут
+/// компилируются впервые для этого поддерева виджетов) — второй и
+/// последующие уже гладкие. Прогреваем это один раз здесь, пока окно ещё
+/// не показано пользователю, чтобы он не видел этот лаг на реальном
+/// диалоге импорта подписки.
+Future<void> _warmUpOverlays() async {
+  await WidgetsBinding.instance.endOfFrame;
+  final context = _navigatorKey.currentContext;
+  if (context == null || !context.mounted) return;
+
+  showShadSheet(context: context, builder: (_) => const ImportSubscriptionSheet());
+  await WidgetsBinding.instance.endOfFrame;
+  final navigator = _navigatorKey.currentState;
+  if (navigator != null && navigator.canPop()) {
+    navigator.pop();
+  }
 }
 
 class VpnClientApp extends StatelessWidget {
-  const VpnClientApp({super.key});
+  final GlobalKey<NavigatorState> navigatorKey;
+
+  const VpnClientApp({super.key, required this.navigatorKey});
 
   @override
   Widget build(BuildContext context) {
     return ShadApp(
+      navigatorKey: navigatorKey,
       title: 'VPN Client',
       theme: ShadThemeData(
         brightness: Brightness.dark,

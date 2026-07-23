@@ -1,32 +1,61 @@
 import 'package:uuid/uuid.dart';
 
 import '../../core_abstraction/proxy_node.dart';
+import '../../core_abstraction/server_config.dart';
 import 'derive_server_icon.dart';
 import 'import_result.dart';
 
 const _uuid = Uuid();
 
-/// Каждый импортированный сервер — отдельный [ServerLeaf] с одним вариантом
-/// подключения. Слияние нескольких вариантов одного физического сервера в
-/// один [ServerLeaf] (см. PLAN.md, "Несколько инбаундов на одном сервере")
-/// пока не делается — нет надёжного способа понять, что два разных outbound
-/// ведут на один и тот же сервер, кроме эвристик по адресу.
+/// Импортированные серверы с одинаковым [VlessConfig.address] — это один
+/// физический сервер с несколькими вариантами подключения (разные
+/// транспорты/security), а не разные серверы: панели часто отдают такие
+/// варианты отдельными записями с суффиксом в remarks вроде
+/// "Germany 1 (xhttp)". Группируем по адресу в один [ServerLeaf] — см.
+/// PLAN.md, "Несколько инбаундов на одном сервере".
 List<ServerLeaf> importedServersToLeaves(List<ImportedServer> servers) {
-  return servers.map((server) {
-    final variantId = _uuid.v4();
-    final derived = deriveServerIcon(server.name);
+  final byAddress = <String, List<ImportedServer>>{};
+  for (final server in servers) {
+    byAddress.putIfAbsent(server.config.address, () => []).add(server);
+  }
+
+  return byAddress.values.map((group) {
+    final derived = deriveServerIcon(group.first.name);
+    final leafName = _stripVariantSuffix(derived.name);
+
+    final variants = group
+        .map(
+          (server) => ConnectionVariant(
+            id: _uuid.v4(),
+            label: _variantLabel(server.config),
+            config: server.config,
+          ),
+        )
+        .toList();
+
     return ServerLeaf(
       id: _uuid.v4(),
-      name: derived.name,
+      name: leafName,
       icon: derived.icon,
-      variants: [
-        ConnectionVariant(
-          id: variantId,
-          label: server.name,
-          config: server.config,
-        ),
-      ],
-      selection: ManualVariantSelection(variantId),
+      variants: variants,
+      selection: ManualVariantSelection(variants.first.id),
     );
   }).toList();
+}
+
+final _variantSuffix = RegExp(r'\s*\([^)]*\)\s*$');
+
+String _stripVariantSuffix(String name) => name.replaceFirst(_variantSuffix, '');
+
+String _variantLabel(VlessConfig config) {
+  final network = switch (config.network) {
+    VlessNetwork.tcp => 'TCP',
+    VlessNetwork.xhttp => 'XHTTP',
+  };
+  final security = switch (config.security) {
+    VlessSecurity.none => null,
+    VlessSecurity.tls => 'TLS',
+    VlessSecurity.reality => 'Reality',
+  };
+  return security == null ? network : '$network $security';
 }

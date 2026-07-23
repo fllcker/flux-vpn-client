@@ -12,7 +12,11 @@ class ConnectionConnecting extends ConnectionUiState {
 
 class ConnectionConnected extends ConnectionUiState {
   final String serverName;
-  const ConnectionConnected({required this.serverName});
+  final DateTime connectedAt;
+  const ConnectionConnected({
+    required this.serverName,
+    required this.connectedAt,
+  });
 }
 
 class ConnectionStopping extends ConnectionUiState {

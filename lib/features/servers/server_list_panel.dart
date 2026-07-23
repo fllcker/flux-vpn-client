@@ -3,11 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../core_abstraction/core_config_provider.dart';
+import '../../core_abstraction/proxy_node.dart';
 import 'flatten_leaves.dart';
 import 'import_subscription_sheet.dart';
+import 'proxy_tree_list.dart';
+import 'right_panel_view.dart';
 import 'selected_server_provider.dart';
-import 'server_row.dart';
-import 'server_sections.dart';
 
 class ServerListPanel extends ConsumerWidget {
   const ServerListPanel({super.key});
@@ -16,11 +17,26 @@ class ServerListPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = ShadTheme.of(context);
     final config = ref.watch(coreConfigProvider);
-    final sections = buildServerSections(config);
     final allLeaves = flattenAllLeaves(config);
     final selectedId =
         ref.watch(selectedServerIdProvider) ??
         (allLeaves.isNotEmpty ? allLeaves.first.id : null);
+    final rightPanelView = ref.watch(rightPanelViewProvider);
+    final activeSubscriptionId = switch (rightPanelView) {
+      SubscriptionInfoView(:final subscriptionId) => subscriptionId,
+      ConnectView() => null,
+    };
+
+    void onSelectLeaf(String id) {
+      ref.read(selectedServerIdProvider.notifier).select(id);
+      ref.read(rightPanelViewProvider.notifier).showConnect();
+    }
+
+    void onSelectVariant(String leafId, String variantId) {
+      ref.read(coreConfigProvider.notifier).selectVariant(leafId, variantId);
+      ref.read(selectedServerIdProvider.notifier).select(leafId);
+      ref.read(rightPanelViewProvider.notifier).showConnect();
+    }
 
     return Container(
       width: 260,
@@ -58,14 +74,31 @@ class ServerListPanel extends ConsumerWidget {
                 : ListView(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     children: [
-                      for (final section in sections)
-                        _ServerSectionView(
-                          section: section,
-                          selectedId: selectedId,
-                          onSelect: (id) => ref
-                              .read(selectedServerIdProvider.notifier)
-                              .select(id),
+                      if (config.standaloneNodes.isNotEmpty)
+                        ProxyTreeList(
+                          nodes: config.standaloneNodes,
+                          selectedLeafId: selectedId,
+                          onSelectLeaf: onSelectLeaf,
+                          onSelectVariant: onSelectVariant,
                         ),
+                      for (final subscription in config.subscriptions) ...[
+                        _SubscriptionHeader(
+                          title: subscription.name,
+                          active: subscription.id == activeSubscriptionId,
+                          onTap: () => ref
+                              .read(rightPanelViewProvider.notifier)
+                              .showSubscription(subscription.id),
+                        ),
+                        ProxyTreeList(
+                          nodes: switch (subscription.root) {
+                            ServerGroup(:final children) => children,
+                            final leaf => [leaf],
+                          },
+                          selectedLeafId: selectedId,
+                          onSelectLeaf: onSelectLeaf,
+                          onSelectVariant: onSelectVariant,
+                        ),
+                      ],
                     ],
                   ),
           ),
@@ -75,46 +108,64 @@ class ServerListPanel extends ConsumerWidget {
   }
 }
 
-class _ServerSectionView extends StatelessWidget {
-  final ServerSection section;
-  final String? selectedId;
-  final ValueChanged<String> onSelect;
+class _SubscriptionHeader extends StatefulWidget {
+  final String title;
+  final bool active;
+  final VoidCallback onTap;
 
-  const _ServerSectionView({
-    required this.section,
-    required this.selectedId,
-    required this.onSelect,
+  const _SubscriptionHeader({
+    required this.title,
+    required this.active,
+    required this.onTap,
   });
+
+  @override
+  State<_SubscriptionHeader> createState() => _SubscriptionHeaderState();
+}
+
+class _SubscriptionHeaderState extends State<_SubscriptionHeader> {
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
+    final highlighted = widget.active || _hovered;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (section.title != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(6, 12, 6, 4),
-            child: Text(
-              section.title!.toUpperCase(),
-              style: theme.textTheme.muted.copyWith(
-                fontSize: 11,
-                letterSpacing: 0.4,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          margin: const EdgeInsets.only(top: 10, bottom: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          decoration: BoxDecoration(
+            color: highlighted ? theme.colorScheme.accent : null,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.title.toUpperCase(),
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.muted.copyWith(
+                    fontSize: 11,
+                    letterSpacing: 0.4,
+                    color: widget.active ? theme.colorScheme.foreground : null,
+                  ),
+                ),
               ),
-            ),
+              Icon(
+                LucideIcons.info,
+                size: 12,
+                color: theme.colorScheme.mutedForeground,
+              ),
+            ],
           ),
-        for (final leaf in section.leaves)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 2),
-            child: ServerRow(
-              name: leaf.name,
-              icon: leaf.icon,
-              selected: leaf.id == selectedId,
-              onTap: () => onSelect(leaf.id),
-            ),
-          ),
-      ],
+        ),
+      ),
     );
   }
 }

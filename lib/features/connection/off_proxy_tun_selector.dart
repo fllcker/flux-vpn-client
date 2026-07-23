@@ -81,32 +81,35 @@ class _Segment extends StatelessWidget {
         ? (activeColor ?? theme.colorScheme.foreground)
         : theme.colorScheme.mutedForeground;
 
-    return GestureDetector(
-      onTap: enabled ? onTap : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? theme.colorScheme.background : null,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: const Color(0x33000000),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ]
-              : null,
-        ),
-        child: AnimatedDefaultTextStyle(
+    return MouseRegion(
+      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      child: GestureDetector(
+        onTap: enabled ? onTap : null,
+        child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          style: theme.textTheme.small.copyWith(
-            color: textColor,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? theme.colorScheme.background : null,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: const Color(0x33000000),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
           ),
-          child: Text(label),
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 180),
+            style: theme.textTheme.small.copyWith(
+              color: textColor,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            ),
+            child: Text(label),
+          ),
         ),
       ),
     );
