@@ -56,6 +56,14 @@ Map<String, dynamic> _streamSettings(VlessConfig server) {
 
   final settings = <String, dynamic>{'network': network};
 
+  if (server.network == VlessNetwork.xhttp) {
+    settings['xhttpSettings'] = {
+      if (server.xhttpPath != null) 'path': server.xhttpPath,
+      if (server.xhttpHost != null) 'host': server.xhttpHost,
+      'mode': 'auto',
+    };
+  }
+
   switch (server.security) {
     case VlessSecurity.none:
       settings['security'] = 'none';

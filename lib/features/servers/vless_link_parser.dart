@@ -68,6 +68,8 @@ ParsedVlessLink parseVlessLink(String link) {
       publicKey: params['pbk'],
       shortId: params['sid'],
       fingerprint: params['fp'],
+      xhttpPath: params['path'],
+      xhttpHost: params['host'],
     ),
   );
 }
