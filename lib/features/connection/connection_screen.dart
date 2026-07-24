@@ -124,6 +124,9 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                         assetPath: 'shaders/color_bends.frag',
                       ),
                     ),
+                    HomeBackground.galaxy => const Positioned.fill(
+                      child: ShaderBackground(assetPath: 'shaders/galaxy.frag'),
+                    ),
                   },
                 switch (rightPanelView) {
                   ConnectView() => const ConnectPanel(),

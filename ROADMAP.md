@@ -15,8 +15,8 @@
 4. ~~Пинг~~ — сделано
 5. ~~Авто-режим~~ — сделано
 6. ~~Drag-and-drop сортировка~~ — сделано
-7. Трей + автозапуск
-8. Фон — шейдерные эффекты (Color Bends → Galaxy)
+7. ~~Трей + автозапуск~~ — сделано
+8. ~~Фон — шейдерные эффекты (Color Bends → Galaxy)~~ — сделано
 
 Явно не делаем сейчас: второе ядро (sing-box), CI, другие платформы
 (Android/iOS/macOS/Linux).
@@ -435,10 +435,43 @@ windows`) — оба сценария (реордер внутри группы,
 
 ---
 
-## 7. Трей-иконка и автозапуск
+## 7. Трей-иконка и автозапуск — сделано
 
-**Закрытие окна (✕) сворачивает в трей** (подтверждено) — полный выход
-только через пункт "Выход" в меню трея.
+`lib/app/tray.dart` — `FluxTray` (`with TrayListener`), держит явный
+`ProviderContainer` (не `WidgetRef` — обработчики кликов по трею живут вне
+дерева виджетов), иконка — `assets/tray_icon.ico` (копия
+`windows/runner/resources/app_icon.ico`, добавлена в `pubspec.yaml` assets,
+т.к. `trayManager.setIcon` резолвит путь только через Flutter-ассеты).
+Меню — Открыть / Подключить-Отключить (лейбл и действие зависят от
+`connectionControllerProvider`, подписка через `container.listen`) /
+Выход. Левый и правый клик оба открывают меню (`popUpContextMenu()`) —
+так делает сам tray_manager в примере для Windows.
+
+`main.dart` — вместо голого `ProviderScope` теперь явный
+`ProviderContainer` + `UncontrolledProviderScope`, чтобы `tray.dart` мог
+читать/писать через тот же контейнер. `windowManager.setPreventClose(true)`
+сразу после первого `runApp`; `_FluxAppState` (`with WindowListener`) →
+`onWindowClose()` вызывает `windowManager.hide()` — обработчик крестика в
+`app_title_bar.dart` не тронут, он как и раньше зовёт `windowManager.close()`,
+но с `preventClose` это теперь просто триггерит `onWindowClose` вместо
+настоящего закрытия. Реальный выход — только пункт "Выход" в трее
+(`tray.dart`), который сначала снимает `preventClose`.
+
+`lib/app/windows_autostart.dart` — `setAutoStartOnBoot(bool)`, по аналогии с
+`deep_link.dart`: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`,
+значение `"<exePath>" --minimized`. `main()` проверяет `--minimized` в
+`args` и пропускает `show()`/`focus()` при старте (окно остаётся скрытым,
+доступно через трей). `app_settings.dart` → `autoStartOnBoot: bool`
+(default `false`), переключатель в `settings_dialog.dart` пишет в реестр
+синхронно с сохранением настройки.
+
+Проверено вручную (`flutter run -d windows`): закрытие окна сворачивает в
+трей, процесс остаётся жив со скрытым окном (не завершается); отладочная
+консоль без исключений при настройке иконки/меню. Всплывающее меню трея
+(Windows notification overflow) не удалось надёжно заскриншотить через
+синтетический клик для визуальной проверки пунктов — сама механика
+(`tray_manager` API, подписка на `connectionControllerProvider`) проверена
+код-ревью, а не скриншотом.
 
 1. Добавить `tray_manager` в `pubspec.yaml`.
 2. `main.dart`/новый `lib/app/tray.dart` — иконка в трее, меню (Открыть /
@@ -457,7 +490,7 @@ windows`) — оба сценария (реордер внутри группы,
 
 ---
 
-## 8. Фон — шейдерные эффекты (Color Bends → Galaxy)
+## 8. Фон — шейдерные эффекты (Color Bends → Galaxy) — сделано
 
 Оба взяты с [reactbits.dev](https://reactbits.dev) (react-bits, MIT,
 [github.com/DavidHDev/react-bits](https://github.com/DavidHDev/react-bits),
@@ -484,15 +517,29 @@ color_bends.frag`/`shaders/simple_gradient.frag` +
 интенсивности потребует передавать параметры динамически — тогда выносить
 в uniform'ы вместе с этой задачей, не заранее).
 
-**Осталось: Galaxy** — второй шейдер ещё не портирован (`shaders/galaxy.frag`
-не существует). Сложнее Color Bends (~300 строк, hash-based процедурная
-генерация звёзд, 4 слоя глубины для параллакса, мерцание через
-треугольную волну по времени), но pipeline (`ShaderBackground` + запись в
-`HomeBackground`/`ShadSelect`/`connection_screen.dart` switch) уже обкатан
-на двух предыдущих — портировать тем же способом, добавить вариант
-`HomeBackground.galaxy`.
+**Galaxy — сделано.** `shaders/galaxy.frag` — построчный порт fragment-
+шейдера react-bits `Galaxy.jsx` (получен через WebFetch с GitHub,
+исходник взят как есть, не по памяти): hash-based процедурная генерация
+звёзд (`Hash21`/`StarLayer`), 4 слоя глубины для параллакса (`NUM_LAYER`),
+HSV-сдвиг цвета (`hsv2rgb`, `HUE_SHIFT`), мерцание через треугольную волну
+(`trisn`/`TWINKLE_INTENSITY`). Упрощено тем же способом, что и Color
+Bends/Simple Gradient — настраиваемые uniform'ы оригинала
+(`density`/`hueShift`/`glowIntensity`/...) зафиксированы константами со
+значениями по умолчанию из react-bits; убрана mouse-интерактивность
+(repulsion, офсет фокуса под курсор — у `ShaderBackground` нет пайплайна
+для позиции мыши) и ручное вращение (`uRotation` оригинала) — оставлена
+только авто-ротация; всегда непрозрачный (`transparent: true` оригинала
+не имеет смысла для полноэкранного базового фона). `SPEED`/
+`ROTATION_SPEED`/`STAR_SPEED` дополнительно снижены против дефолтов
+react-bits (в ~3 раза) — на полноэкранном фоне оригинальная скорость
+ощущалась слишком суетливой (мерцание/параллакс-скролл звёзд бросались в
+глаза). Подключён тем же способом, что и два предыдущих: `pubspec.yaml`
+→ `shaders:`, `HomeBackground.galaxy`, опция в `ShadSelect`
+(`settings_dialog.dart`), ветка в `switch` (`connection_screen.dart`).
+Проверено вручную (`flutter run -d windows`) — компилируется без ошибок
+impellerc, рендерится корректно, скорость подтверждена пользователем.
 
 Не проверено: производительность/нагрев на слабом железе — фон рисуется
-каждый кадр на весь экран, стоит проверить, не роняет ли это FPS
-остального UI поверх (список серверов и т.п.) на реальном ноутбуке, не
-только на разработческой машине.
+каждый кадр на весь экран для всех трёх шейдеров, стоит проверить, не
+роняет ли это FPS остального UI поверх (список серверов и т.п.) на
+реальном ноутбуке, не только на разработческой машине.

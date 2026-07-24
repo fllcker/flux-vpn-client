@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../app/dialog_style.dart';
+import '../../app/windows_autostart.dart';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
 
@@ -67,6 +68,7 @@ class SettingsDialog extends ConsumerWidget {
                     value: HomeBackground.colorBends,
                     child: Text('Color Bends'),
                   ),
+                  ShadOption(value: HomeBackground.galaxy, child: Text('Galaxy')),
                 ],
                 selectedOptionBuilder: (context, value) =>
                     Text(_homeBackgroundLabel(value)),
@@ -126,6 +128,17 @@ class SettingsDialog extends ConsumerWidget {
               onChanged: (value) =>
                   notifier.update((s) => s.copyWith(autoGroupSubscriptions: value)),
             ),
+            const SizedBox(height: 20),
+            const _SectionLabel('Система'),
+            const SizedBox(height: 10),
+            ShadSwitch(
+              value: settings.autoStartOnBoot,
+              label: const Text('Запускать при старте Windows'),
+              onChanged: (value) {
+                setAutoStartOnBoot(value);
+                notifier.update((s) => s.copyWith(autoStartOnBoot: value));
+              },
+            ),
           ],
         ),
       ),
@@ -143,6 +156,7 @@ class SettingsDialog extends ConsumerWidget {
     HomeBackground.globe => 'Планета',
     HomeBackground.simpleGradient => 'Simple Gradient',
     HomeBackground.colorBends => 'Color Bends',
+    HomeBackground.galaxy => 'Galaxy',
   };
 
   String _pingModeLabel(PingMode mode) => switch (mode) {

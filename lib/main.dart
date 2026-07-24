@@ -11,6 +11,7 @@ import 'package:window_manager/window_manager.dart';
 import 'app/app_title_bar.dart';
 import 'app/deep_link.dart';
 import 'app/single_instance.dart';
+import 'app/tray.dart';
 import 'core_abstraction/app_settings.dart';
 import 'core_abstraction/app_settings_provider.dart';
 import 'features/connection/connection_screen.dart';
@@ -30,6 +31,10 @@ void main(List<String> args) async {
     exit(0);
   }
   final incomingDeepLinks = (instance as PrimaryInstance).incomingDeepLinks;
+  // Автозапуск при старте Windows передаёт этот флаг (см.
+  // `windows_autostart.dart`), чтобы не мозолить окном при входе в систему —
+  // окно остаётся скрытым, доступно через иконку в трее.
+  final startMinimized = args.contains('--minimized');
 
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
@@ -42,8 +47,15 @@ void main(List<String> args) async {
     titleBarStyle: TitleBarStyle.hidden,
   );
 
+  // Явный контейнер (вместо неявного из голого ProviderScope) — обработчики
+  // кликов по иконке трея (`tray.dart`) живут вне дерева виджетов и не
+  // могут получить WidgetRef, но могут читать/писать через этот же
+  // контейнер.
+  final container = ProviderContainer();
+
   runApp(
-    ProviderScope(
+    UncontrolledProviderScope(
+      container: container,
       child: FluxApp(
         navigatorKey: _navigatorKey,
         initialDeepLink: initialDeepLink,
@@ -52,8 +64,14 @@ void main(List<String> args) async {
     ),
   );
 
+  // Закрытие окна (крестик/Alt+F4) сворачивает в трей вместо выхода — сам
+  // перехват в `_FluxAppState.onWindowClose` (main.dart, WindowListener).
+  await windowManager.setPreventClose(true);
+  await FluxTray(container).init();
+
   windowManager.waitUntilReadyToShow(windowOptions, () async {
     await _warmUpOverlays();
+    if (startMinimized) return;
     await windowManager.show();
     await windowManager.focus();
   });
@@ -93,12 +111,13 @@ class FluxApp extends ConsumerStatefulWidget {
   ConsumerState<FluxApp> createState() => _FluxAppState();
 }
 
-class _FluxAppState extends ConsumerState<FluxApp> {
+class _FluxAppState extends ConsumerState<FluxApp> with WindowListener {
   StreamSubscription<String>? _deepLinkSub;
 
   @override
   void initState() {
     super.initState();
+    windowManager.addListener(this);
     _deepLinkSub = widget.incomingDeepLinks.listen(_handleIncomingDeepLink);
     if (widget.initialDeepLink case final link?) {
       WidgetsBinding.instance.addPostFrameCallback(
@@ -109,9 +128,17 @@ class _FluxAppState extends ConsumerState<FluxApp> {
 
   @override
   void dispose() {
+    windowManager.removeListener(this);
     _deepLinkSub?.cancel();
     super.dispose();
   }
+
+  // Срабатывает только когда `windowManager.setPreventClose(true)` (см.
+  // main.dart) — обычное закрытие ОС не завершает событийный цикл, вместо
+  // этого прилетает сюда. Полный выход — только через пункт "Выход" в трее
+  // (`tray.dart`), который сначала снимает preventClose.
+  @override
+  void onWindowClose() => windowManager.hide();
 
   Future<void> _handleIncomingDeepLink(String link) async {
     await windowManager.show();

@@ -2,9 +2,9 @@
 enum AppThemeMode { system, light, dark }
 
 /// Фон главного экрана подключения (за карточкой Off/Proxy/TUN).
-/// `simpleGradient`/`colorBends` — прототипы шейдерных фонов, см.
+/// `simpleGradient`/`colorBends`/`galaxy` — шейдерные фоны, см.
 /// ROADMAP.md, "Фон — шейдерные эффекты".
-enum HomeBackground { none, globe, simpleGradient, colorBends }
+enum HomeBackground { none, globe, simpleGradient, colorBends, galaxy }
 
 /// Способ проверки пинга сервера — как в Happ: через локальный
 /// прокси-порт xray (реальная задержка "как будет ощущаться"), напрямую по
@@ -23,6 +23,7 @@ class AppSettings {
   final String pingTestUrl;
   final bool pingAllOnStartup;
   final bool autoGroupSubscriptions;
+  final bool autoStartOnBoot;
 
   const AppSettings({
     this.themeMode = AppThemeMode.dark,
@@ -31,6 +32,7 @@ class AppSettings {
     this.pingTestUrl = _defaultPingTestUrl,
     this.pingAllOnStartup = false,
     this.autoGroupSubscriptions = true,
+    this.autoStartOnBoot = false,
   });
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -52,6 +54,7 @@ class AppSettings {
     pingTestUrl: json['pingTestUrl'] as String? ?? _defaultPingTestUrl,
     pingAllOnStartup: json['pingAllOnStartup'] as bool? ?? false,
     autoGroupSubscriptions: json['autoGroupSubscriptions'] as bool? ?? true,
+    autoStartOnBoot: json['autoStartOnBoot'] as bool? ?? false,
   );
 
   Map<String, dynamic> toJson() => {
@@ -61,6 +64,7 @@ class AppSettings {
     'pingTestUrl': pingTestUrl,
     'pingAllOnStartup': pingAllOnStartup,
     'autoGroupSubscriptions': autoGroupSubscriptions,
+    'autoStartOnBoot': autoStartOnBoot,
   };
 
   AppSettings copyWith({
@@ -70,6 +74,7 @@ class AppSettings {
     String? pingTestUrl,
     bool? pingAllOnStartup,
     bool? autoGroupSubscriptions,
+    bool? autoStartOnBoot,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -79,6 +84,7 @@ class AppSettings {
       pingAllOnStartup: pingAllOnStartup ?? this.pingAllOnStartup,
       autoGroupSubscriptions:
           autoGroupSubscriptions ?? this.autoGroupSubscriptions,
+      autoStartOnBoot: autoStartOnBoot ?? this.autoStartOnBoot,
     );
   }
 }

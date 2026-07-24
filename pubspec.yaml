@@ -67,6 +67,9 @@ dependencies:
   ffi: ^2.1.4
   google_fonts: ^8.2.0
 
+  # Иконка в системном трее + меню (см. ROADMAP.md, трек 7)
+  tray_manager: ^0.5.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -97,10 +100,12 @@ flutter:
   assets:
     - assets/globe/land_mask.png
     - assets/icon.png
+    - assets/tray_icon.ico
 
   shaders:
     - shaders/color_bends.frag
     - shaders/simple_gradient.frag
+    - shaders/galaxy.frag
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
