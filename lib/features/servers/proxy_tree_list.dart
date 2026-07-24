@@ -16,6 +16,10 @@ class ProxyTreeList extends ConsumerWidget {
   final String? selectedLeafId;
   final ValueChanged<String> onSelectLeaf;
   final void Function(String leafId, String variantId) onSelectVariant;
+  // Пункт "Скрыть" в контекстном меню строки — только для серверов внутри
+  // подписки (standalone-серверы скрытие не поддерживают, см. ROADMAP.md,
+  // трек 2).
+  final ValueChanged<String>? onHideLeaf;
 
   const ProxyTreeList({
     super.key,
@@ -24,6 +28,7 @@ class ProxyTreeList extends ConsumerWidget {
     required this.selectedLeafId,
     required this.onSelectLeaf,
     required this.onSelectVariant,
+    this.onHideLeaf,
   });
 
   @override
@@ -52,6 +57,7 @@ class ProxyTreeList extends ConsumerWidget {
                     selectedLeafId: selectedLeafId,
                     onSelectLeaf: onSelectLeaf,
                     onSelectVariant: onSelectVariant,
+                    onHideLeaf: onHideLeaf,
                   ),
               ],
             ),
@@ -67,6 +73,9 @@ class ProxyTreeList extends ConsumerWidget {
                     expanded: expanded.contains(leaf.id),
                     onSelect: () => onSelectLeaf(leaf.id),
                     onToggleExpand: () => toggle(leaf.id),
+                    onHide: onHideLeaf == null
+                        ? null
+                        : () => onHideLeaf!(leaf.id),
                   ),
                   if (leaf.variants.length > 1 && expanded.contains(leaf.id))
                     for (final variant in leaf.variants)

@@ -6,6 +6,7 @@ import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/subscription.dart';
 import 'flatten_leaves.dart';
 import 'right_panel_view.dart';
+import 'server_icon.dart';
 import 'subscription_import.dart';
 
 class SubscriptionInfoPanel extends ConsumerStatefulWidget {
@@ -89,7 +90,9 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
       );
     }
 
-    final serverCount = flattenLeaves([subscription.root]).length;
+    final allLeaves = flattenLeaves([subscription.root]);
+    final serverCount = allLeaves.length;
+    final hiddenLeaves = allLeaves.where((l) => l.hidden).toList();
 
     return Center(
       child: ConstrainedBox(
@@ -201,6 +204,40 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
                     subscription.copyWith(autoRefreshOnStartup: value),
                   ),
             ),
+            if (hiddenLeaves.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              Text(
+                'Скрытые серверы',
+                style: theme.textTheme.small.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.mutedForeground,
+                ),
+              ),
+              const SizedBox(height: 8),
+              for (final leaf in hiddenLeaves)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    children: [
+                      ServerIcon(icon: leaf.icon, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          leaf.name,
+                          style: theme.textTheme.small,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      ShadButton.ghost(
+                        onPressed: () => ref
+                            .read(coreConfigProvider.notifier)
+                            .setHidden(leaf.id, false),
+                        child: const Text('Вернуть'),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
             const SizedBox(height: 24),
             ShadButton.destructive(
               onPressed: () {

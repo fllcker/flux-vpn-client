@@ -14,6 +14,9 @@ class ServerRow extends StatefulWidget {
   final bool expanded;
   final VoidCallback onSelect;
   final VoidCallback onToggleExpand;
+  // Скрытие доступно только серверам внутри подписки, не standalone-нодам
+  // (см. ROADMAP.md, трек 2) — null здесь значит "не показывать пункт".
+  final VoidCallback? onHide;
 
   const ServerRow({
     super.key,
@@ -23,6 +26,7 @@ class ServerRow extends StatefulWidget {
     required this.expanded,
     required this.onSelect,
     required this.onToggleExpand,
+    this.onHide,
   });
 
   @override
@@ -36,13 +40,31 @@ class _ServerRowState extends State<ServerRow> {
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
-    final hasVariantChoice = widget.leaf.variants.length > 1;
 
     final background = widget.selected
         ? scheme.accent
         : _hovered
         ? scheme.accent.withValues(alpha: 0.5)
         : const Color(0x00000000);
+
+    final row = _buildRow(theme, scheme, background);
+    final onHide = widget.onHide;
+    if (onHide == null) return row;
+
+    return ShadContextMenuRegion(
+      items: [
+        ShadContextMenuItem(
+          leading: const Icon(LucideIcons.eyeOff, size: 14),
+          onPressed: onHide,
+          child: const Text('Скрыть'),
+        ),
+      ],
+      child: row,
+    );
+  }
+
+  Widget _buildRow(ShadThemeData theme, ShadColorScheme scheme, Color background) {
+    final hasVariantChoice = widget.leaf.variants.length > 1;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,

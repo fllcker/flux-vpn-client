@@ -177,6 +177,35 @@ ProxyNode replaceLeafSelection(ProxyNode node, String leafId, String variantId) 
   };
 }
 
+/// Ищет узел с [nodeId] в дереве и возвращает копию дерева с его
+/// [ProxyNode.hidden], заменённым на [hidden]. Остальные узлы возвращаются
+/// как есть. Скрывать можно и лист, и целую группу, но UI сейчас вызывает
+/// это только для листьев внутри подписки (см. ROADMAP.md, трек 2 —
+/// standalone-серверы скрытие не поддерживают).
+ProxyNode setNodeHidden(ProxyNode node, String nodeId, bool hidden) {
+  return switch (node) {
+    ServerLeaf leaf when leaf.id == nodeId => ServerLeaf(
+      id: leaf.id,
+      name: leaf.name,
+      icon: leaf.icon,
+      hidden: hidden,
+      variants: leaf.variants,
+      selection: leaf.selection,
+    ),
+    ServerLeaf leaf => leaf,
+    ServerGroup group => ServerGroup(
+      id: group.id,
+      name: group.name,
+      icon: group.icon,
+      hidden: group.id == nodeId ? hidden : group.hidden,
+      strategy: group.strategy,
+      children: group.children
+          .map((c) => setNodeHidden(c, nodeId, hidden))
+          .toList(),
+    ),
+  };
+}
+
 class ServerGroup extends ProxyNode {
   final List<ProxyNode> children; // порядок = порядок списка
   final GroupStrategy strategy;

@@ -87,6 +87,22 @@ class CoreConfigController extends Notifier<CoreConfig> {
     );
   }
 
+  /// Скрывает/возвращает узел с [nodeId] — только внутри подписок
+  /// (`standaloneNodes` не трогаем, они скрытие не поддерживают, см.
+  /// ROADMAP.md, трек 2).
+  void setHidden(String nodeId, bool hidden) {
+    _update(
+      (config) => CoreConfig(
+        schemaVersion: config.schemaVersion,
+        subscriptions: config.subscriptions
+            .map((s) => s.copyWith(root: setNodeHidden(s.root, nodeId, hidden)))
+            .toList(),
+        standaloneNodes: config.standaloneNodes,
+        routingRules: config.routingRules,
+      ),
+    );
+  }
+
   void _update(CoreConfig Function(CoreConfig config) transform) {
     state = transform(state);
     profileStorage.save(state);

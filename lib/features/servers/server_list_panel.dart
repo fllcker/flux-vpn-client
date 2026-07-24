@@ -4,6 +4,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
+import 'filter_hidden_nodes.dart';
 import 'flatten_leaves.dart';
 import 'import_subscription_sheet.dart';
 import 'proxy_tree_list.dart';
@@ -36,6 +37,10 @@ class ServerListPanel extends ConsumerWidget {
       ref.read(coreConfigProvider.notifier).selectVariant(leafId, variantId);
       ref.read(selectedServerIdProvider.notifier).select(leafId);
       ref.read(rightPanelViewProvider.notifier).showConnect();
+    }
+
+    void onHideLeaf(String leafId) {
+      ref.read(coreConfigProvider.notifier).setHidden(leafId, true);
     }
 
     return Container(
@@ -87,13 +92,14 @@ class ServerListPanel extends ConsumerWidget {
                               .showSubscription(subscription.id),
                         ),
                         ProxyTreeList(
-                          nodes: switch (subscription.root) {
+                          nodes: filterHiddenList(switch (subscription.root) {
                             ServerGroup(:final children) => children,
                             final leaf => [leaf],
-                          },
+                          }),
                           selectedLeafId: selectedId,
                           onSelectLeaf: onSelectLeaf,
                           onSelectVariant: onSelectVariant,
+                          onHideLeaf: onHideLeaf,
                         ),
                       ],
                     ],

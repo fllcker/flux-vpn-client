@@ -123,34 +123,19 @@ Salamander опциональна — `obfsPassword == null` значит без
 
 ---
 
-## 2. Скрытие серверов
+## 2. Скрытие серверов — сделано
 
-Правила (уточнено):
-
-- Скрывать можно **только серверы внутри подписки** — standalone-серверы
-  (добавленные напрямую по `vless://`/`hysteria2://` ссылке, не через
-  подписку) скрытие не поддерживают, пункт меню на них не показываем.
-- Если после скрытия в группе **не осталось видимых детей** — сама группа
-  тоже не показывается в дереве (пустая группа бесполезна и путает).
-
-Шаги:
-
-1. `server_row.dart` — `onSecondaryTapDown` (правый клик) → меню с пунктом
-   "Скрыть", видимым только если сервер лежит внутри `subscription.root`, а
-   не в `standaloneNodes` (контекст — откуда сервер, нужно прокинуть из
-   `proxy_tree_list.dart`, которая уже итерирует эти два источника раздельно).
-   В shadcn_ui готового контекстного меню может не быть — проверить при
-   реализации, при необходимости свой overlay через `ShadPopover`.
-2. `core_config_provider.dart` — новый метод `setHidden(nodeId, bool)`,
-   рекурсивный обход **только** `subscriptions[].root` (не
-   `standaloneNodes` — они не скрываемы), аналогично `selectVariant`.
-3. Новая чистая функция `filter_hidden_nodes.dart`: `ProxyNode? filterHidden(ProxyNode node)`
-   — возвращает `null`, если лист скрыт, либо группа целиком опустела после
-   рекурсивной фильтрации детей; иначе — узел с отфильтрованными `children`.
-   Применяется в `proxy_tree_list.dart` перед рендером основного дерева.
-4. `subscription_info_panel.dart` — секция "Скрытые серверы" (плоский список
-   `hidden == true` листьев внутри `subscription.root`, `flatten_leaves.dart`
-   с фильтром) с кнопкой "Вернуть" на каждом → `setHidden(id, false)`.
+`ShadContextMenuRegion`/`ShadContextMenuItem` (в shadcn_ui готовые) на
+`server_row.dart` — правый клик даёт пункт "Скрыть", виден только если
+`ProxyTreeList.onHideLeaf` передан (стандалон-деревья строятся без этого
+колбэка, так что там пункта нет). `proxy_node.dart` → `setNodeHidden`
+(рекурсивный, аналогично `replaceLeafSelection`), `core_config_provider.dart`
+→ `setHidden(nodeId, hidden)` — трогает только `subscriptions[].root`.
+`filter_hidden_nodes.dart` → `filterHidden`/`filterHiddenList` — пустая
+группа после фильтрации тоже пропадает. `server_list_panel.dart` фильтрует
+список перед рендером дерева подписки. `subscription_info_panel.dart` —
+секция "Скрытые серверы" с кнопкой "Вернуть". Тесты —
+`filter_hidden_nodes_test.dart`, `core_abstraction/proxy_node_test.dart`.
 
 ---
 
