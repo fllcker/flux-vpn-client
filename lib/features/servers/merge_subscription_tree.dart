@@ -1,5 +1,4 @@
 import '../../core_abstraction/proxy_node.dart';
-import '../../core_abstraction/server_config.dart';
 
 /// Сопоставляет листья только что скачанного дерева подписки ([newRoot]) со
 /// старым деревом ([oldRoot], тем, что было в [Subscription.root] до
@@ -86,7 +85,7 @@ ConnectionVariant? _withMatchedId(
 ) {
   for (final old in oldVariants) {
     if (old.label == variant.label &&
-        _address(old.config) == _address(variant.config)) {
+        old.config.address == variant.config.address) {
       return ConnectionVariant(
         id: old.id,
         label: variant.label,
@@ -99,9 +98,5 @@ ConnectionVariant? _withMatchedId(
 
 String? _primaryAddress(ServerLeaf leaf) {
   if (leaf.variants.isEmpty) return null;
-  return _address(leaf.variants.first.config);
+  return leaf.variants.first.config.address;
 }
-
-String _address(ServerConfig config) => switch (config) {
-  VlessConfig config => config.address,
-};

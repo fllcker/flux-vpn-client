@@ -106,59 +106,20 @@
 
 ---
 
-## 1. Hysteria2
+## 1. Hysteria2 — сделано
 
-Сейчас `hysteria`/`hysteria2` явно дропается при импорте
-(`xray_subscription_parser.dart:34-43`), ссылок `hysteria2://` парсер не
-понимает вообще.
-
-Актуальная схема xray-core (протокол называется `hysteria`, не `hysteria2`,
-обязателен `version: 2` в двух местах). Обфускация (Salamander) —
-**опциональна**, не у всех серверов есть:
-
-```json
-{
-  "protocol": "hysteria",
-  "settings": { "version": 2, "address": "example.com", "port": 443 },
-  "streamSettings": {
-    "network": "hysteria",
-    "security": "tls",
-    "tlsSettings": { "serverName": "example.com" },
-    "hysteriaSettings": {
-      "version": 2,
-      "auth": "<password>",
-      "udpIdleTimeout": 120,
-      "obfs": { "type": "salamander", "password": "<obfs-password>" }
-    }
-  }
-}
-```
-
-Шаги:
-
-1. `server_config.dart` — новый `Hysteria2Config extends ServerConfig`:
-   address, port, auth/password, sni, insecure, и **опциональные**
-   `obfsPassword` (null = без обфускации, непустая строка = salamander) +
-   ветка в `ServerConfig.fromJson` (`protocol == 'hysteria2'` в Magic
-   JSON — своё имя, не обязано совпадать с xray-шным `hysteria`).
-2. Новый `hysteria2_link_parser.dart` —
-   `hysteria2://auth@host:port/?insecure=1&obfs=salamander&obfs-password=...&sni=...#name`,
-   алиас схемы `hy2://`. `obfs`/`obfs-password` читаются, только если оба
-   параметра присутствуют — иначе обфускация не включается.
-3. `xray_subscription_parser.dart` — убрать hard-drop, добавить ветку
-   `protocol == 'hysteria'` → `Hysteria2Config`, `hysteriaSettings.obfs`
-   читается только если объект присутствует.
-4. `base64_subscription_parser.dart` — диспатч на `hysteria2://`/`hy2://`
-   рядом с `vless://`.
-5. `subscription_import.dart` `importLink` — принять `hysteria2://`/`hy2://`
-   как единичную ссылку (сейчас хардкод на `vless://`).
-6. `xray_config_mapper.dart` — обобщить `_vlessOutbound` в диспетчер по типу
-   `ServerConfig` (`switch (config) { VlessConfig => ..., Hysteria2Config => ... }`),
-   `hysteriaSettings.obfs` добавляется в конфиг только если задан.
-7. `xray_engine_windows.dart` `_firstVlessServer` — обобщить под любой
-   `ServerConfig`, не только `VlessConfig`.
-8. `import_to_proxy_nodes.dart` `_variantLabel` — сейчас принимает только
-   `VlessConfig`, нужен общий `switch`.
+`Hysteria2Config` в `server_config.dart` (Magic JSON называет протокол
+`hysteria2`, xray-core — `hysteria` с `version: 2` в двух местах, обфускация
+Salamander опциональна — `obfsPassword == null` значит без неё).
+`hysteria2_link_parser.dart` разбирает `hysteria2://auth@host:port/?...`
+(алиас `hy2://`). Ветки добавлены во всех точках диспетчеризации по
+протоколу: `xray_subscription_parser.dart` (xray-json подписка),
+`base64_subscription_parser.dart` (построчная подписка), `subscription_import.dart`
+`importLink` (одиночная ссылка) и `clipboard_import_hotkey.dart` (Ctrl+V).
+`xray_config_mapper.dart`/`xray_engine_windows.dart`/`import_to_proxy_nodes.dart`
+обобщены под `ServerConfig` вместо жёсткого `VlessConfig`. Тесты —
+`hysteria2_link_parser_test.dart`, плюс hysteria-сервер добавлен в
+`xray_subscription_parser_test.dart`.
 
 ---
 

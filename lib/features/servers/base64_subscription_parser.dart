@@ -1,12 +1,13 @@
 import 'dart:convert';
 
+import 'hysteria2_link_parser.dart';
 import 'import_result.dart';
 import 'vless_link_parser.dart';
 
-/// Разбирает тело base64-подписки (список ссылок вида `vless://...`, по
-/// одной на строку, целиком закодированный в base64/base64url) в
-/// [SubscriptionImportResult]. Поддерживается только `vless://` — остальные
-/// схемы (`ss://`, `trojan://`, ...) попадают в `skipped`.
+/// Разбирает тело base64-подписки (список ссылок вида `vless://...`/
+/// `hysteria2://...`, по одной на строку, целиком закодированный в
+/// base64/base64url) в [SubscriptionImportResult]. Остальные схемы
+/// (`ss://`, `trojan://`, ...) попадают в `skipped`.
 SubscriptionImportResult parseBase64Subscription(String body) {
   final decoded = _decodeBody(body);
   final lines = decoded
@@ -18,23 +19,33 @@ SubscriptionImportResult parseBase64Subscription(String body) {
   final skipped = <ImportSkipped>[];
 
   for (final line in lines) {
-    if (!line.startsWith('vless://')) {
-      final scheme = line.contains('://') ? line.split('://').first : line;
-      skipped.add(
-        ImportSkipped(
-          label: scheme,
-          reason: 'Протокол $scheme:// пока не поддерживается',
-        ),
-      );
+    if (line.startsWith('vless://')) {
+      try {
+        final parsed = parseVlessLink(line);
+        servers.add(ImportedServer(name: parsed.name, config: parsed.config));
+      } on VlessLinkFormatException catch (e) {
+        skipped.add(ImportSkipped(label: line, reason: e.message));
+      }
       continue;
     }
 
-    try {
-      final parsed = parseVlessLink(line);
-      servers.add(ImportedServer(name: parsed.name, config: parsed.config));
-    } on VlessLinkFormatException catch (e) {
-      skipped.add(ImportSkipped(label: line, reason: e.message));
+    if (line.startsWith('hysteria2://') || line.startsWith('hy2://')) {
+      try {
+        final parsed = parseHysteria2Link(line);
+        servers.add(ImportedServer(name: parsed.name, config: parsed.config));
+      } on Hysteria2LinkFormatException catch (e) {
+        skipped.add(ImportSkipped(label: line, reason: e.message));
+      }
+      continue;
     }
+
+    final scheme = line.contains('://') ? line.split('://').first : line;
+    skipped.add(
+      ImportSkipped(
+        label: scheme,
+        reason: 'Протокол $scheme:// пока не поддерживается',
+      ),
+    );
   }
 
   return SubscriptionImportResult(servers: servers, skipped: skipped);

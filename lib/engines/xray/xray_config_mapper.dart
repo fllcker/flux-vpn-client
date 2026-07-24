@@ -11,7 +11,7 @@ const tunInterfaceName = 'flux0';
 /// ProxyNode/роутинга появится вместе с поддержкой групп и правил
 /// маршрутизации — см. PLAN.md, "Единый формат конфига".
 Map<String, dynamic> buildXrayConfig(
-  VlessConfig server, {
+  ServerConfig server, {
   required int socksPort,
   required int httpPort,
 }) {
@@ -30,7 +30,7 @@ Map<String, dynamic> buildXrayConfig(
         'protocol': 'http',
       },
     ],
-    'outbounds': [_vlessOutbound(server), _directOutbound],
+    'outbounds': [_outbound(server), _directOutbound],
   };
 }
 
@@ -49,7 +49,7 @@ Map<String, dynamic> buildXrayConfig(
 /// хотя приложение считает себя подключённым (см. PLAN.md баг про утечку
 /// в TUN-режиме). Лучше "закрыть" IPv6 в туннель и уронить такие
 /// соединения, чем молча слить их в обход VPN.
-Map<String, dynamic> buildXrayTunConfig(VlessConfig server) {
+Map<String, dynamic> buildXrayTunConfig(ServerConfig server) {
   return {
     'log': {'loglevel': 'warning'},
     'inbounds': [
@@ -67,11 +67,16 @@ Map<String, dynamic> buildXrayTunConfig(VlessConfig server) {
         },
       },
     ],
-    'outbounds': [_vlessOutbound(server), _directOutbound],
+    'outbounds': [_outbound(server), _directOutbound],
   };
 }
 
 const _directOutbound = {'protocol': 'freedom', 'tag': 'direct'};
+
+Map<String, dynamic> _outbound(ServerConfig server) => switch (server) {
+  VlessConfig server => _vlessOutbound(server),
+  Hysteria2Config server => _hysteria2Outbound(server),
+};
 
 Map<String, dynamic> _vlessOutbound(VlessConfig server) => {
   'protocol': 'vless',
@@ -130,3 +135,31 @@ Map<String, dynamic> _streamSettings(VlessConfig server) {
 
   return settings;
 }
+
+/// xray-core называет протокол `hysteria` (не `hysteria2`), `version: 2`
+/// обязателен и в `settings`, и в `hysteriaSettings` — так xray-core
+/// различает Hysteria v1/v2. `obfs` добавляется только если у сервера задан
+/// пароль обфускации (Salamander опциональна, см. `Hysteria2Config`).
+Map<String, dynamic> _hysteria2Outbound(Hysteria2Config server) => {
+  'protocol': 'hysteria',
+  'settings': {
+    'version': 2,
+    'address': server.address,
+    'port': server.port,
+  },
+  'streamSettings': {
+    'network': 'hysteria',
+    'security': 'tls',
+    'tlsSettings': {
+      'serverName': server.sni ?? server.address,
+      if (server.insecure) 'allowInsecure': true,
+    },
+    'hysteriaSettings': {
+      'version': 2,
+      'auth': server.auth,
+      'udpIdleTimeout': 120,
+      if (server.obfsPassword != null)
+        'obfs': {'type': 'salamander', 'password': server.obfsPassword},
+    },
+  },
+};

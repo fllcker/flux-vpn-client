@@ -23,15 +23,15 @@ void main() {
 
     final germany = result.servers[0];
     expect(germany.name, 'Germany #1');
-    final germanyConfig = germany.config;
+    final germanyConfig = germany.config as VlessConfig;
     expect(germanyConfig.address, 'de1.example.com');
     expect(germanyConfig.security, VlessSecurity.reality);
     expect(germanyConfig.publicKey, 'pbk');
 
-    final poland = result.servers[1];
-    expect(poland.config.network, VlessNetwork.xhttp);
-    expect(poland.config.xhttpPath, '/api');
-    expect(poland.config.xhttpHost, 'cdn.example.com');
+    final poland = result.servers[1].config as VlessConfig;
+    expect(poland.network, VlessNetwork.xhttp);
+    expect(poland.xhttpPath, '/api');
+    expect(poland.xhttpHost, 'cdn.example.com');
   });
 
   test('falls back to plain text when body is not valid base64', () {

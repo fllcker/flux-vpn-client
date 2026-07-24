@@ -47,7 +47,13 @@ final _variantSuffix = RegExp(r'\s*\([^)]*\)\s*$');
 
 String _stripVariantSuffix(String name) => name.replaceFirst(_variantSuffix, '');
 
-String _variantLabel(VlessConfig config) {
+String _variantLabel(ServerConfig config) => switch (config) {
+  VlessConfig config => _vlessVariantLabel(config),
+  Hysteria2Config config =>
+    config.obfsPassword == null ? 'Hysteria2' : 'Hysteria2 Obfs',
+};
+
+String _vlessVariantLabel(VlessConfig config) {
   final network = switch (config.network) {
     VlessNetwork.tcp => 'TCP',
     VlessNetwork.xhttp => 'XHTTP',

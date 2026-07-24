@@ -62,10 +62,10 @@ class XrayEngineWindows implements CoreEngine {
       );
     }
 
-    final server = _firstVlessServer(config);
+    final server = _firstServerConfig(config);
     if (server == null) {
       _statusController.add(EngineStatus.error);
-      throw StateError('CoreConfig has no VLESS server to connect to');
+      throw StateError('CoreConfig has no server to connect to');
     }
 
     final xrayConfig = switch (mode) {
@@ -123,16 +123,15 @@ class XrayEngineWindows implements CoreEngine {
     return const EngineStats(uploadBytes: 0, downloadBytes: 0);
   }
 
-  VlessConfig? _firstVlessServer(CoreConfig config) {
+  ServerConfig? _firstServerConfig(CoreConfig config) {
     final roots = [
       ...config.standaloneNodes,
       ...config.subscriptions.map((s) => s.root),
     ];
     for (final root in roots) {
       final leaf = _firstLeaf(root);
-      if (leaf?.activeVariant?.config case final VlessConfig vless) {
-        return vless;
-      }
+      final config = leaf?.activeVariant?.config;
+      if (config != null) return config;
     }
     return null;
   }

@@ -72,6 +72,8 @@ class _ClipboardImportHotkeyState
 
     final looksLikeLink =
         text.startsWith('vless://') ||
+        text.startsWith('hysteria2://') ||
+        text.startsWith('hy2://') ||
         text.startsWith('http://') ||
         text.startsWith('https://');
     if (!looksLikeLink) return;

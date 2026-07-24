@@ -32,7 +32,7 @@ SubscriptionImportResult parseXraySubscription(String rawJson) {
     }
 
     final protocol = proxyOutbound['protocol'] as String?;
-    if (protocol != 'vless') {
+    if (protocol != 'vless' && protocol != 'hysteria') {
       skipped.add(
         ImportSkipped(
           label: name,
@@ -43,9 +43,10 @@ SubscriptionImportResult parseXraySubscription(String rawJson) {
     }
 
     try {
-      servers.add(
-        ImportedServer(name: name, config: _parseVlessOutbound(proxyOutbound)),
-      );
+      final config = protocol == 'vless'
+          ? _parseVlessOutbound(proxyOutbound)
+          : _parseHysteriaOutbound(proxyOutbound);
+      servers.add(ImportedServer(name: name, config: config));
     } on FormatException catch (e) {
       skipped.add(ImportSkipped(label: name, reason: e.message));
     }
@@ -96,6 +97,25 @@ VlessConfig _parseVlessOutbound(Map<String, dynamic> outbound) {
             as String?,
     xhttpPath: xhttpSettings?['path'] as String?,
     xhttpHost: xhttpSettings?['host'] as String?,
+  );
+}
+
+Hysteria2Config _parseHysteriaOutbound(Map<String, dynamic> outbound) {
+  final settings = outbound['settings'] as Map<String, dynamic>;
+  final streamSettings =
+      outbound['streamSettings'] as Map<String, dynamic>? ?? const {};
+  final tlsSettings = streamSettings['tlsSettings'] as Map<String, dynamic>?;
+  final hysteriaSettings =
+      streamSettings['hysteriaSettings'] as Map<String, dynamic>? ?? const {};
+  final obfs = hysteriaSettings['obfs'] as Map<String, dynamic>?;
+
+  return Hysteria2Config(
+    address: settings['address'] as String,
+    port: settings['port'] as int,
+    auth: hysteriaSettings['auth'] as String,
+    sni: tlsSettings?['serverName'] as String?,
+    insecure: tlsSettings?['allowInsecure'] as bool? ?? false,
+    obfsPassword: obfs?['password'] as String?,
   );
 }
 

@@ -2,13 +2,13 @@ import '../../core_abstraction/server_config.dart';
 
 class ImportedServer {
   final String name;
-  final VlessConfig config;
+  final ServerConfig config;
 
   const ImportedServer({required this.name, required this.config});
 }
 
 /// Запись подписки, которую не удалось привести к Magic JSON — например,
-/// неподдерживаемый протокол (пока поддерживается только VLESS).
+/// протокол, который парсер ещё не понимает (сейчас VLESS и Hysteria2).
 class ImportSkipped {
   final String label;
   final String reason;

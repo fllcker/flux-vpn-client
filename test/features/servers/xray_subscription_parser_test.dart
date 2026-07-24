@@ -71,9 +71,29 @@ const _sampleXrayArray = '''
     ]
   },
   {
-    "remarks": "Unsupported hysteria",
+    "remarks": "Sweden hysteria2",
     "outbounds": [
-      {"tag": "proxy", "protocol": "hysteria", "settings": {}, "streamSettings": {}},
+      {
+        "tag": "proxy",
+        "protocol": "hysteria",
+        "settings": {"address": "se1.example.com", "port": 443},
+        "streamSettings": {
+          "security": "tls",
+          "tlsSettings": {"serverName": "se1.example.com", "allowInsecure": true},
+          "hysteriaSettings": {
+            "version": 2,
+            "auth": "hy2-password",
+            "obfs": {"type": "salamander", "password": "obfs-password"}
+          }
+        }
+      },
+      {"tag": "direct", "protocol": "freedom"}
+    ]
+  },
+  {
+    "remarks": "Unsupported shadowsocks",
+    "outbounds": [
+      {"tag": "proxy", "protocol": "shadowsocks", "settings": {}, "streamSettings": {}},
       {"tag": "direct", "protocol": "freedom"}
     ]
   }
@@ -84,20 +104,28 @@ void main() {
   test('parses a real-world-shaped xray-json subscription array', () {
     final result = parseXraySubscription(_sampleXrayArray);
 
-    expect(result.servers, hasLength(2));
+    expect(result.servers, hasLength(3));
     expect(result.skipped, hasLength(1));
-    expect(result.skipped.single.label, 'Unsupported hysteria');
+    expect(result.skipped.single.label, 'Unsupported shadowsocks');
 
-    final germany = result.servers[0];
-    expect(germany.name, 'Germany #1');
-    expect(germany.config.address, 'de1.example.com');
-    expect(germany.config.security, VlessSecurity.reality);
-    expect(germany.config.flow, 'xtls-rprx-vision');
+    final germany = result.servers[0].config as VlessConfig;
+    expect(result.servers[0].name, 'Germany #1');
+    expect(germany.address, 'de1.example.com');
+    expect(germany.security, VlessSecurity.reality);
+    expect(germany.flow, 'xtls-rprx-vision');
 
-    final poland = result.servers[1];
-    expect(poland.config.network, VlessNetwork.xhttp);
-    expect(poland.config.xhttpPath, '/api');
-    expect(poland.config.xhttpHost, 'cdn.example.com');
+    final poland = result.servers[1].config as VlessConfig;
+    expect(poland.network, VlessNetwork.xhttp);
+    expect(poland.xhttpPath, '/api');
+    expect(poland.xhttpHost, 'cdn.example.com');
+
+    final sweden = result.servers[2].config as Hysteria2Config;
+    expect(result.servers[2].name, 'Sweden hysteria2');
+    expect(sweden.address, 'se1.example.com');
+    expect(sweden.auth, 'hy2-password');
+    expect(sweden.sni, 'se1.example.com');
+    expect(sweden.insecure, isTrue);
+    expect(sweden.obfsPassword, 'obfs-password');
   });
 
   test('parses a single xray-json config object (not wrapped in an array)', () {

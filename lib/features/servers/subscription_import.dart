@@ -7,6 +7,7 @@ import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/subscription.dart';
 import 'base64_subscription_parser.dart';
 import 'group_leaves_by_name.dart';
+import 'hysteria2_link_parser.dart';
 import 'import_result.dart';
 import 'import_to_proxy_nodes.dart';
 import 'merge_subscription_tree.dart';
@@ -40,8 +41,8 @@ class LinkImportFailure extends LinkImportResult {
 }
 
 /// Разбирает то, что пользователь вставил в поле "Добавить сервер" — как
-/// делают остальные клиенты, это всегда ссылка: либо `vless://...`, либо
-/// http(s):// адрес подписки.
+/// делают остальные клиенты, это всегда ссылка: либо `vless://...`/
+/// `hysteria2://...`(`hy2://`), либо http(s):// адрес подписки.
 Future<LinkImportResult> importLink(
   String rawInput, {
   bool autoGroup = true,
@@ -60,9 +61,21 @@ Future<LinkImportResult> importLink(
     }
   }
 
+  if (link.startsWith('hysteria2://') || link.startsWith('hy2://')) {
+    try {
+      final parsed = parseHysteria2Link(link);
+      final leaves = importedServersToLeaves([
+        ImportedServer(name: parsed.name, config: parsed.config),
+      ]);
+      return SingleServerImportResult(leaves.single);
+    } on Hysteria2LinkFormatException catch (e) {
+      return LinkImportFailure(e.message);
+    }
+  }
+
   if (!link.startsWith('http://') && !link.startsWith('https://')) {
     return const LinkImportFailure(
-      'Ожидается ссылка: vless://... или http(s)://ссылка-на-подписку',
+      'Ожидается ссылка: vless://.../hysteria2://... или http(s)://ссылка-на-подписку',
     );
   }
 
