@@ -49,6 +49,22 @@ class CoreConfigController extends Notifier<CoreConfig> {
     );
   }
 
+  /// Заменяет подписку с тем же [Subscription.id] целиком — используется и
+  /// для рефреша (новое дерево серверов/трафик/срок с сервера), и для смены
+  /// url/настроек в UI страницы подписки.
+  void updateSubscription(Subscription updated) {
+    _update(
+      (config) => CoreConfig(
+        schemaVersion: config.schemaVersion,
+        subscriptions: config.subscriptions
+            .map((s) => s.id == updated.id ? updated : s)
+            .toList(),
+        standaloneNodes: config.standaloneNodes,
+        routingRules: config.routingRules,
+      ),
+    );
+  }
+
   /// Выбирает [variantId] как активный вариант подключения для листа
   /// [leafId] — где бы он ни лежал в дереве (standalone или внутри
   /// подписки).
@@ -58,15 +74,7 @@ class CoreConfigController extends Notifier<CoreConfig> {
         schemaVersion: config.schemaVersion,
         subscriptions: config.subscriptions
             .map(
-              (s) => Subscription(
-                id: s.id,
-                name: s.name,
-                url: s.url,
-                pictureUrl: s.pictureUrl,
-                annotation: s.annotation,
-                traffic: s.traffic,
-                expiresAt: s.expiresAt,
-                lastRefreshedAt: s.lastRefreshedAt,
+              (s) => s.copyWith(
                 root: replaceLeafSelection(s.root, leafId, variantId),
               ),
             )

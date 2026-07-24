@@ -25,7 +25,7 @@ class OffProxyTunSelector extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: theme.colorScheme.muted,
+        color: theme.colorScheme.muted.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(

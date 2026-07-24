@@ -28,6 +28,7 @@ class Subscription {
   final TrafficInfo? traffic;
   final DateTime? expiresAt;
   final DateTime? lastRefreshedAt;
+  final bool autoRefreshOnStartup;
   final ProxyNode root;
 
   const Subscription({
@@ -39,6 +40,7 @@ class Subscription {
     this.traffic,
     this.expiresAt,
     this.lastRefreshedAt,
+    this.autoRefreshOnStartup = false,
     required this.root,
   });
 
@@ -58,6 +60,7 @@ class Subscription {
       lastRefreshedAt: json['lastRefreshedAt'] == null
           ? null
           : DateTime.parse(json['lastRefreshedAt'] as String),
+      autoRefreshOnStartup: json['autoRefreshOnStartup'] as bool? ?? false,
       root: ProxyNode.fromJson(json['root'] as Map<String, dynamic>),
     );
   }
@@ -72,6 +75,32 @@ class Subscription {
     if (expiresAt != null) 'expiresAt': expiresAt!.toIso8601String(),
     if (lastRefreshedAt != null)
       'lastRefreshedAt': lastRefreshedAt!.toIso8601String(),
+    if (autoRefreshOnStartup) 'autoRefreshOnStartup': autoRefreshOnStartup,
     'root': root.toJson(),
   };
+
+  Subscription copyWith({
+    String? name,
+    String? url,
+    String? pictureUrl,
+    String? annotation,
+    TrafficInfo? traffic,
+    DateTime? expiresAt,
+    DateTime? lastRefreshedAt,
+    bool? autoRefreshOnStartup,
+    ProxyNode? root,
+  }) {
+    return Subscription(
+      id: id,
+      name: name ?? this.name,
+      url: url ?? this.url,
+      pictureUrl: pictureUrl ?? this.pictureUrl,
+      annotation: annotation ?? this.annotation,
+      traffic: traffic ?? this.traffic,
+      expiresAt: expiresAt ?? this.expiresAt,
+      lastRefreshedAt: lastRefreshedAt ?? this.lastRefreshedAt,
+      autoRefreshOnStartup: autoRefreshOnStartup ?? this.autoRefreshOnStartup,
+      root: root ?? this.root,
+    );
+  }
 }

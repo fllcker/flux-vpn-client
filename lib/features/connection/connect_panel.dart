@@ -48,29 +48,62 @@ class ConnectPanel extends ConsumerWidget {
       _ => ConnectSelection.off,
     };
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 340),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ServerIcon(icon: selectedLeaf.icon, size: 64),
-            const SizedBox(height: 12),
-            Text(selectedLeaf.name, style: theme.textTheme.h4),
-            const SizedBox(height: 4),
-            _StatusText(state: connectionState),
-            const SizedBox(height: 24),
-            OffProxyTunSelector(
-              value: selection,
-              busy: busy,
-              onChanged: (selection) => _onSelectionChanged(
-                context,
-                ref,
-                selectedLeaf,
-                selection,
-              ),
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 56),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340),
+          child: IntrinsicWidth(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.muted.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      ServerIcon(icon: selectedLeaf.icon, size: 32),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              selectedLeaf.name,
+                              style: theme.textTheme.large,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 1),
+                            _StatusText(state: connectionState),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OffProxyTunSelector(
+                  value: selection,
+                  busy: busy,
+                  onChanged: (selection) => _onSelectionChanged(
+                    context,
+                    ref,
+                    selectedLeaf,
+                    selection,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

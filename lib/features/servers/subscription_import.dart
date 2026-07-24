@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
@@ -61,8 +63,9 @@ Future<LinkImportResult> importLink(String rawInput) async {
   }
 
   final String body;
+  final http.Response response;
   try {
-    final response = await http.get(Uri.parse(link));
+    response = await http.get(Uri.parse(link));
     if (response.statusCode != 200) {
       return LinkImportFailure(
         'Не удалось скачать подписку: HTTP ${response.statusCode}',
@@ -86,11 +89,16 @@ Future<LinkImportResult> importLink(String rawInput) async {
 
   final leaves = importedServersToLeaves(parsed.servers);
   final name = Uri.tryParse(link)?.host ?? 'Подписка';
+  final userinfo = _parseSubscriptionUserinfo(response.headers);
+  final announce = _parseAnnounce(response.headers);
 
   final subscription = Subscription(
     id: _uuid.v4(),
     name: name,
     url: link,
+    annotation: announce,
+    traffic: userinfo?.traffic,
+    expiresAt: userinfo?.expiresAt,
     lastRefreshedAt: DateTime.now(),
     root: ServerGroup(
       id: _uuid.v4(),
@@ -100,6 +108,85 @@ Future<LinkImportResult> importLink(String rawInput) async {
   );
 
   return SubscriptionImportResultOk(subscription, parsed.skipped);
+}
+
+/// Перекачивает [subscription.url] заново и возвращает обновлённую
+/// подписку с тем же [Subscription.id] (и настройками вроде
+/// [Subscription.autoRefreshOnStartup]) — используется и кнопкой "Обновить"
+/// на странице подписки, и автообновлением при запуске.
+Future<LinkImportResult> refreshSubscription(Subscription subscription) async {
+  final result = await importLink(subscription.url);
+  if (result is! SubscriptionImportResultOk) return result;
+
+  final fetched = result.subscription;
+  final merged = Subscription(
+    id: subscription.id,
+    name: fetched.name,
+    url: fetched.url,
+    pictureUrl: fetched.pictureUrl,
+    annotation: fetched.annotation,
+    traffic: fetched.traffic,
+    expiresAt: fetched.expiresAt,
+    lastRefreshedAt: fetched.lastRefreshedAt,
+    autoRefreshOnStartup: subscription.autoRefreshOnStartup,
+    root: fetched.root,
+  );
+  return SubscriptionImportResultOk(merged, result.skipped);
+}
+
+class _SubscriptionUserinfo {
+  final TrafficInfo traffic;
+  final DateTime? expiresAt;
+  const _SubscriptionUserinfo(this.traffic, this.expiresAt);
+}
+
+/// Де-факто стандартный заголовок панелей подписок (3x-ui, Marzban и т.п.):
+/// `Subscription-Userinfo: upload=123; download=456; total=789; expire=169...`
+/// `expire` — unix-время в секундах (0 или отсутствует — без срока).
+_SubscriptionUserinfo? _parseSubscriptionUserinfo(
+  Map<String, String> headers,
+) {
+  final header = headers['subscription-userinfo'];
+  if (header == null) return null;
+
+  final fields = <String, int>{};
+  for (final part in header.split(';')) {
+    final kv = part.trim().split('=');
+    if (kv.length != 2) continue;
+    final value = int.tryParse(kv[1].trim());
+    if (value != null) fields[kv[0].trim().toLowerCase()] = value;
+  }
+
+  final upload = fields['upload'] ?? 0;
+  final download = fields['download'] ?? 0;
+  final total = fields['total'];
+  if (total == null) return null;
+
+  final expire = fields['expire'];
+  final expiresAt = (expire == null || expire == 0)
+      ? null
+      : DateTime.fromMillisecondsSinceEpoch(expire * 1000);
+
+  return _SubscriptionUserinfo(
+    TrafficInfo(usedBytes: upload + download, totalBytes: total),
+    expiresAt,
+  );
+}
+
+/// Человекочитаемая аннотация подписки, обычно `base64:<...>` с
+/// UTF‑8-текстом внутри (эмодзи, статус аккаунта и т.п.).
+String? _parseAnnounce(Map<String, String> headers) {
+  final header = headers['announce'];
+  if (header == null || header.isEmpty) return null;
+
+  final encoded = header.startsWith('base64:')
+      ? header.substring('base64:'.length)
+      : header;
+  try {
+    return utf8.decode(base64.decode(base64.normalize(encoded)));
+  } catch (_) {
+    return header;
+  }
 }
 
 SubscriptionImportResult _tryParseXray(String body) {
