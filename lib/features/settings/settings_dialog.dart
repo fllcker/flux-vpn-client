@@ -184,6 +184,7 @@ Future<void> showSettingsDialog(BuildContext context) {
   return showShadDialog(
     context: context,
     barrierColor: dialogBarrierColor,
+    opaque: false,
     builder: (_) => const SettingsDialog(),
   );
 }

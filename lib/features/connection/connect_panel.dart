@@ -16,11 +16,31 @@ import 'connection_state.dart';
 import 'connection_timer.dart';
 import 'off_proxy_tun_selector.dart';
 
-class ConnectPanel extends ConsumerWidget {
+class ConnectPanel extends ConsumerStatefulWidget {
   const ConnectPanel({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ConnectPanel> createState() => _ConnectPanelState();
+}
+
+class _ConnectPanelState extends ConsumerState<ConnectPanel> {
+  // IntrinsicWidth недостаточно точен для Row из AnimatedContainer
+  // (см. историю переполнения) — вместо приближённого intrinsic-расчёта
+  // измеряем реальную отрисованную ширину переключателя после кадра и
+  // задаём её карточке сервера явно, чтобы совпадение было пиксельным.
+  final _selectorKey = GlobalKey();
+  double? _selectorWidth;
+
+  void _measureSelectorWidth(Duration _) {
+    final width = _selectorKey.currentContext?.size?.width;
+    if (width != null && width != _selectorWidth) {
+      setState(() => _selectorWidth = width);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback(_measureSelectorWidth);
     final theme = ShadTheme.of(context);
     final leaves = flattenAllLeaves(ref.watch(coreConfigProvider));
     final selectedId =
@@ -55,12 +75,13 @@ class ConnectPanel extends ConsumerWidget {
         padding: const EdgeInsets.only(bottom: 56),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 340),
-          child: IntrinsicWidth(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: _selectorWidth,
+                child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 10,
@@ -74,13 +95,7 @@ class ConnectPanel extends ConsumerWidget {
                     children: [
                       ServerIcon(icon: selectedLeaf.icon, size: 32),
                       const SizedBox(width: 10),
-                      // Ширина фиксированная (не Expanded) — внутри
-                      // IntrinsicWidth у Expanded нет собственной
-                      // внутренней ширины, из-за чего расчёт ширины всей
-                      // колонки уходил в нелепо узкое число и ломал
-                      // переключатель ниже переполнением (см. историю).
-                      SizedBox(
-                        width: 200,
+                      Flexible(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
@@ -98,19 +113,20 @@ class ConnectPanel extends ConsumerWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                OffProxyTunSelector(
-                  value: selection,
-                  busy: busy,
-                  onChanged: (selection) => _onSelectionChanged(
-                    context,
-                    ref,
-                    selectedLeaf,
-                    selection,
-                  ),
+              ),
+              const SizedBox(height: 12),
+              OffProxyTunSelector(
+                key: _selectorKey,
+                value: selection,
+                busy: busy,
+                onChanged: (selection) => _onSelectionChanged(
+                  context,
+                  ref,
+                  selectedLeaf,
+                  selection,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -143,6 +159,7 @@ class ConnectPanel extends ConsumerWidget {
     final confirmed = await showShadDialog<bool>(
       context: context,
       barrierColor: dialogBarrierColor,
+      opaque: false,
       builder: (context) => ShadDialog.alert(
         title: const Text('Нужны права администратора'),
         description: const Text(

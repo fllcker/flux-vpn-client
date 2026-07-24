@@ -3,6 +3,8 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:flux/core_abstraction/app_settings.dart';
+import 'package:flux/core_abstraction/app_settings_provider.dart';
 import 'package:flux/core_abstraction/core_config.dart';
 import 'package:flux/core_abstraction/core_config_provider.dart';
 import 'package:flux/core_abstraction/proxy_node.dart';
@@ -35,10 +37,11 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          // Не зависим от реального profile.json на диске.
+          // Не зависим от реального profile.json/settings.json на диске.
           coreConfigProvider.overrideWith(
             () => _PresetCoreConfigController(const CoreConfig()),
           ),
+          appSettingsProvider.overrideWith(_PresetAppSettingsController.new),
         ],
         child: FluxApp(
           navigatorKey: GlobalKey<NavigatorState>(),
@@ -85,6 +88,7 @@ void main() {
               const CoreConfig(standaloneNodes: [leaf]),
             ),
           ),
+          appSettingsProvider.overrideWith(_PresetAppSettingsController.new),
         ],
         child: FluxApp(
           navigatorKey: GlobalKey<NavigatorState>(),
@@ -107,4 +111,9 @@ class _PresetCoreConfigController extends CoreConfigController {
 
   @override
   CoreConfig build() => initial;
+}
+
+class _PresetAppSettingsController extends AppSettingsController {
+  @override
+  AppSettings build() => const AppSettings();
 }

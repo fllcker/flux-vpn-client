@@ -130,6 +130,7 @@ Future<void> showAddServerDialog(
   return showShadDialog(
     context: context,
     barrierColor: dialogBarrierColor,
+    opaque: false,
     builder: (_) => ImportSubscriptionSheet(initialLink: initialLink),
   );
 }

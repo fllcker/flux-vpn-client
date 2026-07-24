@@ -9,6 +9,7 @@ import 'base64_subscription_parser.dart';
 import 'group_leaves_by_name.dart';
 import 'import_result.dart';
 import 'import_to_proxy_nodes.dart';
+import 'merge_subscription_tree.dart';
 import 'vless_link_parser.dart';
 import 'xray_subscription_parser.dart';
 
@@ -135,7 +136,7 @@ Future<LinkImportResult> refreshSubscription(
     expiresAt: fetched.expiresAt,
     lastRefreshedAt: fetched.lastRefreshedAt,
     autoRefreshOnStartup: subscription.autoRefreshOnStartup,
-    root: fetched.root,
+    root: mergeSubscriptionTree(subscription.root, fetched.root),
   );
   return SubscriptionImportResultOk(merged, result.skipped);
 }
