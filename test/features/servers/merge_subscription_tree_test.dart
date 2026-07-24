@@ -110,6 +110,45 @@ void main() {
     expect((merged.children.single as ServerLeaf).id, 'old-poland');
   });
 
+  test('routing rules come from the fresh subscription data, not preserved', () {
+    const oldGermanyWithRules = ServerLeaf(
+      id: 'old-germany',
+      name: 'Germany 1',
+      variants: [_germanyVariant],
+      selection: ManualVariantSelection('old-variant-de'),
+      routingRules: [
+        DomainRule(values: ['old-rule.example.com'], outboundTag: 'block'),
+      ],
+    );
+    final oldRoot = ServerGroup(
+      id: 'old-root',
+      name: 'Sub',
+      children: [oldGermanyWithRules],
+    );
+    final newRoot = ServerGroup(
+      id: 'new-root',
+      name: 'Sub',
+      children: [
+        const ServerLeaf(
+          id: 'new-germany',
+          name: 'Germany 1',
+          variants: [_germanyVariant],
+          selection: ManualVariantSelection('old-variant-de'),
+          routingRules: [
+            DomainRule(values: ['new-rule.example.com'], outboundTag: 'proxy'),
+          ],
+        ),
+      ],
+    );
+
+    final merged = mergeSubscriptionTree(oldRoot, newRoot) as ServerGroup;
+    final leaf = merged.children.single as ServerLeaf;
+    final rule = leaf.routingRules.single as DomainRule;
+
+    expect(rule.values, ['new-rule.example.com']);
+    expect(rule.outboundTag, 'proxy');
+  });
+
   test('new variant on an existing leaf gets a fresh id, unmatched selection falls back', () {
     final oldRoot = ServerGroup(
       id: 'old-root',

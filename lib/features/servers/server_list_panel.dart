@@ -9,6 +9,7 @@ import 'flatten_leaves.dart';
 import 'import_subscription_sheet.dart';
 import 'proxy_tree_list.dart';
 import 'right_panel_view.dart';
+import 'routing_rules_dialog.dart';
 import 'selected_server_provider.dart';
 
 class ServerListPanel extends ConsumerWidget {
@@ -41,6 +42,18 @@ class ServerListPanel extends ConsumerWidget {
 
     void onHideLeaf(String leafId) {
       ref.read(coreConfigProvider.notifier).setHidden(leafId, true);
+    }
+
+    void onEditRoutingLeaf(String leafId) {
+      final leaf = allLeaves.where((l) => l.id == leafId).firstOrNull;
+      if (leaf == null) return;
+      showRoutingRulesDialog(
+        context,
+        title: 'Роутинг — ${leaf.name}',
+        initialRules: leaf.routingRules,
+        onSave: (rules) =>
+            ref.read(coreConfigProvider.notifier).setRoutingRules(leafId, rules),
+      );
     }
 
     return Container(
@@ -82,6 +95,7 @@ class ServerListPanel extends ConsumerWidget {
                           selectedLeafId: selectedId,
                           onSelectLeaf: onSelectLeaf,
                           onSelectVariant: onSelectVariant,
+                          onEditRoutingLeaf: onEditRoutingLeaf,
                         ),
                       for (final subscription in config.subscriptions) ...[
                         _SubscriptionHeader(
@@ -100,6 +114,7 @@ class ServerListPanel extends ConsumerWidget {
                           onSelectLeaf: onSelectLeaf,
                           onSelectVariant: onSelectVariant,
                           onHideLeaf: onHideLeaf,
+                          onEditRoutingLeaf: onEditRoutingLeaf,
                         ),
                       ],
                     ],
@@ -171,4 +186,8 @@ class _SubscriptionHeaderState extends State<_SubscriptionHeader> {
       ),
     );
   }
+}
+
+extension<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }

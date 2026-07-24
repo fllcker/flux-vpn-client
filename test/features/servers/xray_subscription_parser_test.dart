@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flux/core_abstraction/proxy_node.dart';
 import 'package:flux/core_abstraction/server_config.dart';
 import 'package:flux/features/servers/xray_subscription_parser.dart';
 
@@ -10,6 +11,12 @@ const _sampleXrayArray = '''
 [
   {
     "remarks": "Germany #1",
+    "routing": {
+      "rules": [
+        {"type": "field", "domain": ["geosite:category-ads"], "outboundTag": "block"},
+        {"type": "field", "ip": ["1.2.3.0/24", "geoip:cn"], "outboundTag": "direct"}
+      ]
+    },
     "outbounds": [
       {
         "tag": "proxy",
@@ -113,6 +120,14 @@ void main() {
     expect(germany.address, 'de1.example.com');
     expect(germany.security, VlessSecurity.reality);
     expect(germany.flow, 'xtls-rprx-vision');
+    expect(result.servers[0].routingRules, hasLength(2));
+    final domainRule = result.servers[0].routingRules[0] as DomainRule;
+    expect(domainRule.values, ['geosite:category-ads']);
+    expect(domainRule.outboundTag, 'block');
+    final ipRule = result.servers[0].routingRules[1] as IpRule;
+    expect(ipRule.values, ['1.2.3.0/24', 'geoip:cn']);
+    expect(ipRule.outboundTag, 'direct');
+    expect(result.servers[1].routingRules, isEmpty);
 
     final poland = result.servers[1].config as VlessConfig;
     expect(poland.network, VlessNetwork.xhttp);

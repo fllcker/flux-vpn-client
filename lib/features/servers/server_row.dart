@@ -17,6 +17,7 @@ class ServerRow extends StatefulWidget {
   // Скрытие доступно только серверам внутри подписки, не standalone-нодам
   // (см. ROADMAP.md, трек 2) — null здесь значит "не показывать пункт".
   final VoidCallback? onHide;
+  final VoidCallback? onEditRouting;
 
   const ServerRow({
     super.key,
@@ -27,6 +28,7 @@ class ServerRow extends StatefulWidget {
     required this.onSelect,
     required this.onToggleExpand,
     this.onHide,
+    this.onEditRouting,
   });
 
   @override
@@ -49,15 +51,23 @@ class _ServerRowState extends State<ServerRow> {
 
     final row = _buildRow(theme, scheme, background);
     final onHide = widget.onHide;
-    if (onHide == null) return row;
+    final onEditRouting = widget.onEditRouting;
+    if (onHide == null && onEditRouting == null) return row;
 
     return ShadContextMenuRegion(
       items: [
-        ShadContextMenuItem(
-          leading: const Icon(LucideIcons.eyeOff, size: 14),
-          onPressed: onHide,
-          child: const Text('Скрыть'),
-        ),
+        if (onEditRouting != null)
+          ShadContextMenuItem(
+            leading: const Icon(LucideIcons.route, size: 14),
+            onPressed: onEditRouting,
+            child: const Text('Роутинг'),
+          ),
+        if (onHide != null)
+          ShadContextMenuItem(
+            leading: const Icon(LucideIcons.eyeOff, size: 14),
+            onPressed: onHide,
+            child: const Text('Скрыть'),
+          ),
       ],
       child: row,
     );

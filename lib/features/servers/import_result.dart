@@ -1,10 +1,19 @@
+import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/server_config.dart';
 
 class ImportedServer {
   final String name;
   final ServerConfig config;
+  // Правила роутинга этого сервера, если панель их отдаёт (только
+  // xray-json подписки — см. `xray_subscription_parser.dart`). Пусто у
+  // остальных источников (vless:// ссылки, base64-подписки).
+  final List<RoutingRule> routingRules;
 
-  const ImportedServer({required this.name, required this.config});
+  const ImportedServer({
+    required this.name,
+    required this.config,
+    this.routingRules = const [],
+  });
 }
 
 /// Запись подписки, которую не удалось привести к Magic JSON — например,

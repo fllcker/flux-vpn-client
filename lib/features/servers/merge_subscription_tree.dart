@@ -72,6 +72,11 @@ ServerLeaf _mergeLeaf(ServerLeaf old, ServerLeaf fresh) {
     hidden: old.hidden,
     variants: variants,
     selection: selection,
+    // Правила роутинга приходят с сервера при каждом импорте (см.
+    // `xray_subscription_parser.dart`) — берём свежие, не переносим старые
+    // (в отличие от hidden/selection, это не локальный пользовательский
+    // выбор, а данные подписки), см. ROADMAP.md, трек 3.
+    routingRules: fresh.routingRules,
   );
 }
 

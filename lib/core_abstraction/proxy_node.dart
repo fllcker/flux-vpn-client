@@ -2,6 +2,71 @@ import 'server_config.dart';
 
 enum GroupStrategy { select, urlTest, fallback, loadBalance }
 
+/// Правило роутинга — живёт на [ServerLeaf], не на [CoreConfig] или
+/// [Subscription], т.к. в xray-json подписке роутинг обычно приходит
+/// отдельным блоком `"routing"` внутри JSON-объекта каждого сервера (данные
+/// конкретного сервера, не подписки/приложения целиком) — см. ROADMAP.md,
+/// трек 3.
+///
+/// Значения в [DomainRule.values]/[IpRule.values] хранятся как есть, один в
+/// один с xray-шным синтаксисом (`"example.com"`, `"domain:sub.example.com"`,
+/// `"regexp:..."`, `"geosite:category-ads"` для доменов;
+/// `"1.2.3.0/24"`, `"geoip:cn"` для IP) — xray сам допускает смешивать
+/// голые значения и `geosite:`/`geoip:`-префиксы в одном списке, поэтому
+/// отдельных типов правил под geosite/geoip не заводим.
+sealed class RoutingRule {
+  const RoutingRule();
+
+  Map<String, dynamic> toJson();
+
+  factory RoutingRule.fromJson(Map<String, dynamic> json) {
+    final type = json['type'] as String?;
+    return switch (type) {
+      'domain' => DomainRule.fromJson(json),
+      'ip' => IpRule.fromJson(json),
+      _ => throw FormatException('Unknown RoutingRule.type: $type'),
+    };
+  }
+}
+
+class DomainRule extends RoutingRule {
+  final List<String> values;
+  final String outboundTag; // "direct" | "block" | "proxy"
+
+  const DomainRule({required this.values, required this.outboundTag});
+
+  factory DomainRule.fromJson(Map<String, dynamic> json) => DomainRule(
+    values: (json['values'] as List).cast<String>(),
+    outboundTag: json['outboundTag'] as String,
+  );
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'domain',
+    'values': values,
+    'outboundTag': outboundTag,
+  };
+}
+
+class IpRule extends RoutingRule {
+  final List<String> values;
+  final String outboundTag; // "direct" | "block" | "proxy"
+
+  const IpRule({required this.values, required this.outboundTag});
+
+  factory IpRule.fromJson(Map<String, dynamic> json) => IpRule(
+    values: (json['values'] as List).cast<String>(),
+    outboundTag: json['outboundTag'] as String,
+  );
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'ip',
+    'values': values,
+    'outboundTag': outboundTag,
+  };
+}
+
 sealed class VariantSelection {
   const VariantSelection();
 
@@ -95,6 +160,8 @@ sealed class ProxyNode {
 class ServerLeaf extends ProxyNode {
   final List<ConnectionVariant> variants;
   final VariantSelection selection;
+  final List<RoutingRule> routingRules; // [] = нет своих правил — весь
+  // трафик через прокси, как раньше
 
   const ServerLeaf({
     required super.id,
@@ -103,6 +170,7 @@ class ServerLeaf extends ProxyNode {
     super.hidden,
     required this.variants,
     this.selection = const AutoVariantSelection(),
+    this.routingRules = const [],
   });
 
   /// Активный вариант подключения по [selection]: конкретный — если
@@ -127,6 +195,17 @@ class ServerLeaf extends ProxyNode {
     hidden: hidden,
     variants: variants,
     selection: selection,
+    routingRules: routingRules,
+  );
+
+  ServerLeaf withRoutingRules(List<RoutingRule> routingRules) => ServerLeaf(
+    id: id,
+    name: name,
+    icon: icon,
+    hidden: hidden,
+    variants: variants,
+    selection: selection,
+    routingRules: routingRules,
   );
 
   factory ServerLeaf.fromJson(Map<String, dynamic> json) {
@@ -141,6 +220,9 @@ class ServerLeaf extends ProxyNode {
       selection: json['selection'] == null
           ? const AutoVariantSelection()
           : VariantSelection.fromJson(json['selection'] as Map<String, dynamic>),
+      routingRules: ((json['routingRules'] as List?) ?? const [])
+          .map((r) => RoutingRule.fromJson(r as Map<String, dynamic>))
+          .toList(),
     );
   }
 
@@ -153,6 +235,7 @@ class ServerLeaf extends ProxyNode {
     'hidden': hidden,
     'variants': variants.map((v) => v.toJson()).toList(),
     'selection': selection.toJson(),
+    'routingRules': routingRules.map((r) => r.toJson()).toList(),
   };
 }
 
@@ -191,6 +274,7 @@ ProxyNode setNodeHidden(ProxyNode node, String nodeId, bool hidden) {
       hidden: hidden,
       variants: leaf.variants,
       selection: leaf.selection,
+      routingRules: leaf.routingRules,
     ),
     ServerLeaf leaf => leaf,
     ServerGroup group => ServerGroup(
@@ -201,6 +285,32 @@ ProxyNode setNodeHidden(ProxyNode node, String nodeId, bool hidden) {
       strategy: group.strategy,
       children: group.children
           .map((c) => setNodeHidden(c, nodeId, hidden))
+          .toList(),
+    ),
+  };
+}
+
+/// Ищет [ServerLeaf] с [leafId] в дереве и возвращает копию дерева с его
+/// [ServerLeaf.routingRules], заменённым на [rules]. Остальные узлы
+/// возвращаются как есть — используется и для одного сервера, и (вызовом по
+/// каждому листу подписки) для bulk-применения одинаковых правил на всю
+/// подписку, см. ROADMAP.md, трек 3.
+ProxyNode setLeafRoutingRules(
+  ProxyNode node,
+  String leafId,
+  List<RoutingRule> rules,
+) {
+  return switch (node) {
+    ServerLeaf leaf when leaf.id == leafId => leaf.withRoutingRules(rules),
+    ServerLeaf leaf => leaf,
+    ServerGroup group => ServerGroup(
+      id: group.id,
+      name: group.name,
+      icon: group.icon,
+      hidden: group.hidden,
+      strategy: group.strategy,
+      children: group.children
+          .map((c) => setLeafRoutingRules(c, leafId, rules))
           .toList(),
     ),
   };

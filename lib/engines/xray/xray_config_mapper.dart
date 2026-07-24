@@ -1,3 +1,4 @@
+import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/server_config.dart';
 
 /// Фиксированное имя TUN-адаптера — без этого xray-core генерирует
@@ -14,6 +15,7 @@ Map<String, dynamic> buildXrayConfig(
   ServerConfig server, {
   required int socksPort,
   required int httpPort,
+  List<RoutingRule> routingRules = const [],
 }) {
   return {
     'log': {'loglevel': 'warning'},
@@ -30,7 +32,8 @@ Map<String, dynamic> buildXrayConfig(
         'protocol': 'http',
       },
     ],
-    'outbounds': [_outbound(server), _directOutbound],
+    'outbounds': [_outbound(server), _directOutbound, _blockOutbound],
+    if (routingRules.isNotEmpty) 'routing': _routing(routingRules),
   };
 }
 
@@ -49,7 +52,10 @@ Map<String, dynamic> buildXrayConfig(
 /// хотя приложение считает себя подключённым (см. PLAN.md баг про утечку
 /// в TUN-режиме). Лучше "закрыть" IPv6 в туннель и уронить такие
 /// соединения, чем молча слить их в обход VPN.
-Map<String, dynamic> buildXrayTunConfig(ServerConfig server) {
+Map<String, dynamic> buildXrayTunConfig(
+  ServerConfig server, {
+  List<RoutingRule> routingRules = const [],
+}) {
   return {
     'log': {'loglevel': 'warning'},
     'inbounds': [
@@ -67,11 +73,36 @@ Map<String, dynamic> buildXrayTunConfig(ServerConfig server) {
         },
       },
     ],
-    'outbounds': [_outbound(server), _directOutbound],
+    'outbounds': [_outbound(server), _directOutbound, _blockOutbound],
+    if (routingRules.isNotEmpty) 'routing': _routing(routingRules),
   };
 }
 
 const _directOutbound = {'protocol': 'freedom', 'tag': 'direct'};
+const _blockOutbound = {'protocol': 'blackhole', 'tag': 'block'};
+
+/// `outboundTag` в [RoutingRule] — `"direct"`/`"block"`/`"proxy"` (см.
+/// ROADMAP.md, трек 3) — совпадает с тегами outbound'ов один в один, кроме
+/// `"proxy"`: сам сервер-outbound не имеет фиксированного тега на уровне
+/// [ServerConfig] (он один и всегда первый в списке), поэтому проставляем
+/// ему тег `"proxy"` здесь же, при сборке конфига.
+Map<String, dynamic> _routing(List<RoutingRule> rules) => {
+  'rules': [
+    for (final rule in rules)
+      switch (rule) {
+        DomainRule(:final values, :final outboundTag) => {
+          'type': 'field',
+          'domain': values,
+          'outboundTag': outboundTag,
+        },
+        IpRule(:final values, :final outboundTag) => {
+          'type': 'field',
+          'ip': values,
+          'outboundTag': outboundTag,
+        },
+      },
+  ],
+};
 
 Map<String, dynamic> _outbound(ServerConfig server) => switch (server) {
   VlessConfig server => _vlessOutbound(server),
@@ -80,6 +111,7 @@ Map<String, dynamic> _outbound(ServerConfig server) => switch (server) {
 
 Map<String, dynamic> _vlessOutbound(VlessConfig server) => {
   'protocol': 'vless',
+  'tag': 'proxy',
   'settings': {
     'vnext': [
       {
@@ -142,6 +174,7 @@ Map<String, dynamic> _streamSettings(VlessConfig server) {
 /// пароль обфускации (Salamander опциональна, см. `Hysteria2Config`).
 Map<String, dynamic> _hysteria2Outbound(Hysteria2Config server) => {
   'protocol': 'hysteria',
+  'tag': 'proxy',
   'settings': {
     'version': 2,
     'address': server.address,

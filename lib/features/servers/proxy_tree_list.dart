@@ -20,6 +20,9 @@ class ProxyTreeList extends ConsumerWidget {
   // подписки (standalone-серверы скрытие не поддерживают, см. ROADMAP.md,
   // трек 2).
   final ValueChanged<String>? onHideLeaf;
+  // Пункт "Роутинг" — доступен и standalone-серверам, и серверам внутри
+  // подписки (см. ROADMAP.md, трек 3).
+  final ValueChanged<String>? onEditRoutingLeaf;
 
   const ProxyTreeList({
     super.key,
@@ -29,6 +32,7 @@ class ProxyTreeList extends ConsumerWidget {
     required this.onSelectLeaf,
     required this.onSelectVariant,
     this.onHideLeaf,
+    this.onEditRoutingLeaf,
   });
 
   @override
@@ -58,6 +62,7 @@ class ProxyTreeList extends ConsumerWidget {
                     onSelectLeaf: onSelectLeaf,
                     onSelectVariant: onSelectVariant,
                     onHideLeaf: onHideLeaf,
+                    onEditRoutingLeaf: onEditRoutingLeaf,
                   ),
               ],
             ),
@@ -76,6 +81,9 @@ class ProxyTreeList extends ConsumerWidget {
                     onHide: onHideLeaf == null
                         ? null
                         : () => onHideLeaf!(leaf.id),
+                    onEditRouting: onEditRoutingLeaf == null
+                        ? null
+                        : () => onEditRoutingLeaf!(leaf.id),
                   ),
                   if (leaf.variants.length > 1 && expanded.contains(leaf.id))
                     for (final variant in leaf.variants)

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/server_config.dart';
 import 'import_result.dart';
 
@@ -46,7 +47,10 @@ SubscriptionImportResult parseXraySubscription(String rawJson) {
       final config = protocol == 'vless'
           ? _parseVlessOutbound(proxyOutbound)
           : _parseHysteriaOutbound(proxyOutbound);
-      servers.add(ImportedServer(name: name, config: config));
+      final routingRules = _parseRoutingRules(map['routing']);
+      servers.add(
+        ImportedServer(name: name, config: config, routingRules: routingRules),
+      );
     } on FormatException catch (e) {
       skipped.add(ImportSkipped(label: name, reason: e.message));
     }
@@ -117,6 +121,36 @@ Hysteria2Config _parseHysteriaOutbound(Map<String, dynamic> outbound) {
     insecure: tlsSettings?['allowInsecure'] as bool? ?? false,
     obfsPassword: obfs?['password'] as String?,
   );
+}
+
+/// Разбирает xray-шный блок `"routing"."rules"` (массив объектов
+/// `{"type": "field", "domain": [...], "outboundTag": ...}` /
+/// `{"type": "field", "ip": [...], "outboundTag": ...}`) в [RoutingRule].
+/// Значения (в т.ч. `geosite:`/`geoip:`-префиксы) сохраняются как есть, без
+/// интерпретации — см. ROADMAP.md, трек 3.
+List<RoutingRule> _parseRoutingRules(dynamic routing) {
+  if (routing is! Map<String, dynamic>) return const [];
+  final rulesJson = routing['rules'] as List? ?? const [];
+
+  final rules = <RoutingRule>[];
+  for (final entry in rulesJson) {
+    final rule = entry as Map<String, dynamic>;
+    final outboundTag = rule['outboundTag'] as String?;
+    if (outboundTag == null) continue;
+
+    final domain = rule['domain'] as List?;
+    if (domain != null && domain.isNotEmpty) {
+      rules.add(
+        DomainRule(values: domain.cast<String>(), outboundTag: outboundTag),
+      );
+    }
+
+    final ip = rule['ip'] as List?;
+    if (ip != null && ip.isNotEmpty) {
+      rules.add(IpRule(values: ip.cast<String>(), outboundTag: outboundTag));
+    }
+  }
+  return rules;
 }
 
 extension<T> on Iterable<T> {

@@ -6,7 +6,6 @@ import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config.dart';
 import '../../core_abstraction/core_engine.dart';
 import '../../core_abstraction/proxy_node.dart';
-import '../../core_abstraction/server_config.dart';
 import 'child_process_job.dart';
 import 'windows_elevation.dart';
 import 'windows_system_proxy.dart';
@@ -62,16 +61,22 @@ class XrayEngineWindows implements CoreEngine {
       );
     }
 
-    final server = _firstServerConfig(config);
-    if (server == null) {
+    final leaf = _firstLeafWithConfig(config);
+    final server = leaf?.activeVariant?.config;
+    if (leaf == null || server == null) {
       _statusController.add(EngineStatus.error);
       throw StateError('CoreConfig has no server to connect to');
     }
 
     final xrayConfig = switch (mode) {
-      ConnectionMode.proxy =>
-        buildXrayConfig(server, socksPort: socksPort, httpPort: httpPort),
-      ConnectionMode.tun => buildXrayTunConfig(server),
+      ConnectionMode.proxy => buildXrayConfig(
+        server,
+        socksPort: socksPort,
+        httpPort: httpPort,
+        routingRules: leaf.routingRules,
+      ),
+      ConnectionMode.tun =>
+        buildXrayTunConfig(server, routingRules: leaf.routingRules),
     };
     _activeMode = mode;
 
@@ -123,15 +128,14 @@ class XrayEngineWindows implements CoreEngine {
     return const EngineStats(uploadBytes: 0, downloadBytes: 0);
   }
 
-  ServerConfig? _firstServerConfig(CoreConfig config) {
+  ServerLeaf? _firstLeafWithConfig(CoreConfig config) {
     final roots = [
       ...config.standaloneNodes,
       ...config.subscriptions.map((s) => s.root),
     ];
     for (final root in roots) {
       final leaf = _firstLeaf(root);
-      final config = leaf?.activeVariant?.config;
-      if (config != null) return config;
+      if (leaf?.activeVariant?.config != null) return leaf;
     }
     return null;
   }

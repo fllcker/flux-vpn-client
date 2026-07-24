@@ -39,6 +39,9 @@ List<ServerLeaf> importedServersToLeaves(List<ImportedServer> servers) {
       icon: derived.icon,
       variants: variants,
       selection: ManualVariantSelection(variants.first.id),
+      // Правила роутинга берём у первого варианта — в норме одинаковые у
+      // всех вариантов одного сервера (см. ROADMAP.md, трек 3).
+      routingRules: group.first.routingRules,
     );
   }).toList();
 }

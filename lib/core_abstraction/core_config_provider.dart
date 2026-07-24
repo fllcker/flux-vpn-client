@@ -22,7 +22,6 @@ class CoreConfigController extends Notifier<CoreConfig> {
         schemaVersion: config.schemaVersion,
         subscriptions: config.subscriptions,
         standaloneNodes: [...config.standaloneNodes, ...leaves],
-        routingRules: config.routingRules,
       ),
     );
   }
@@ -33,7 +32,6 @@ class CoreConfigController extends Notifier<CoreConfig> {
         schemaVersion: config.schemaVersion,
         subscriptions: [...config.subscriptions, subscription],
         standaloneNodes: config.standaloneNodes,
-        routingRules: config.routingRules,
       ),
     );
   }
@@ -44,7 +42,6 @@ class CoreConfigController extends Notifier<CoreConfig> {
         schemaVersion: config.schemaVersion,
         subscriptions: config.subscriptions.where((s) => s.id != id).toList(),
         standaloneNodes: config.standaloneNodes,
-        routingRules: config.routingRules,
       ),
     );
   }
@@ -60,7 +57,6 @@ class CoreConfigController extends Notifier<CoreConfig> {
             .map((s) => s.id == updated.id ? updated : s)
             .toList(),
         standaloneNodes: config.standaloneNodes,
-        routingRules: config.routingRules,
       ),
     );
   }
@@ -82,7 +78,6 @@ class CoreConfigController extends Notifier<CoreConfig> {
         standaloneNodes: config.standaloneNodes
             .map((n) => replaceLeafSelection(n, leafId, variantId))
             .toList(),
-        routingRules: config.routingRules,
       ),
     );
   }
@@ -98,13 +93,74 @@ class CoreConfigController extends Notifier<CoreConfig> {
             .map((s) => s.copyWith(root: setNodeHidden(s.root, nodeId, hidden)))
             .toList(),
         standaloneNodes: config.standaloneNodes,
-        routingRules: config.routingRules,
       ),
     );
+  }
+
+  /// Заменяет [ServerLeaf.routingRules] одного сервера [leafId] — где бы он
+  /// ни лежал в дереве (standalone или внутри подписки), см. ROADMAP.md,
+  /// трек 3.
+  void setRoutingRules(String leafId, List<RoutingRule> rules) {
+    _update(
+      (config) => CoreConfig(
+        schemaVersion: config.schemaVersion,
+        subscriptions: config.subscriptions
+            .map(
+              (s) => s.copyWith(
+                root: setLeafRoutingRules(s.root, leafId, rules),
+              ),
+            )
+            .toList(),
+        standaloneNodes: config.standaloneNodes
+            .map((n) => setLeafRoutingRules(n, leafId, rules))
+            .toList(),
+      ),
+    );
+  }
+
+  /// Bulk-применение: перезаписывает [rules] у каждого [ServerLeaf] подписки
+  /// [subscriptionId] одним и тем же списком — см. ROADMAP.md, трек 3, "На
+  /// странице подписки".
+  void setRoutingRulesForSubscription(
+    String subscriptionId,
+    List<RoutingRule> rules,
+  ) {
+    _update((config) {
+      final subscription = config.subscriptions
+          .where((s) => s.id == subscriptionId)
+          .firstOrNull;
+      if (subscription == null) return config;
+
+      var root = subscription.root;
+      for (final leaf in _flattenLeaves(root)) {
+        root = setLeafRoutingRules(root, leaf.id, rules);
+      }
+
+      return CoreConfig(
+        schemaVersion: config.schemaVersion,
+        subscriptions: config.subscriptions
+            .map((s) => s.id == subscriptionId ? s.copyWith(root: root) : s)
+            .toList(),
+        standaloneNodes: config.standaloneNodes,
+      );
+    });
   }
 
   void _update(CoreConfig Function(CoreConfig config) transform) {
     state = transform(state);
     profileStorage.save(state);
   }
+}
+
+List<ServerLeaf> _flattenLeaves(ProxyNode node) {
+  return switch (node) {
+    ServerLeaf leaf => [leaf],
+    ServerGroup group => [
+      for (final child in group.children) ..._flattenLeaves(child),
+    ],
+  };
+}
+
+extension<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }

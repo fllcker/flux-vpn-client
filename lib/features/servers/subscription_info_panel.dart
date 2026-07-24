@@ -1,11 +1,15 @@
+import 'dart:convert';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../core_abstraction/core_config_provider.dart';
+import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/subscription.dart';
 import 'flatten_leaves.dart';
 import 'right_panel_view.dart';
+import 'routing_rules_dialog.dart';
 import 'server_icon.dart';
 import 'subscription_import.dart';
 
@@ -238,6 +242,8 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
                   ),
                 ),
             ],
+            const SizedBox(height: 20),
+            _RoutingSection(subscription: subscription, allLeaves: allLeaves),
             const SizedBox(height: 24),
             ShadButton.destructive(
               onPressed: () {
@@ -253,6 +259,101 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
       ),
     );
   }
+}
+
+/// Секция "Роутинг" — правила живут на каждом [ServerLeaf] отдельно (см.
+/// ROADMAP.md, трек 3), поэтому у подписки нет одного "истинного" набора
+/// правил. Показываем общий набор, если он одинаков у всех серверов
+/// подписки, иначе — предупреждение с кнопкой bulk-применения.
+class _RoutingSection extends ConsumerWidget {
+  final Subscription subscription;
+  final List<ServerLeaf> allLeaves;
+
+  const _RoutingSection({required this.subscription, required this.allLeaves});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = ShadTheme.of(context);
+    if (allLeaves.isEmpty) return const SizedBox.shrink();
+
+    final first = allLeaves.first.routingRules;
+    final identical = allLeaves.every(
+      (l) => _rulesEqual(l.routingRules, first),
+    );
+
+    void editCommon() {
+      showRoutingRulesDialog(
+        context,
+        title: 'Роутинг — ${subscription.name}',
+        initialRules: identical ? first : const [],
+        onSave: (rules) => ref
+            .read(coreConfigProvider.notifier)
+            .setRoutingRulesForSubscription(subscription.id, rules),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Роутинг',
+                style: theme.textTheme.small.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.mutedForeground,
+                ),
+              ),
+            ),
+            if (identical)
+              ShadIconButton.ghost(
+                icon: const Icon(LucideIcons.pencil, size: 14),
+                onPressed: editCommon,
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (identical)
+          Text(
+            first.isEmpty
+                ? 'Правил нет — весь трафик через прокси'
+                : '${first.length} ${_ruleWord(first.length)}',
+            style: theme.textTheme.muted,
+          )
+        else ...[
+          Text(
+            'Правила различаются по серверам',
+            style: theme.textTheme.muted,
+          ),
+          const SizedBox(height: 8),
+          ShadButton.outline(
+            onPressed: editCommon,
+            child: const Text('Задать одинаковые правила для всех'),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+bool _rulesEqual(List<RoutingRule> a, List<RoutingRule> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (jsonEncode(a[i].toJson()) != jsonEncode(b[i].toJson())) return false;
+  }
+  return true;
+}
+
+String _ruleWord(int count) {
+  final lastDigit = count % 10;
+  final lastTwoDigits = count % 100;
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return 'правил';
+  return switch (lastDigit) {
+    1 => 'правило',
+    2 || 3 || 4 => 'правила',
+    _ => 'правил',
+  };
 }
 
 class _InfoRow extends StatelessWidget {
