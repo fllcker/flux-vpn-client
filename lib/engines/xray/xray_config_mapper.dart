@@ -41,6 +41,14 @@ Map<String, dynamic> buildXrayConfig(
 ///
 /// `autoOutboundsInterface: "auto"` обязателен — без него исходящий трафик
 /// самого xray к VLESS-серверу тоже завернётся в TUN, получится петля.
+///
+/// IPv6-адрес и маршрут `::/0` обязательны, даже если апстрим не умеет в
+/// IPv6: без них TUN ставит только IPv4-маршрут по умолчанию, а Windows по
+/// RFC 6724 предпочитает IPv6, если он есть у провайдера — весь трафик к
+/// dual-stack сайтам уходит напрямую мимо TUN, показывая настоящий IP,
+/// хотя приложение считает себя подключённым (см. PLAN.md баг про утечку
+/// в TUN-режиме). Лучше "закрыть" IPv6 в туннель и уронить такие
+/// соединения, чем молча слить их в обход VPN.
 Map<String, dynamic> buildXrayTunConfig(VlessConfig server) {
   return {
     'log': {'loglevel': 'warning'},
@@ -52,9 +60,9 @@ Map<String, dynamic> buildXrayTunConfig(VlessConfig server) {
         'settings': {
           'name': tunInterfaceName,
           'mtu': 1500,
-          'gateway': ['10.10.10.1/24'],
+          'gateway': ['10.10.10.1/24', 'fdfe:dcba:9876::1/126'],
           'dns': ['1.1.1.1', '8.8.8.8'],
-          'autoSystemRoutingTable': ['0.0.0.0/0'],
+          'autoSystemRoutingTable': ['0.0.0.0/0', '::/0'],
           'autoOutboundsInterface': 'auto',
         },
       },

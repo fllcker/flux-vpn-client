@@ -54,10 +54,7 @@ class ServerListPanel extends ConsumerWidget {
                 Expanded(child: Text('Серверы', style: theme.textTheme.h4)),
                 ShadIconButton.ghost(
                   icon: const Icon(LucideIcons.plus, size: 18),
-                  onPressed: () => showShadSheet(
-                    context: context,
-                    builder: (_) => const ImportSubscriptionSheet(),
-                  ),
+                  onPressed: () => showAddServerDialog(context),
                 ),
               ],
             ),

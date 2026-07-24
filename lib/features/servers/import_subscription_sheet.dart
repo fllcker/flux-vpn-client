@@ -2,11 +2,21 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
+import '../../app/dialog_style.dart';
+import '../../core_abstraction/app_settings_provider.dart';
 import '../../core_abstraction/core_config_provider.dart';
 import 'subscription_import.dart';
 
+/// Небольшой диалог по центру окна для добавления `vless://` ссылки или
+/// подписки — обычный `ShadDialog`, а не `ShadSheet` на всю ширину: так
+/// привычнее выглядит и не отвлекает на весь экран ради одного поля ввода.
+///
+/// [initialLink] позволяет предзаполнить поле — используется диплинком
+/// `flux://add/...` и глобальной вставкой по Ctrl+V.
 class ImportSubscriptionSheet extends ConsumerStatefulWidget {
-  const ImportSubscriptionSheet({super.key});
+  final String? initialLink;
+
+  const ImportSubscriptionSheet({super.key, this.initialLink});
 
   @override
   ConsumerState<ImportSubscriptionSheet> createState() =>
@@ -15,7 +25,9 @@ class ImportSubscriptionSheet extends ConsumerStatefulWidget {
 
 class _ImportSubscriptionSheetState
     extends ConsumerState<ImportSubscriptionSheet> {
-  final _linkController = TextEditingController();
+  late final _linkController = TextEditingController(
+    text: widget.initialLink ?? '',
+  );
   bool _loading = false;
   String? _error;
 
@@ -34,7 +46,8 @@ class _ImportSubscriptionSheetState
       _error = null;
     });
 
-    final result = await importLink(link);
+    final autoGroup = ref.read(appSettingsProvider).autoGroupSubscriptions;
+    final result = await importLink(link, autoGroup: autoGroup);
     if (!mounted) return;
 
     switch (result) {
@@ -42,7 +55,22 @@ class _ImportSubscriptionSheetState
         ref.read(coreConfigProvider.notifier).addServers([leaf]);
         Navigator.of(context).pop();
       case SubscriptionImportResultOk(:final subscription):
-        ref.read(coreConfigProvider.notifier).addSubscription(subscription);
+        final existing = findSubscriptionByUrl(
+          ref.read(coreConfigProvider).subscriptions,
+          subscription.url,
+        );
+        if (existing != null) {
+          final refreshed = await refreshSubscription(
+            existing,
+            autoGroup: autoGroup,
+          );
+          if (!mounted) return;
+          if (refreshed case SubscriptionImportResultOk(:final subscription)) {
+            ref.read(coreConfigProvider.notifier).updateSubscription(subscription);
+          }
+        } else {
+          ref.read(coreConfigProvider.notifier).addSubscription(subscription);
+        }
         Navigator.of(context).pop();
       case LinkImportFailure(:final reason):
         setState(() {
@@ -56,7 +84,7 @@ class _ImportSubscriptionSheetState
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
 
-    return ShadSheet(
+    return ShadDialog(
       title: const Text('Добавить сервер'),
       description: const Text('Ссылка на подписку или vless:// ссылка'),
       actions: [
@@ -75,6 +103,7 @@ class _ImportSubscriptionSheetState
               controller: _linkController,
               placeholder: const Text('https://... или vless://...'),
               enabled: !_loading,
+              autofocus: true,
               onSubmitted: (_) => _submit(),
             ),
             if (_error != null) ...[
@@ -91,4 +120,16 @@ class _ImportSubscriptionSheetState
       ),
     );
   }
+}
+
+/// Показывает диалог добавления сервера по центру окна.
+Future<void> showAddServerDialog(
+  BuildContext context, {
+  String? initialLink,
+}) {
+  return showShadDialog(
+    context: context,
+    barrierColor: dialogBarrierColor,
+    builder: (_) => ImportSubscriptionSheet(initialLink: initialLink),
+  );
 }

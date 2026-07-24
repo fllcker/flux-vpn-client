@@ -40,7 +40,10 @@ void main() {
             () => _PresetCoreConfigController(const CoreConfig()),
           ),
         ],
-        child: FluxApp(navigatorKey: GlobalKey<NavigatorState>()),
+        child: FluxApp(
+          navigatorKey: GlobalKey<NavigatorState>(),
+          incomingDeepLinks: const Stream.empty(),
+        ),
       ),
     );
 
@@ -83,7 +86,10 @@ void main() {
             ),
           ),
         ],
-        child: FluxApp(navigatorKey: GlobalKey<NavigatorState>()),
+        child: FluxApp(
+          navigatorKey: GlobalKey<NavigatorState>(),
+          incomingDeepLinks: const Stream.empty(),
+        ),
       ),
     );
 

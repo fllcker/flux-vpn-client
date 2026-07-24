@@ -41,7 +41,10 @@ class LinkImportFailure extends LinkImportResult {
 /// Разбирает то, что пользователь вставил в поле "Добавить сервер" — как
 /// делают остальные клиенты, это всегда ссылка: либо `vless://...`, либо
 /// http(s):// адрес подписки.
-Future<LinkImportResult> importLink(String rawInput) async {
+Future<LinkImportResult> importLink(
+  String rawInput, {
+  bool autoGroup = true,
+}) async {
   final link = rawInput.trim();
 
   if (link.startsWith('vless://')) {
@@ -103,7 +106,7 @@ Future<LinkImportResult> importLink(String rawInput) async {
     root: ServerGroup(
       id: _uuid.v4(),
       name: name,
-      children: groupLeavesByName(leaves),
+      children: autoGroup ? groupLeavesByName(leaves) : leaves,
     ),
   );
 
@@ -114,8 +117,11 @@ Future<LinkImportResult> importLink(String rawInput) async {
 /// подписку с тем же [Subscription.id] (и настройками вроде
 /// [Subscription.autoRefreshOnStartup]) — используется и кнопкой "Обновить"
 /// на странице подписки, и автообновлением при запуске.
-Future<LinkImportResult> refreshSubscription(Subscription subscription) async {
-  final result = await importLink(subscription.url);
+Future<LinkImportResult> refreshSubscription(
+  Subscription subscription, {
+  bool autoGroup = true,
+}) async {
+  final result = await importLink(subscription.url, autoGroup: autoGroup);
   if (result is! SubscriptionImportResultOk) return result;
 
   final fetched = result.subscription;
@@ -132,6 +138,20 @@ Future<LinkImportResult> refreshSubscription(Subscription subscription) async {
     root: fetched.root,
   );
   return SubscriptionImportResultOk(merged, result.skipped);
+}
+
+/// Ищет подписку с идентичным (посимвольно) URL — так можно держать в
+/// списке `example.com/?preset=1` и `example.com/?preset=2` отдельно, но
+/// повторный импорт того же `preset=1` находит существующую запись вместо
+/// создания дубликата.
+Subscription? findSubscriptionByUrl(
+  Iterable<Subscription> subscriptions,
+  String url,
+) {
+  for (final s in subscriptions) {
+    if (s.url == url) return s;
+  }
+  return null;
 }
 
 class _SubscriptionUserinfo {

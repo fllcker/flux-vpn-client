@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../app/dialog_style.dart';
 import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
@@ -69,10 +70,17 @@ class ConnectPanel extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       ServerIcon(icon: selectedLeaf.icon, size: 32),
                       const SizedBox(width: 10),
-                      Expanded(
+                      // Ширина фиксированная (не Expanded) — внутри
+                      // IntrinsicWidth у Expanded нет собственной
+                      // внутренней ширины, из-за чего расчёт ширины всей
+                      // колонки уходил в нелепо узкое число и ломал
+                      // переключатель ниже переполнением (см. историю).
+                      SizedBox(
+                        width: 200,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
@@ -134,6 +142,7 @@ class ConnectPanel extends ConsumerWidget {
   Future<void> _promptElevateForTun(BuildContext context, WidgetRef ref) async {
     final confirmed = await showShadDialog<bool>(
       context: context,
+      barrierColor: dialogBarrierColor,
       builder: (context) => ShadDialog.alert(
         title: const Text('Нужны права администратора'),
         description: const Text(

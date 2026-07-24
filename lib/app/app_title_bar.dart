@@ -2,6 +2,8 @@ import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../features/settings/settings_dialog.dart';
+
 /// Кастомный тайтлбар вместо системного — окно создаётся как frameless
 /// (см. main.dart, `TitleBarStyle.hidden`), поэтому перетаскивание и
 /// свёртывание/закрытие теперь целиком на нашей стороне.
@@ -67,6 +69,11 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
                 ),
               ),
             ),
+          ),
+          _TitleBarButton(
+            icon: LucideIcons.settings,
+            iconSize: 13,
+            onPressed: () => showSettingsDialog(context),
           ),
           _TitleBarButton(
             icon: LucideIcons.minus,

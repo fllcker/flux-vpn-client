@@ -2,8 +2,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
+import '../../core_abstraction/app_settings.dart';
+import '../../core_abstraction/app_settings_provider.dart';
 import '../../core_abstraction/core_config_provider.dart';
 import '../../widgets/globe/country_centroids.dart';
+import '../../widgets/globe/shader_background.dart';
 import '../../widgets/globe/sphere_globe.dart';
 import '../../widgets/globe/starfield.dart';
 import '../servers/flag_emoji.dart';
@@ -48,8 +51,9 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
         .read(coreConfigProvider)
         .subscriptions
         .where((s) => s.autoRefreshOnStartup);
+    final autoGroup = ref.read(appSettingsProvider).autoGroupSubscriptions;
     for (final subscription in subscriptions) {
-      final result = await refreshSubscription(subscription);
+      final result = await refreshSubscription(subscription, autoGroup: autoGroup);
       if (!mounted) return;
       if (result case SubscriptionImportResultOk(:final subscription)) {
         ref.read(coreConfigProvider.notifier).updateSubscription(subscription);
@@ -61,7 +65,9 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   Widget build(BuildContext context) {
     final rightPanelView = ref.watch(rightPanelViewProvider);
     final theme = ShadTheme.of(context);
-    final showGlobe = rightPanelView is ConnectView;
+    final homeBackground = ref.watch(appSettingsProvider).homeBackground;
+    final showBackground =
+        rightPanelView is ConnectView && homeBackground != HomeBackground.none;
 
     return ColoredBox(
       color: theme.colorScheme.background,
@@ -71,29 +77,45 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
           Expanded(
             child: Stack(
               children: [
-                if (showGlobe) ...[
-                  Positioned.fill(
-                    child: Starfield(
-                      color: theme.colorScheme.foreground,
-                      rotation: _rotation,
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: Center(
-                      child: SizedBox(
-                        width: 620,
-                        height: 620,
-                        child: SphereGlobe(
-                          color: theme.colorScheme.primary.withValues(
-                            alpha: 0.45,
+                if (showBackground)
+                  switch (homeBackground) {
+                    HomeBackground.none => const SizedBox.shrink(),
+                    HomeBackground.globe => Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Starfield(
+                            color: theme.colorScheme.foreground,
+                            rotation: _rotation,
                           ),
-                          markers: _selectedServerMarker(context, ref),
-                          rotationController: _rotation,
                         ),
+                        Positioned.fill(
+                          child: Center(
+                            child: SizedBox(
+                              width: 620,
+                              height: 620,
+                              child: SphereGlobe(
+                                color: theme.colorScheme.primary.withValues(
+                                  alpha: 0.45,
+                                ),
+                                markers: _selectedServerMarker(context, ref),
+                                rotationController: _rotation,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    HomeBackground.simpleGradient => const Positioned.fill(
+                      child: ShaderBackground(
+                        assetPath: 'shaders/simple_gradient.frag',
                       ),
                     ),
-                  ),
-                ],
+                    HomeBackground.colorBends => const Positioned.fill(
+                      child: ShaderBackground(
+                        assetPath: 'shaders/color_bends.frag',
+                      ),
+                    ),
+                  },
                 switch (rightPanelView) {
                   ConnectView() => const ConnectPanel(),
                   SubscriptionInfoView(:final subscriptionId) =>
