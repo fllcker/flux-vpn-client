@@ -76,7 +76,7 @@ class XrayEngineWindows implements CoreEngine {
     _activeMode = mode;
 
     final configFile = await File(
-      '${Directory.systemTemp.path}/vpn_client_xray_$id.json',
+      '${Directory.systemTemp.path}/flux_xray_$id.json',
     ).writeAsString(jsonEncode(xrayConfig));
     _configFile = configFile;
 

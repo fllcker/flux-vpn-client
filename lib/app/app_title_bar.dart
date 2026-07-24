@@ -54,9 +54,15 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(
                   children: [
-                    Text('🛡️', style: const TextStyle(fontSize: 14)),
+                    Image.asset(
+                      'assets/icon.png',
+                      width: 20,
+                      height: 20,
+                      color: theme.colorScheme.foreground,
+                      colorBlendMode: BlendMode.srcIn,
+                    ),
                     const SizedBox(width: 8),
-                    Text('VPN Client', style: theme.textTheme.small),
+                    Text('Flux', style: theme.textTheme.small),
                   ],
                 ),
               ),

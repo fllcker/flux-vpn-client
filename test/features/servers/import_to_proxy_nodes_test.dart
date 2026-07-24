@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vpn_client/core_abstraction/proxy_node.dart';
-import 'package:vpn_client/core_abstraction/server_config.dart';
-import 'package:vpn_client/features/servers/import_result.dart';
-import 'package:vpn_client/features/servers/import_to_proxy_nodes.dart';
+import 'package:flux/core_abstraction/proxy_node.dart';
+import 'package:flux/core_abstraction/server_config.dart';
+import 'package:flux/features/servers/import_result.dart';
+import 'package:flux/features/servers/import_to_proxy_nodes.dart';
 
 void main() {
   test('converts imported servers to one ServerLeaf each', () {

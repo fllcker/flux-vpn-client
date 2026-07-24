@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vpn_client/core_abstraction/core_config.dart';
-import 'package:vpn_client/core_abstraction/proxy_node.dart';
-import 'package:vpn_client/core_abstraction/server_config.dart';
-import 'package:vpn_client/core_abstraction/subscription.dart';
+import 'package:flux/core_abstraction/core_config.dart';
+import 'package:flux/core_abstraction/proxy_node.dart';
+import 'package:flux/core_abstraction/server_config.dart';
+import 'package:flux/core_abstraction/subscription.dart';
 
 void main() {
   test('CoreConfig round-trips through JSON', () {

@@ -20,7 +20,7 @@ void main() async {
     titleBarStyle: TitleBarStyle.hidden,
   );
 
-  runApp(ProviderScope(child: VpnClientApp(navigatorKey: _navigatorKey)));
+  runApp(ProviderScope(child: FluxApp(navigatorKey: _navigatorKey)));
 
   windowManager.waitUntilReadyToShow(windowOptions, () async {
     await _warmUpOverlays();
@@ -47,16 +47,16 @@ Future<void> _warmUpOverlays() async {
   }
 }
 
-class VpnClientApp extends StatelessWidget {
+class FluxApp extends StatelessWidget {
   final GlobalKey<NavigatorState> navigatorKey;
 
-  const VpnClientApp({super.key, required this.navigatorKey});
+  const FluxApp({super.key, required this.navigatorKey});
 
   @override
   Widget build(BuildContext context) {
     return ShadApp(
       navigatorKey: navigatorKey,
-      title: 'VPN Client',
+      title: 'Flux',
       theme: ShadThemeData(
         brightness: Brightness.dark,
         colorScheme: const ShadZincColorScheme.dark(),

@@ -3,11 +3,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:vpn_client/core_abstraction/core_config.dart';
-import 'package:vpn_client/core_abstraction/core_config_provider.dart';
-import 'package:vpn_client/core_abstraction/proxy_node.dart';
-import 'package:vpn_client/core_abstraction/server_config.dart';
-import 'package:vpn_client/main.dart';
+import 'package:flux/core_abstraction/core_config.dart';
+import 'package:flux/core_abstraction/core_config_provider.dart';
+import 'package:flux/core_abstraction/proxy_node.dart';
+import 'package:flux/core_abstraction/server_config.dart';
+import 'package:flux/main.dart';
 
 void main() {
   // AppTitleBar talks to the native window_manager plugin (isMaximized,
@@ -40,7 +40,7 @@ void main() {
             () => _PresetCoreConfigController(const CoreConfig()),
           ),
         ],
-        child: VpnClientApp(navigatorKey: GlobalKey<NavigatorState>()),
+        child: FluxApp(navigatorKey: GlobalKey<NavigatorState>()),
       ),
     );
 
@@ -83,7 +83,7 @@ void main() {
             ),
           ),
         ],
-        child: VpnClientApp(navigatorKey: GlobalKey<NavigatorState>()),
+        child: FluxApp(navigatorKey: GlobalKey<NavigatorState>()),
       ),
     );
 

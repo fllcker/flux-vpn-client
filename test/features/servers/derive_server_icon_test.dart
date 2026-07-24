@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vpn_client/features/servers/derive_server_icon.dart';
+import 'package:flux/features/servers/derive_server_icon.dart';
 
 void main() {
   test('extracts a flag from a leading ISO country code', () {

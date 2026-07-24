@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vpn_client/core_abstraction/server_config.dart';
-import 'package:vpn_client/features/servers/xray_subscription_parser.dart';
+import 'package:flux/core_abstraction/server_config.dart';
+import 'package:flux/features/servers/xray_subscription_parser.dart';
 
 /// Форма конфигов взята из реальной xray-json подписки (проверено вручную,
 /// сама подписка в репозиторий не попадает).

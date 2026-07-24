@@ -4,7 +4,7 @@ import '../../core_abstraction/server_config.dart';
 /// случайное имя ("utunN") при каждом запуске, и в системе постепенно
 /// накапливаются адаптеры-призраки от прошлых сессий вместо переиспользования
 /// одного и того же.
-const tunInterfaceName = 'vpnclient0';
+const tunInterfaceName = 'flux0';
 
 /// Строит xray-core JSON-конфиг для одного VLESS-сервера в Proxy-режиме
 /// (Вариант B — локальный SOCKS/HTTP). Полноценный экспорт из дерева

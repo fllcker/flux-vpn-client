@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vpn_client/core_abstraction/proxy_node.dart';
-import 'package:vpn_client/core_abstraction/server_config.dart';
-import 'package:vpn_client/features/servers/group_leaves_by_name.dart';
+import 'package:flux/core_abstraction/proxy_node.dart';
+import 'package:flux/core_abstraction/server_config.dart';
+import 'package:flux/features/servers/group_leaves_by_name.dart';
 
 ServerLeaf _leaf(String name) => ServerLeaf(
   id: name,

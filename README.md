@@ -1,6 +1,6 @@
-# vpn_client
+# Flux
 
-A new Flutter project.
+A cross-platform VLESS/VPN client.
 
 ## Getting Started
 
