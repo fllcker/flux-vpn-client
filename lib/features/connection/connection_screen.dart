@@ -9,6 +9,7 @@ import '../../widgets/globe/country_centroids.dart';
 import '../../widgets/globe/shader_background.dart';
 import '../../widgets/globe/sphere_globe.dart';
 import '../../widgets/globe/starfield.dart';
+import '../ping/ping_all.dart';
 import '../servers/flag_emoji.dart';
 import '../servers/flatten_leaves.dart';
 import '../servers/right_panel_view.dart';
@@ -37,7 +38,10 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _autoRefreshSubscriptions());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoRefreshSubscriptions();
+      _pingAllOnStartup();
+    });
   }
 
   @override
@@ -59,6 +63,11 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
         ref.read(coreConfigProvider.notifier).updateSubscription(subscription);
       }
     }
+  }
+
+  void _pingAllOnStartup() {
+    if (!ref.read(appSettingsProvider).pingAllOnStartup) return;
+    pingAllLeaves(ref, flattenAllLeaves(ref.read(coreConfigProvider)));
   }
 
   @override

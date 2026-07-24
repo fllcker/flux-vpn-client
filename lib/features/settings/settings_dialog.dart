@@ -110,6 +110,13 @@ class SettingsDialog extends ConsumerWidget {
                 );
               },
             ),
+            const SizedBox(height: 12),
+            ShadSwitch(
+              value: settings.pingAllOnStartup,
+              label: const Text('Пинговать все серверы при открытии'),
+              onChanged: (value) =>
+                  notifier.update((s) => s.copyWith(pingAllOnStartup: value)),
+            ),
             const SizedBox(height: 20),
             const _SectionLabel('Подписка'),
             const SizedBox(height: 10),

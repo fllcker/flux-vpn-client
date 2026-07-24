@@ -4,6 +4,8 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
+import '../ping/ping_all.dart';
+import '../ping/ping_cache.dart';
 import 'filter_hidden_nodes.dart';
 import 'flatten_leaves.dart';
 import 'import_subscription_sheet.dart';
@@ -56,6 +58,14 @@ class ServerListPanel extends ConsumerWidget {
       );
     }
 
+    final pingCache = ref.watch(pingCacheProvider);
+    final pingingLeafIds = ref.watch(pingingLeafIdsProvider);
+
+    void onPingLeaf(String leafId) {
+      final leaf = allLeaves.where((l) => l.id == leafId).firstOrNull;
+      if (leaf != null) pingLeaf(ref, leaf);
+    }
+
     return Container(
       width: 260,
       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -70,6 +80,13 @@ class ServerListPanel extends ConsumerWidget {
             child: Row(
               children: [
                 Expanded(child: Text('Серверы', style: theme.textTheme.h4)),
+                if (allLeaves.isNotEmpty)
+                  ShadIconButton.ghost(
+                    icon: const Icon(LucideIcons.activity, size: 16),
+                    onPressed: pingingLeafIds.isEmpty
+                        ? () => pingAllLeaves(ref, allLeaves)
+                        : null,
+                  ),
                 ShadIconButton.ghost(
                   icon: const Icon(LucideIcons.plus, size: 18),
                   onPressed: () => showAddServerDialog(context),
@@ -96,6 +113,9 @@ class ServerListPanel extends ConsumerWidget {
                           onSelectLeaf: onSelectLeaf,
                           onSelectVariant: onSelectVariant,
                           onEditRoutingLeaf: onEditRoutingLeaf,
+                          onPingLeaf: onPingLeaf,
+                          latencyForLeaf: (id) => pingCache[id]?.latencyMs,
+                          pingingLeafIds: pingingLeafIds,
                         ),
                       for (final subscription in config.subscriptions) ...[
                         _SubscriptionHeader(
@@ -115,6 +135,9 @@ class ServerListPanel extends ConsumerWidget {
                           onSelectVariant: onSelectVariant,
                           onHideLeaf: onHideLeaf,
                           onEditRoutingLeaf: onEditRoutingLeaf,
+                          onPingLeaf: onPingLeaf,
+                          latencyForLeaf: (id) => pingCache[id]?.latencyMs,
+                          pingingLeafIds: pingingLeafIds,
                         ),
                       ],
                     ],

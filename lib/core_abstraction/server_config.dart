@@ -11,6 +11,10 @@ sealed class ServerConfig {
   /// состояния при рефреше подписки, см. `merge_subscription_tree.dart`).
   String get address;
 
+  /// Порт хоста — общий для всех протоколов, нужен, например, для TCP-пинга
+  /// без запуска ядра (см. `ping_service.dart`).
+  int get port;
+
   Map<String, dynamic> toJson();
 
   /// Диспетчер по полю `protocol`. Незнакомый протокол — ошибка формата, а
@@ -34,6 +38,7 @@ enum VlessSecurity { none, tls, reality }
 class VlessConfig extends ServerConfig {
   @override
   final String address;
+  @override
   final int port;
   final String uuid;
   final String? flow;
@@ -109,6 +114,7 @@ class VlessConfig extends ServerConfig {
 class Hysteria2Config extends ServerConfig {
   @override
   final String address;
+  @override
   final int port;
   final String auth;
   final String? sni;

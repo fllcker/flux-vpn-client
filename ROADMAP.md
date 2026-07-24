@@ -12,7 +12,7 @@
 1. ~~Hysteria2~~ — сделано
 2. ~~Скрытие серверов~~ — сделано
 3. ~~Роутинг (per-server + bulk на подписку)~~ — сделано
-4. Пинг
+4. ~~Пинг~~ — сделано
 5. Авто-режим
 6. Drag-and-drop сортировка
 7. Трей + автозапуск
@@ -217,7 +217,24 @@ class IpRule extends RoutingRule {
 
 ---
 
-## 4. Пинг
+## 4. Пинг — сделано
+
+`lib/features/ping/ping_service.dart` — `PingService.ping()` диспетчер по
+`PingMode`: `tcp` (`Socket.connect`), `icmp` (`Process.run('ping', ...)` +
+парсинг вывода), `viaProxy`. `viaProxy` реализован **не через встроенный
+Observatory**, как задумывалось ниже, а через временный xray-процесс с
+одним outbound'ом (`buildXrayConfig` на свободных портах) и таймингом
+HTTP-запроса на `pingTestUrl` через его локальный HTTP-инбаунд — тот же
+итоговый результат, без gRPC-клиента к Stats API, которого в проекте нет
+(см. "Открытые вопросы" в PLAN.md). Кэш — `lib/features/ping/ping_cache.dart`
+(`%AppData%\flux\ping_cache.json`, `PingCacheEntry{latencyMs, measuredAt}`,
+`pingCacheProvider`) + `pingingLeafIdsProvider` для UI-состояния "сейчас
+измеряется". Общая логика пинга одного/всех серверов —
+`lib/features/ping/ping_all.dart` (`pingLeaf`/`pingAllLeaves`), переиспользуется
+кнопкой на `server_row.dart`, кнопкой "Пинг всех" в `server_list_panel.dart` и
+автопингом при старте (`connection_screen.dart`, настройка
+`pingAllOnStartup` в `settings_dialog.dart`). Тесты —
+`ping_service_test.dart` (TCP), `ping_cache_test.dart` (JSON round-trip).
 
 Основа для авто-режима (трек 5) — делаем раньше него. Уже есть настройки
 (`app_settings.dart`): `PingMode` (`viaProxy` / `tcp` / `icmp`) и

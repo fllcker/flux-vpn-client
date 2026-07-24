@@ -18,6 +18,11 @@ class ServerRow extends StatefulWidget {
   // (см. ROADMAP.md, трек 2) — null здесь значит "не показывать пункт".
   final VoidCallback? onHide;
   final VoidCallback? onEditRouting;
+  // Задержка из кэша пинга (см. ROADMAP.md, трек 4) — null значит "ещё не
+  // измеряли". onPing == null скрывает индикатор целиком.
+  final int? latencyMs;
+  final bool pinging;
+  final VoidCallback? onPing;
 
   const ServerRow({
     super.key,
@@ -29,6 +34,9 @@ class ServerRow extends StatefulWidget {
     required this.onToggleExpand,
     this.onHide,
     this.onEditRouting,
+    this.latencyMs,
+    this.pinging = false,
+    this.onPing,
   });
 
   @override
@@ -130,6 +138,12 @@ class _ServerRowState extends State<ServerRow> {
                   ],
                 ),
               ),
+              if (widget.onPing != null)
+                _PingIndicator(
+                  latencyMs: widget.latencyMs,
+                  pinging: widget.pinging,
+                  onPing: widget.onPing!,
+                ),
               if (hasVariantChoice)
                 Icon(
                   widget.expanded
@@ -143,6 +157,58 @@ class _ServerRowState extends State<ServerRow> {
         ),
       ),
     );
+  }
+}
+
+/// Задержка сервера — тап заново запускает замер. Обёрнут в свой
+/// `GestureDetector`, вложенный в тап-область всей строки: Flutter
+/// разрешает такую вложенность в пользу самого внутреннего распознавателя
+/// (обычный паттерн — иконка-кнопка внутри кликабельного `ListTile`).
+class _PingIndicator extends StatelessWidget {
+  final int? latencyMs;
+  final bool pinging;
+  final VoidCallback onPing;
+
+  const _PingIndicator({
+    required this.latencyMs,
+    required this.pinging,
+    required this.onPing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+
+    if (pinging) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Text(
+          '…',
+          style: theme.textTheme.muted.copyWith(fontSize: 11),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: onPing,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Text(
+          latencyMs == null ? '—' : '${latencyMs}ms',
+          style: theme.textTheme.muted.copyWith(
+            fontSize: 11,
+            color: _latencyColor(latencyMs) ?? theme.colorScheme.mutedForeground,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color? _latencyColor(int? ms) {
+    if (ms == null) return null;
+    if (ms < 100) return const Color(0xFF4ADE80);
+    if (ms < 300) return const Color(0xFFFACC15);
+    return const Color(0xFFF87171);
   }
 }
 

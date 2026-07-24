@@ -21,6 +21,7 @@ class AppSettings {
   final HomeBackground homeBackground;
   final PingMode pingMode;
   final String pingTestUrl;
+  final bool pingAllOnStartup;
   final bool autoGroupSubscriptions;
 
   const AppSettings({
@@ -28,6 +29,7 @@ class AppSettings {
     this.homeBackground = HomeBackground.globe,
     this.pingMode = PingMode.viaProxy,
     this.pingTestUrl = _defaultPingTestUrl,
+    this.pingAllOnStartup = false,
     this.autoGroupSubscriptions = true,
   });
 
@@ -48,6 +50,7 @@ class AppSettings {
       PingMode.viaProxy,
     ),
     pingTestUrl: json['pingTestUrl'] as String? ?? _defaultPingTestUrl,
+    pingAllOnStartup: json['pingAllOnStartup'] as bool? ?? false,
     autoGroupSubscriptions: json['autoGroupSubscriptions'] as bool? ?? true,
   );
 
@@ -56,6 +59,7 @@ class AppSettings {
     'homeBackground': homeBackground.name,
     'pingMode': pingMode.name,
     'pingTestUrl': pingTestUrl,
+    'pingAllOnStartup': pingAllOnStartup,
     'autoGroupSubscriptions': autoGroupSubscriptions,
   };
 
@@ -64,6 +68,7 @@ class AppSettings {
     HomeBackground? homeBackground,
     PingMode? pingMode,
     String? pingTestUrl,
+    bool? pingAllOnStartup,
     bool? autoGroupSubscriptions,
   }) {
     return AppSettings(
@@ -71,6 +76,7 @@ class AppSettings {
       homeBackground: homeBackground ?? this.homeBackground,
       pingMode: pingMode ?? this.pingMode,
       pingTestUrl: pingTestUrl ?? this.pingTestUrl,
+      pingAllOnStartup: pingAllOnStartup ?? this.pingAllOnStartup,
       autoGroupSubscriptions:
           autoGroupSubscriptions ?? this.autoGroupSubscriptions,
     );
