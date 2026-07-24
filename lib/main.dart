@@ -20,6 +20,41 @@ import 'features/servers/import_subscription_sheet.dart';
 
 final _navigatorKey = GlobalKey<NavigatorState>();
 
+// Дефолтные анимации shadcn_ui (fade+scale, 300ms открытие / 150-300ms
+// закрытие) на десктопе ощущаются вязко — диалоги и контекстные меню должны
+// открываться почти мгновенно. Укорачиваем длительность, оставляя те же
+// fade+scale эффекты, чтобы не менять сам стиль анимации.
+const _fastPopoverTheme = ShadPopoverTheme(
+  effects: [
+    FadeEffect(duration: Duration(milliseconds: 90)),
+    ScaleEffect(
+      duration: Duration(milliseconds: 90),
+      begin: Offset(.95, .95),
+      end: Offset(1, 1),
+    ),
+  ],
+  reverseDuration: Duration(milliseconds: 80),
+);
+
+const _fastDialogTheme = ShadDialogTheme(
+  animateIn: [
+    FadeEffect(duration: Duration(milliseconds: 110)),
+    ScaleEffect(
+      duration: Duration(milliseconds: 110),
+      begin: Offset(.95, .95),
+      end: Offset(1, 1),
+    ),
+  ],
+  animateOut: [
+    FadeEffect(duration: Duration(milliseconds: 90), begin: 1, end: 0),
+    ScaleEffect(
+      duration: Duration(milliseconds: 90),
+      begin: Offset(1, 1),
+      end: Offset(.95, .95),
+    ),
+  ],
+);
+
 void main(List<String> args) async {
   // Windows передаёт зарегистрированный `flux://...` URL как аргумент
   // командной строки — как при первом запуске, так и при повторном клике по
@@ -173,11 +208,17 @@ class _FluxAppState extends ConsumerState<FluxApp> with WindowListener {
         brightness: Brightness.light,
         colorScheme: const ShadZincColorScheme.light(),
         textTheme: ShadTextTheme.fromGoogleFont(GoogleFonts.inter),
+        popoverTheme: _fastPopoverTheme,
+        primaryDialogTheme: _fastDialogTheme,
+        alertDialogTheme: _fastDialogTheme,
       ),
       darkTheme: ShadThemeData(
         brightness: Brightness.dark,
         colorScheme: const ShadZincColorScheme.dark(),
         textTheme: ShadTextTheme.fromGoogleFont(GoogleFonts.inter),
+        popoverTheme: _fastPopoverTheme,
+        primaryDialogTheme: _fastDialogTheme,
+        alertDialogTheme: _fastDialogTheme,
       ),
       home: const ClipboardImportHotkey(
         child: Column(
