@@ -152,9 +152,27 @@ sealed class ProxyNode {
     return switch (type) {
       'leaf' => ServerLeaf.fromJson(json),
       'group' => ServerGroup.fromJson(json),
+      'auto' => AutoSelectMarker.fromJson(json),
       _ => throw FormatException('Unknown ProxyNode.type: $type'),
     };
   }
+}
+
+/// Псевдо-узел "Авто" — не сервер, а маркер, который автогруппировка
+/// (`insert_auto_select_markers.dart`) вставляет первым элементом в каждую
+/// `ServerGroup.children`. Клик по нему в UI один раз выбирает сервер с
+/// наименьшей задержкой среди листьев группы (см.
+/// `pick_best_by_latency.dart`) — не отдельный узел подключения сам по
+/// себе, реального `ServerConfig` тут нет. V1 — разовый выбор, не live
+/// failover, см. ROADMAP.md, трек 5.
+class AutoSelectMarker extends ProxyNode {
+  const AutoSelectMarker({required super.id, super.name = 'Авто'});
+
+  factory AutoSelectMarker.fromJson(Map<String, dynamic> json) =>
+      AutoSelectMarker(id: json['id'] as String, name: json['name'] as String);
+
+  @override
+  Map<String, dynamic> toJson() => {'type': 'auto', 'id': id, 'name': name};
 }
 
 class ServerLeaf extends ProxyNode {
@@ -247,6 +265,7 @@ ProxyNode replaceLeafSelection(ProxyNode node, String leafId, String variantId) 
     ServerLeaf leaf when leaf.id == leafId =>
       leaf.withSelection(ManualVariantSelection(variantId)),
     ServerLeaf leaf => leaf,
+    AutoSelectMarker marker => marker,
     ServerGroup group => ServerGroup(
       id: group.id,
       name: group.name,
@@ -277,6 +296,7 @@ ProxyNode setNodeHidden(ProxyNode node, String nodeId, bool hidden) {
       routingRules: leaf.routingRules,
     ),
     ServerLeaf leaf => leaf,
+    AutoSelectMarker marker => marker,
     ServerGroup group => ServerGroup(
       id: group.id,
       name: group.name,
@@ -303,6 +323,7 @@ ProxyNode setLeafRoutingRules(
   return switch (node) {
     ServerLeaf leaf when leaf.id == leafId => leaf.withRoutingRules(rules),
     ServerLeaf leaf => leaf,
+    AutoSelectMarker marker => marker,
     ServerGroup group => ServerGroup(
       id: group.id,
       name: group.name,
@@ -311,6 +332,28 @@ ProxyNode setLeafRoutingRules(
       strategy: group.strategy,
       children: group.children
           .map((c) => setLeafRoutingRules(c, leafId, rules))
+          .toList(),
+    ),
+  };
+}
+
+/// Ищет [ServerGroup] с [groupId] в дереве и возвращает копию дерева с его
+/// [ServerGroup.strategy], заменённой на [strategy]. Остальные узлы
+/// возвращаются как есть — используется, когда пользователь кликает "Авто"
+/// на группе (см. `pick_best_by_latency.dart`), чтобы запомнить сам факт
+/// выбора авто-режима для этой группы, см. ROADMAP.md, трек 5.
+ProxyNode setGroupStrategy(ProxyNode node, String groupId, GroupStrategy strategy) {
+  return switch (node) {
+    ServerLeaf leaf => leaf,
+    AutoSelectMarker marker => marker,
+    ServerGroup group => ServerGroup(
+      id: group.id,
+      name: group.name,
+      icon: group.icon,
+      hidden: group.hidden,
+      strategy: group.id == groupId ? strategy : group.strategy,
+      children: group.children
+          .map((c) => setGroupStrategy(c, groupId, strategy))
           .toList(),
     ),
   };

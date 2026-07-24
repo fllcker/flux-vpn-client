@@ -6,6 +6,7 @@ import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../ping/ping_all.dart';
 import '../ping/ping_cache.dart';
+import '../ping/pick_best_by_latency.dart';
 import 'filter_hidden_nodes.dart';
 import 'flatten_leaves.dart';
 import 'import_subscription_sheet.dart';
@@ -64,6 +65,20 @@ class ServerListPanel extends ConsumerWidget {
     void onPingLeaf(String leafId) {
       final leaf = allLeaves.where((l) => l.id == leafId).firstOrNull;
       if (leaf != null) pingLeaf(ref, leaf);
+    }
+
+    // V1 — разовый выбор (не live failover): берём лучший по свежему кэшу
+    // пинга, иначе — первый по списку и фоновый пинг группы на будущее. См.
+    // ROADMAP.md, трек 5.
+    void onSelectAuto(String groupId, List<ServerLeaf> leavesInGroup) {
+      if (leavesInGroup.isEmpty) return;
+      final bestId =
+          pickBestByLatency(leavesInGroup, pingCache) ?? leavesInGroup.first.id;
+      onSelectLeaf(bestId);
+      ref.read(coreConfigProvider.notifier).markGroupAutoSelected(groupId);
+      if (pickBestByLatency(leavesInGroup, pingCache) == null) {
+        pingAllLeaves(ref, leavesInGroup);
+      }
     }
 
     return Container(
@@ -138,6 +153,8 @@ class ServerListPanel extends ConsumerWidget {
                           onPingLeaf: onPingLeaf,
                           latencyForLeaf: (id) => pingCache[id]?.latencyMs,
                           pingingLeafIds: pingingLeafIds,
+                          parentGroupId: subscription.root.id,
+                          onSelectAuto: onSelectAuto,
                         ),
                       ],
                     ],

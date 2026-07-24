@@ -13,7 +13,7 @@
 2. ~~Скрытие серверов~~ — сделано
 3. ~~Роутинг (per-server + bulk на подписку)~~ — сделано
 4. ~~Пинг~~ — сделано
-5. Авто-режим
+5. ~~Авто-режим~~ — сделано
 6. Drag-and-drop сортировка
 7. Трей + автозапуск
 8. Фон — шейдерные эффекты (Color Bends → Galaxy)
@@ -285,7 +285,43 @@ HTTP-запроса на `pingTestUrl` через его локальный HTTP
 
 ---
 
-## 5. Авто-режим как узел Magic JSON
+## 5. Авто-режим как узел Magic JSON — сделано
+
+`proxy_node.dart` — `AutoSelectMarker extends ProxyNode` (id + name,
+дефолт "Авто"), диспетчер `ProxyNode.fromJson` понимает `type: "auto"`.
+`insert_auto_select_markers.dart` — `insertAutoSelectMarkers(ProxyNode)`
+рекурсивно вставляет свежий маркер первым элементом в каждую `ServerGroup`
+(вложенные тоже); вызывается один раз в `subscription_import.dart` при
+построении дерева подписки (после `groupLeavesByName`), в т.ч. на
+рефреше — маркер не переносится через `merge_subscription_tree.dart`
+(пересоздаётся каждый раз, состояния не несёт). `pick_best_by_latency.dart`
+— чистая функция `pickBestByLatency(leaves, pingCache) -> id?`, игнорирует
+как отсутствующие, так и устаревшие (>5 минут) записи кэша пинга. Клик по
+строке "Авто" в `proxy_tree_list.dart` (иконка ⚡, компонент `_AutoRow`)
+собирает `flattenLeaves` всех серверов группы (рекурсивно, вложенные группы
+тоже, свои Auto-маркеры пропускаются) и в `server_list_panel.dart` выбирает
+лучший по кэшу — либо, если кэша нет, первый по списку + фоновый
+`pingAllLeaves` на будущее; сам выбор "проваливается" в обычный
+`onSelectLeaf`, так что дальше в UI подсвечивается как обычно выбранный
+сервер (никакого отдельного понятия "активен через Авто" не заводили,
+см. ниже про пределы v1). `core_config_provider.dart` →
+`markGroupAutoSelected(groupId)` фиксирует `GroupStrategy.urlTest` на
+группе (данные, никуда пока не читаются, задел под трек live failover).
+Поскольку `ProxyNode` — sealed class, добавление `AutoSelectMarker`
+потребовало явного case во всех исчерпывающих switch по дереву:
+`replaceLeafSelection`/`setNodeHidden`/`setLeafRoutingRules` (проброс без
+изменений), `filter_hidden_nodes.dart` (группа, где после фильтрации
+скрытых остался только маркер, тоже пустая — дропается),
+`flatten_leaves.dart`/`core_config_provider._flattenLeaves` (пропускается,
+не реальный сервер), `xray_engine_windows._firstLeaf` (пропускается при
+поиске первого подключаемого листа). Тесты —
+`insert_auto_select_markers_test.dart`, `pick_best_by_latency_test.dart`,
+плюс кейсы на проброс/JSON в `proxy_node_test.dart`,
+`filter_hidden_nodes_test.dart`.
+
+Live failover (авто-переподключение при обрыве текущего сервера) — не
+сделан, `pickBestByLatency` спроектирован под это, но вызывающая сторона
+(таймер/детект обрыва) не реализована, см. "V1" ниже.
 
 Отдельный узел (не флаг на группе) — даёт больше свободы в UI: можно
 кликнуть, увидеть, какой сервер сейчас активен по факту.

@@ -10,6 +10,7 @@ import 'group_leaves_by_name.dart';
 import 'hysteria2_link_parser.dart';
 import 'import_result.dart';
 import 'import_to_proxy_nodes.dart';
+import 'insert_auto_select_markers.dart';
 import 'merge_subscription_tree.dart';
 import 'vless_link_parser.dart';
 import 'xray_subscription_parser.dart';
@@ -117,10 +118,12 @@ Future<LinkImportResult> importLink(
     traffic: userinfo?.traffic,
     expiresAt: userinfo?.expiresAt,
     lastRefreshedAt: DateTime.now(),
-    root: ServerGroup(
-      id: _uuid.v4(),
-      name: name,
-      children: autoGroup ? groupLeavesByName(leaves) : leaves,
+    root: insertAutoSelectMarkers(
+      ServerGroup(
+        id: _uuid.v4(),
+        name: name,
+        children: autoGroup ? groupLeavesByName(leaves) : leaves,
+      ),
     ),
   );
 

@@ -71,4 +71,37 @@ void main() {
     expect(restoredIp.values, ip.values);
     expect(restoredIp.outboundTag, 'direct');
   });
+
+  test('AutoSelectMarker round-trips through JSON', () {
+    const marker = AutoSelectMarker(id: 'auto-1');
+
+    final restored = ProxyNode.fromJson(marker.toJson()) as AutoSelectMarker;
+
+    expect(restored.id, 'auto-1');
+    expect(restored.name, 'Авто');
+  });
+
+  test('setGroupStrategy replaces strategy on a matching group only', () {
+    const nested = ServerGroup(id: 'nested', name: 'N', children: [_leaf]);
+    const root = ServerGroup(id: 'root', name: 'R', children: [nested]);
+
+    final result = setGroupStrategy(root, 'nested', GroupStrategy.urlTest) as ServerGroup;
+
+    expect(result.strategy, GroupStrategy.select);
+    expect((result.children.single as ServerGroup).strategy, GroupStrategy.urlTest);
+  });
+
+  test('setNodeHidden/setLeafRoutingRules/replaceLeafSelection pass an AutoSelectMarker through unchanged', () {
+    const marker = AutoSelectMarker(id: 'auto-1');
+    const group = ServerGroup(id: 'g', name: 'G', children: [marker, _leaf]);
+
+    final afterHidden = setNodeHidden(group, 'leaf-1', true) as ServerGroup;
+    expect(afterHidden.children.first, same(marker));
+
+    final afterRules = setLeafRoutingRules(group, 'leaf-1', const []) as ServerGroup;
+    expect(afterRules.children.first, same(marker));
+
+    final afterSelection = replaceLeafSelection(group, 'leaf-1', 'v1') as ServerGroup;
+    expect(afterSelection.children.first, same(marker));
+  });
 }

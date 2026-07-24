@@ -8,6 +8,7 @@ import '../../core_abstraction/proxy_node.dart';
 ProxyNode? filterHidden(ProxyNode node) {
   return switch (node) {
     ServerLeaf leaf => leaf.hidden ? null : leaf,
+    AutoSelectMarker marker => marker,
     ServerGroup group => _filterGroup(group),
   };
 }
@@ -18,7 +19,10 @@ ServerGroup? _filterGroup(ServerGroup group) {
       .map(filterHidden)
       .whereType<ProxyNode>()
       .toList();
-  if (children.isEmpty) return null;
+  // Пустая группа бесполезна и путает — но группа, где после фильтрации
+  // остался только маркер "Авто" (см. ROADMAP.md, трек 5), с тем же успехом
+  // пуста: выбирать не из чего.
+  if (children.every((c) => c is AutoSelectMarker)) return null;
   return ServerGroup(
     id: group.id,
     name: group.name,

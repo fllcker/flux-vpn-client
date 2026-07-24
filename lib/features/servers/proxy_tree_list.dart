@@ -4,6 +4,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../core_abstraction/proxy_node.dart';
 import 'expanded_nodes_provider.dart';
+import 'flatten_leaves.dart';
 import 'server_row.dart';
 
 /// Рекурсивный рендер дерева серверов/групп — инлайн-аккордеон: клик по
@@ -28,6 +29,13 @@ class ProxyTreeList extends ConsumerWidget {
   final ValueChanged<String>? onPingLeaf;
   final int? Function(String leafId)? latencyForLeaf;
   final Set<String> pingingLeafIds;
+  // Id группы, чьи дети рендерит этот уровень рекурсии — нужен только для
+  // клика по строке "Авто" (см. ROADMAP.md, трек 5): она находится среди
+  // `nodes` этого же уровня, но сама группа-владелец недоступна отсюда без
+  // явной передачи id.
+  final String? parentGroupId;
+  final void Function(String groupId, List<ServerLeaf> leavesInGroup)?
+  onSelectAuto;
 
   const ProxyTreeList({
     super.key,
@@ -41,6 +49,8 @@ class ProxyTreeList extends ConsumerWidget {
     this.onPingLeaf,
     this.latencyForLeaf,
     this.pingingLeafIds = const {},
+    this.parentGroupId,
+    this.onSelectAuto,
   });
 
   @override
@@ -74,9 +84,21 @@ class ProxyTreeList extends ConsumerWidget {
                     onPingLeaf: onPingLeaf,
                     latencyForLeaf: latencyForLeaf,
                     pingingLeafIds: pingingLeafIds,
+                    parentGroupId: group.id,
+                    onSelectAuto: onSelectAuto,
                   ),
               ],
             ),
+            AutoSelectMarker marker => onSelectAuto == null || parentGroupId == null
+                ? const SizedBox.shrink()
+                : _AutoRow(
+                    marker: marker,
+                    depth: depth,
+                    onTap: () => onSelectAuto!(
+                      parentGroupId!,
+                      flattenLeaves(nodes),
+                    ),
+                  ),
             ServerLeaf leaf => Padding(
               padding: const EdgeInsets.only(bottom: 2),
               child: Column(
@@ -114,6 +136,64 @@ class ProxyTreeList extends ConsumerWidget {
             ),
           },
       ],
+    );
+  }
+}
+
+/// Строка псевдо-узла "Авто" — клик один раз выбирает сервер с наименьшей
+/// задержкой среди листьев группы (см. `pick_best_by_latency.dart`); сам
+/// результат подсвечивается как обычная выбранная строка сервера в другом
+/// месте дерева, не здесь — см. ROADMAP.md, трек 5.
+class _AutoRow extends StatefulWidget {
+  final AutoSelectMarker marker;
+  final int depth;
+  final VoidCallback onTap;
+
+  const _AutoRow({required this.marker, required this.depth, required this.onTap});
+
+  @override
+  State<_AutoRow> createState() => _AutoRowState();
+}
+
+class _AutoRowState extends State<_AutoRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
+    final background = _hovered
+        ? scheme.accent.withValues(alpha: 0.5)
+        : const Color(0x00000000);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 2),
+          padding: EdgeInsets.fromLTRB(10 + 14.0 * widget.depth, 8, 10, 8),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(LucideIcons.zap, size: 15, color: scheme.mutedForeground),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  widget.marker.name,
+                  style: theme.textTheme.small,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

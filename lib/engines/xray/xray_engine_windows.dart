@@ -143,6 +143,7 @@ class XrayEngineWindows implements CoreEngine {
   ServerLeaf? _firstLeaf(ProxyNode node) {
     return switch (node) {
       ServerLeaf leaf => leaf,
+      AutoSelectMarker() => null,
       ServerGroup group => group.children
           .map(_firstLeaf)
           .firstWhere((leaf) => leaf != null, orElse: () => null),

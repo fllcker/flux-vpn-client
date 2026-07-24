@@ -57,4 +57,20 @@ void main() {
     expect(filtered, hasLength(1));
     expect((filtered.single as ServerLeaf).id, 'a');
   });
+
+  test('a group left with only the Auto marker after filtering disappears too', () {
+    const group = ServerGroup(
+      id: 'g',
+      name: 'G',
+      children: [AutoSelectMarker(id: 'auto'), _leafB],
+    );
+
+    expect(filterHidden(group), isNull);
+  });
+
+  test('the Auto marker itself always passes through unchanged', () {
+    const marker = AutoSelectMarker(id: 'auto');
+
+    expect(filterHidden(marker), same(marker));
+  });
 }

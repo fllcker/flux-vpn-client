@@ -10,6 +10,8 @@ List<ServerLeaf> flattenLeaves(List<ProxyNode> nodes) {
     switch (node) {
       case ServerLeaf leaf:
         result.add(leaf);
+      case AutoSelectMarker():
+        break;
       case ServerGroup group:
         result.addAll(flattenLeaves(group.children));
     }

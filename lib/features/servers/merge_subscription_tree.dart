@@ -25,6 +25,8 @@ void _indexLeaves(ProxyNode node, Map<String, ServerLeaf> out) {
     case ServerLeaf leaf:
       final address = _primaryAddress(leaf);
       if (address != null) out[address] = leaf;
+    case AutoSelectMarker():
+      break;
     case ServerGroup group:
       for (final child in group.children) {
         _indexLeaves(child, out);
@@ -38,6 +40,10 @@ ProxyNode _merge(ProxyNode node, Map<String, ServerLeaf> oldByAddress) {
       final address = _primaryAddress(leaf);
       final old = address == null ? null : oldByAddress[address];
       return old == null ? leaf : _mergeLeaf(old, leaf);
+    // Псевдо-узел "Авто" пересоздаётся заново при каждом импорте
+    // (`insert_auto_select_markers.dart`) — переносить из него нечего.
+    case AutoSelectMarker marker:
+      return marker;
     case ServerGroup group:
       return ServerGroup(
         id: group.id,

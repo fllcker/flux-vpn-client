@@ -146,6 +146,28 @@ class CoreConfigController extends Notifier<CoreConfig> {
     });
   }
 
+  /// Запоминает, что для группы [groupId] последний раз использовался
+  /// авто-выбор по задержке — см. ROADMAP.md, трек 5. Само подключение уже
+  /// выполнено к моменту вызова (см. `pick_best_by_latency.dart`), это
+  /// только фиксация факта на модели.
+  void markGroupAutoSelected(String groupId) {
+    _update(
+      (config) => CoreConfig(
+        schemaVersion: config.schemaVersion,
+        subscriptions: config.subscriptions
+            .map(
+              (s) => s.copyWith(
+                root: setGroupStrategy(s.root, groupId, GroupStrategy.urlTest),
+              ),
+            )
+            .toList(),
+        standaloneNodes: config.standaloneNodes
+            .map((n) => setGroupStrategy(n, groupId, GroupStrategy.urlTest))
+            .toList(),
+      ),
+    );
+  }
+
   void _update(CoreConfig Function(CoreConfig config) transform) {
     state = transform(state);
     profileStorage.save(state);
@@ -155,6 +177,7 @@ class CoreConfigController extends Notifier<CoreConfig> {
 List<ServerLeaf> _flattenLeaves(ProxyNode node) {
   return switch (node) {
     ServerLeaf leaf => [leaf],
+    AutoSelectMarker() => const [],
     ServerGroup group => [
       for (final child in group.children) ..._flattenLeaves(child),
     ],
