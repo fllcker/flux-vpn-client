@@ -13,6 +13,28 @@ const _leaf = ServerLeaf(
     ),
   ],
 );
+const _leaf2 = ServerLeaf(
+  id: 'leaf-2',
+  name: 'B',
+  variants: [
+    ConnectionVariant(
+      id: 'v2',
+      label: 'TCP',
+      config: VlessConfig(address: 'b.example.com', port: 443, uuid: 'u2'),
+    ),
+  ],
+);
+const _leaf3 = ServerLeaf(
+  id: 'leaf-3',
+  name: 'C',
+  variants: [
+    ConnectionVariant(
+      id: 'v3',
+      label: 'TCP',
+      config: VlessConfig(address: 'c.example.com', port: 443, uuid: 'u3'),
+    ),
+  ],
+);
 
 void main() {
   test('setNodeHidden flips hidden on a matching leaf, leaves others untouched', () {
@@ -103,5 +125,78 @@ void main() {
 
     final afterSelection = replaceLeafSelection(group, 'leaf-1', 'v1') as ServerGroup;
     expect(afterSelection.children.first, same(marker));
+  });
+
+  test('moveNodeInTree reorders a leaf within the same group', () {
+    const group = ServerGroup(
+      id: 'g',
+      name: 'G',
+      children: [_leaf, _leaf2, _leaf3],
+    );
+
+    final result = moveNodeInTree(group, 'leaf-3', 'g', 0) as ServerGroup;
+
+    expect(
+      result.children.map((c) => c.id).toList(),
+      ['leaf-3', 'leaf-1', 'leaf-2'],
+    );
+  });
+
+  test('moveNodeInTree moves a leaf into a different nested group', () {
+    const tree = ServerGroup(
+      id: 'root',
+      name: 'Root',
+      children: [
+        _leaf,
+        ServerGroup(id: 'nested', name: 'Nested', children: [_leaf2]),
+      ],
+    );
+
+    final result = moveNodeInTree(tree, 'leaf-1', 'nested', 1) as ServerGroup;
+
+    expect(result.children.map((c) => c.id).toList(), ['nested']);
+    final nested = result.children.single as ServerGroup;
+    expect(nested.children.map((c) => c.id).toList(), ['leaf-2', 'leaf-1']);
+  });
+
+  test('moveNodeInTree is a no-op when the node id is not in this tree', () {
+    const group = ServerGroup(id: 'g', name: 'G', children: [_leaf]);
+
+    final result = moveNodeInTree(group, 'not-found', 'g', 0);
+
+    expect(result, same(group));
+  });
+
+  test('moveNodeInTree rolls back without losing the node when the target parent is not in this tree', () {
+    const group = ServerGroup(id: 'g', name: 'G', children: [_leaf, _leaf2]);
+
+    final result = moveNodeInTree(group, 'leaf-1', 'other-tree-group', 0);
+
+    expect(result, same(group));
+  });
+
+  test('moveNodeInTree never moves the AutoSelectMarker itself', () {
+    const marker = AutoSelectMarker(id: 'auto-1');
+    const group = ServerGroup(id: 'g', name: 'G', children: [marker, _leaf]);
+
+    final result = moveNodeInTree(group, 'auto-1', 'g', 1);
+
+    expect(result, same(group));
+  });
+
+  test('moveNodeInTree keeps the AutoSelectMarker first even when inserting at index 0', () {
+    const marker = AutoSelectMarker(id: 'auto-1');
+    const group = ServerGroup(
+      id: 'g',
+      name: 'G',
+      children: [marker, _leaf, _leaf2],
+    );
+
+    final result = moveNodeInTree(group, 'leaf-2', 'g', 0) as ServerGroup;
+
+    expect(
+      result.children.map((c) => c.id).toList(),
+      ['auto-1', 'leaf-2', 'leaf-1'],
+    );
   });
 }

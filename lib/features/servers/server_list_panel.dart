@@ -67,6 +67,12 @@ class ServerListPanel extends ConsumerWidget {
       if (leaf != null) pingLeaf(ref, leaf);
     }
 
+    void onReorder(String draggedId, String targetParentGroupId, int targetIndex) {
+      ref
+          .read(coreConfigProvider.notifier)
+          .moveNode(draggedId, targetParentGroupId, targetIndex);
+    }
+
     // V1 — разовый выбор (не live failover): берём лучший по свежему кэшу
     // пинга, иначе — первый по списку и фоновый пинг группы на будущее. См.
     // ROADMAP.md, трек 5.
@@ -131,6 +137,8 @@ class ServerListPanel extends ConsumerWidget {
                           onPingLeaf: onPingLeaf,
                           latencyForLeaf: (id) => pingCache[id]?.latencyMs,
                           pingingLeafIds: pingingLeafIds,
+                          parentGroupId: standaloneParentId,
+                          onReorder: onReorder,
                         ),
                       for (final subscription in config.subscriptions) ...[
                         _SubscriptionHeader(
@@ -155,6 +163,7 @@ class ServerListPanel extends ConsumerWidget {
                           pingingLeafIds: pingingLeafIds,
                           parentGroupId: subscription.root.id,
                           onSelectAuto: onSelectAuto,
+                          onReorder: onReorder,
                         ),
                       ],
                     ],

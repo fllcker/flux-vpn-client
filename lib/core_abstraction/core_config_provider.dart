@@ -168,10 +168,66 @@ class CoreConfigController extends Notifier<CoreConfig> {
     );
   }
 
+  /// Перемещает узел [nodeId] так, чтобы он стал элементом [newIndex] в
+  /// `children` группы [newParentGroupId] — либо, если [newParentGroupId] ==
+  /// [standaloneParentId], элементом [newIndex] плоского списка
+  /// standalone-серверов. Перетаскивание работает только внутри одного
+  /// дерева (одной подписки) или внутри standalone-списка — источник и цель
+  /// в разных деревьях друг для друга просто не существуют, поэтому
+  /// операция no-op'ится сама (см. `moveNodeInTree`), см. ROADMAP.md, трек 6.
+  void moveNode(String nodeId, String newParentGroupId, int newIndex) {
+    if (newParentGroupId == standaloneParentId) {
+      _update(
+        (config) => CoreConfig(
+          schemaVersion: config.schemaVersion,
+          subscriptions: config.subscriptions,
+          standaloneNodes: _reorderStandalone(
+            config.standaloneNodes,
+            nodeId,
+            newIndex,
+          ),
+        ),
+      );
+      return;
+    }
+
+    _update(
+      (config) => CoreConfig(
+        schemaVersion: config.schemaVersion,
+        subscriptions: config.subscriptions
+            .map(
+              (s) => s.copyWith(
+                root: moveNodeInTree(s.root, nodeId, newParentGroupId, newIndex),
+              ),
+            )
+            .toList(),
+        standaloneNodes: config.standaloneNodes,
+      ),
+    );
+  }
+
   void _update(CoreConfig Function(CoreConfig config) transform) {
     state = transform(state);
     profileStorage.save(state);
   }
+}
+
+/// Значение [newParentGroupId] для `CoreConfigController.moveNode`, когда
+/// цель перетаскивания — плоский список standalone-серверов, а не группа
+/// внутри подписки (у standalone-списка нет обёртки-`ServerGroup`, значит и
+/// нет собственного id).
+const standaloneParentId = '__standalone__';
+
+List<ProxyNode> _reorderStandalone(
+  List<ProxyNode> nodes,
+  String nodeId,
+  int newIndex,
+) {
+  final index = nodes.indexWhere((n) => n.id == nodeId);
+  if (index == -1) return nodes;
+  final updated = List<ProxyNode>.of(nodes)..removeAt(index);
+  updated.insert(newIndex.clamp(0, updated.length), nodes[index]);
+  return updated;
 }
 
 List<ServerLeaf> _flattenLeaves(ProxyNode node) {

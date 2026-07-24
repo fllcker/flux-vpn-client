@@ -359,6 +359,123 @@ ProxyNode setGroupStrategy(ProxyNode node, String groupId, GroupStrategy strateg
   };
 }
 
+/// Перемещает узел [nodeId] в [root] так, чтобы он стал элементом с индексом
+/// [newIndex] в `children` группы [newParentGroupId] — драг-н-дроп сортировки
+/// внутри одного дерева (одной подписки), см. ROADMAP.md, трек 6.
+/// [AutoSelectMarker] никогда не перетаскивается — вставка перед ним (индекс
+/// 0 группы, где он есть) сдвигается на 1, чтобы он остался первым.
+///
+/// Если [nodeId] или [newParentGroupId] не нашлись в этом же дереве —
+/// no-op, возвращает [root] как есть (а не дерево с уже вырезанным, но
+/// никуда не вставленным узлом): так перетаскивание между разными деревьями
+/// (другой подпиской/standalone-списком) безопасно проваливается в ничего
+/// не делающий вызов вместо потери сервера.
+ProxyNode moveNodeInTree(
+  ProxyNode root,
+  String nodeId,
+  String newParentGroupId,
+  int newIndex,
+) {
+  final extraction = _extractNode(root, nodeId);
+  final removed = extraction.removed;
+  if (removed == null || removed is AutoSelectMarker) return root;
+  if (!_containsGroup(extraction.tree, newParentGroupId)) return root;
+  return _insertNode(extraction.tree, newParentGroupId, newIndex, removed);
+}
+
+class _Extraction {
+  final ProxyNode? removed;
+  final ProxyNode tree;
+  const _Extraction(this.removed, this.tree);
+}
+
+_Extraction _extractNode(ProxyNode node, String nodeId) {
+  return switch (node) {
+    ServerLeaf leaf => _Extraction(null, leaf),
+    AutoSelectMarker marker => _Extraction(null, marker),
+    ServerGroup group => _extractFromGroup(group, nodeId),
+  };
+}
+
+_Extraction _extractFromGroup(ServerGroup group, String nodeId) {
+  ProxyNode? removed;
+  final newChildren = <ProxyNode>[];
+  for (final child in group.children) {
+    if (removed == null && child.id == nodeId && child is! AutoSelectMarker) {
+      removed = child;
+      continue;
+    }
+    if (removed == null) {
+      final result = _extractNode(child, nodeId);
+      removed = result.removed;
+      newChildren.add(result.tree);
+    } else {
+      newChildren.add(child);
+    }
+  }
+  return _Extraction(
+    removed,
+    ServerGroup(
+      id: group.id,
+      name: group.name,
+      icon: group.icon,
+      hidden: group.hidden,
+      strategy: group.strategy,
+      children: newChildren,
+    ),
+  );
+}
+
+bool _containsGroup(ProxyNode node, String groupId) {
+  return switch (node) {
+    ServerLeaf() => false,
+    AutoSelectMarker() => false,
+    ServerGroup group =>
+      group.id == groupId || group.children.any((c) => _containsGroup(c, groupId)),
+  };
+}
+
+ProxyNode _insertNode(
+  ProxyNode node,
+  String parentGroupId,
+  int index,
+  ProxyNode toInsert,
+) {
+  return switch (node) {
+    ServerLeaf leaf => leaf,
+    AutoSelectMarker marker => marker,
+    ServerGroup group when group.id == parentGroupId => ServerGroup(
+      id: group.id,
+      name: group.name,
+      icon: group.icon,
+      hidden: group.hidden,
+      strategy: group.strategy,
+      children: _insertAt(group.children, index, toInsert),
+    ),
+    ServerGroup group => ServerGroup(
+      id: group.id,
+      name: group.name,
+      icon: group.icon,
+      hidden: group.hidden,
+      strategy: group.strategy,
+      children: group.children
+          .map((c) => _insertNode(c, parentGroupId, index, toInsert))
+          .toList(),
+    ),
+  };
+}
+
+List<ProxyNode> _insertAt(List<ProxyNode> children, int index, ProxyNode toInsert) {
+  // AutoSelectMarker всегда остаётся первым элементом группы.
+  final minIndex = children.isNotEmpty && children.first is AutoSelectMarker ? 1 : 0;
+  final clamped = index.clamp(minIndex, children.length);
+  return [
+    ...children.sublist(0, clamped),
+    toInsert,
+    ...children.sublist(clamped),
+  ];
+}
+
 class ServerGroup extends ProxyNode {
   final List<ProxyNode> children; // порядок = порядок списка
   final GroupStrategy strategy;

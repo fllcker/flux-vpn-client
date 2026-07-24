@@ -2,9 +2,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
+import '../../core_abstraction/core_config_provider.dart' show standaloneParentId;
 import '../../core_abstraction/proxy_node.dart';
 import 'expanded_nodes_provider.dart';
 import 'flatten_leaves.dart';
+import 'server_icon.dart';
 import 'server_row.dart';
 
 /// Рекурсивный рендер дерева серверов/групп — инлайн-аккордеон: клик по
@@ -36,6 +38,16 @@ class ProxyTreeList extends ConsumerWidget {
   final String? parentGroupId;
   final void Function(String groupId, List<ServerLeaf> leavesInGroup)?
   onSelectAuto;
+  // Драг-н-дрой сортировки (см. ROADMAP.md, трек 6): dragged node id, id
+  // группы-цели (или `standaloneParentId`) и индекс внутри её `children`.
+  // null отключает перетаскивание целиком (например, в диалогах, где дерево
+  // рендерится вне основного списка серверов).
+  final void Function(
+    String draggedNodeId,
+    String targetParentGroupId,
+    int targetIndex,
+  )?
+  onReorder;
 
   const ProxyTreeList({
     super.key,
@@ -51,12 +63,17 @@ class ProxyTreeList extends ConsumerWidget {
     this.pingingLeafIds = const {},
     this.parentGroupId,
     this.onSelectAuto,
+    this.onReorder,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final expanded = ref.watch(expandedNodesProvider);
     final toggle = ref.read(expandedNodesProvider.notifier).toggle;
+    // Родитель для операций "переставить перед этим узлом"/"добавить в
+    // конец" на ЭТОМ уровне рекурсии — id группы-владельца `nodes`, либо
+    // standalone-список, если владельца-группы нет вообще.
+    final ownParentId = parentGroupId ?? standaloneParentId;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -66,11 +83,21 @@ class ProxyTreeList extends ConsumerWidget {
             ServerGroup group => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _GroupRow(
-                  group: group,
-                  depth: depth,
-                  expanded: expanded.contains(group.id),
-                  onTap: () => toggle(group.id),
+                _dragWrap(
+                  nodeId: group.id,
+                  feedbackLabel: group.name,
+                  feedbackIcon: group.icon,
+                  // Дроп на строку группы = переместить внутрь неё (в
+                  // конец) — переставить группу саму на этом уровне можно,
+                  // бросив её на соседний лист или в конец списка.
+                  onAccept: (draggedId) =>
+                      onReorder!(draggedId, group.id, group.children.length),
+                  child: _GroupRow(
+                    group: group,
+                    depth: depth,
+                    expanded: expanded.contains(group.id),
+                    onTap: () => toggle(group.id),
+                  ),
                 ),
                 if (expanded.contains(group.id))
                   ProxyTreeList(
@@ -86,6 +113,7 @@ class ProxyTreeList extends ConsumerWidget {
                     pingingLeafIds: pingingLeafIds,
                     parentGroupId: group.id,
                     onSelectAuto: onSelectAuto,
+                    onReorder: onReorder,
                   ),
               ],
             ),
@@ -104,24 +132,36 @@ class ProxyTreeList extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ServerRow(
-                    leaf: leaf,
-                    depth: depth,
-                    selected: leaf.id == selectedLeafId,
-                    expanded: expanded.contains(leaf.id),
-                    onSelect: () => onSelectLeaf(leaf.id),
-                    onToggleExpand: () => toggle(leaf.id),
-                    onHide: onHideLeaf == null
-                        ? null
-                        : () => onHideLeaf!(leaf.id),
-                    onEditRouting: onEditRoutingLeaf == null
-                        ? null
-                        : () => onEditRoutingLeaf!(leaf.id),
-                    latencyMs: latencyForLeaf?.call(leaf.id),
-                    pinging: pingingLeafIds.contains(leaf.id),
-                    onPing: onPingLeaf == null
-                        ? null
-                        : () => onPingLeaf!(leaf.id),
+                  _dragWrap(
+                    nodeId: leaf.id,
+                    feedbackLabel: leaf.name,
+                    feedbackIcon: leaf.icon,
+                    // Дроп на строку сервера = встать перед ним на этом же
+                    // уровне.
+                    onAccept: (draggedId) => onReorder!(
+                      draggedId,
+                      ownParentId,
+                      nodes.indexOf(leaf),
+                    ),
+                    child: ServerRow(
+                      leaf: leaf,
+                      depth: depth,
+                      selected: leaf.id == selectedLeafId,
+                      expanded: expanded.contains(leaf.id),
+                      onSelect: () => onSelectLeaf(leaf.id),
+                      onToggleExpand: () => toggle(leaf.id),
+                      onHide: onHideLeaf == null
+                          ? null
+                          : () => onHideLeaf!(leaf.id),
+                      onEditRouting: onEditRoutingLeaf == null
+                          ? null
+                          : () => onEditRoutingLeaf!(leaf.id),
+                      latencyMs: latencyForLeaf?.call(leaf.id),
+                      pinging: pingingLeafIds.contains(leaf.id),
+                      onPing: onPingLeaf == null
+                          ? null
+                          : () => onPingLeaf!(leaf.id),
+                    ),
                   ),
                   if (leaf.variants.length > 1 && expanded.contains(leaf.id))
                     for (final variant in leaf.variants)
@@ -135,7 +175,113 @@ class ProxyTreeList extends ConsumerWidget {
               ),
             ),
           },
+        if (onReorder != null)
+          _TrailingDropZone(
+            onAccept: (draggedId) =>
+                onReorder!(draggedId, ownParentId, nodes.length),
+          ),
       ],
+    );
+  }
+
+  /// Оборачивает [child] в `Draggable`+`DragTarget`, если `onReorder`
+  /// задан — иначе возвращает [child] как есть (перетаскивание выключено).
+  Widget _dragWrap({
+    required String nodeId,
+    required String feedbackLabel,
+    required String? feedbackIcon,
+    required void Function(String draggedId) onAccept,
+    required Widget child,
+  }) {
+    if (onReorder == null) return child;
+
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (details) => details.data != nodeId,
+      onAcceptWithDetails: (details) => onAccept(details.data),
+      builder: (context, candidateData, rejectedData) {
+        final hovering = candidateData.isNotEmpty;
+        return Draggable<String>(
+          data: nodeId,
+          feedback: _DragFeedback(label: feedbackLabel, icon: feedbackIcon),
+          childWhenDragging: Opacity(opacity: 0.4, child: child),
+          child: hovering
+              ? DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(
+                        color: ShadTheme.of(context).colorScheme.primary,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                  child: child,
+                )
+              : child,
+        );
+      },
+    );
+  }
+}
+
+/// Полоса-приёмник в конце списка узлов одного уровня — дроп на неё
+/// добавляет перетаскиваемый узел последним элементом этого уровня.
+class _TrailingDropZone extends StatelessWidget {
+  final void Function(String draggedId) onAccept;
+  const _TrailingDropZone({required this.onAccept});
+
+  @override
+  Widget build(BuildContext context) {
+    return DragTarget<String>(
+      onAcceptWithDetails: (details) => onAccept(details.data),
+      builder: (context, candidateData, rejectedData) {
+        final hovering = candidateData.isNotEmpty;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          height: hovering ? 20 : 8,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: hovering
+                ? ShadTheme.of(context).colorScheme.accent.withValues(alpha: 0.5)
+                : null,
+            borderRadius: BorderRadius.circular(6),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DragFeedback extends StatelessWidget {
+  final String label;
+  final String? icon;
+  const _DragFeedback({required this.label, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.popover,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.colorScheme.border),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withValues(alpha: 0.2),
+            blurRadius: 12,
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ServerIcon(icon: icon, size: 18),
+            const SizedBox(width: 8),
+            Text(label, style: theme.textTheme.small),
+          ],
+        ),
+      ),
     );
   }
 }

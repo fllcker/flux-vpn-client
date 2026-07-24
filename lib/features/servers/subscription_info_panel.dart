@@ -8,6 +8,7 @@ import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/subscription.dart';
 import 'flatten_leaves.dart';
+import 'reset_subscription_order.dart';
 import 'right_panel_view.dart';
 import 'routing_rules_dialog.dart';
 import 'server_icon.dart';
@@ -207,6 +208,20 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
                   .updateSubscription(
                     subscription.copyWith(autoRefreshOnStartup: value),
                   ),
+            ),
+            const SizedBox(height: 12),
+            ShadButton.outline(
+              onPressed: () {
+                final root = subscription.root;
+                if (root is! ServerGroup) return;
+                ref
+                    .read(coreConfigProvider.notifier)
+                    .updateSubscription(
+                      subscription.copyWith(root: rebuildDefaultOrder(root)),
+                    );
+              },
+              leading: const Icon(LucideIcons.rotateCcw, size: 14),
+              child: const Text('Сбросить сортировку'),
             ),
             if (hiddenLeaves.isNotEmpty) ...[
               const SizedBox(height: 20),
