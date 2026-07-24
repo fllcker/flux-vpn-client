@@ -134,14 +134,24 @@ Future<LinkImportResult> importLink(
 /// подписку с тем же [Subscription.id] (и настройками вроде
 /// [Subscription.autoRefreshOnStartup]) — используется и кнопкой "Обновить"
 /// на странице подписки, и автообновлением при запуске.
+///
+/// [resetOrder] переключает стратегию слияния дерева: по умолчанию
+/// (`false`) сохраняется текущий порядок/группировка, в т.ч. ручная
+/// drag-and-drop сортировка (см. [mergeSubscriptionTree]); `true` —
+/// используется кнопкой "Сбросить сортировку" на странице подписки, чтобы
+/// пересобрать дерево заново из источника (см. [resetSubscriptionOrder]).
 Future<LinkImportResult> refreshSubscription(
   Subscription subscription, {
   bool autoGroup = true,
+  bool resetOrder = false,
 }) async {
   final result = await importLink(subscription.url, autoGroup: autoGroup);
   if (result is! SubscriptionImportResultOk) return result;
 
   final fetched = result.subscription;
+  final root = resetOrder
+      ? resetSubscriptionOrder(subscription.root, fetched.root)
+      : mergeSubscriptionTree(subscription.root, fetched.root);
   final merged = Subscription(
     id: subscription.id,
     name: fetched.name,
@@ -152,7 +162,7 @@ Future<LinkImportResult> refreshSubscription(
     expiresAt: fetched.expiresAt,
     lastRefreshedAt: fetched.lastRefreshedAt,
     autoRefreshOnStartup: subscription.autoRefreshOnStartup,
-    root: mergeSubscriptionTree(subscription.root, fetched.root),
+    root: root,
   );
   return SubscriptionImportResultOk(merged, result.skipped);
 }

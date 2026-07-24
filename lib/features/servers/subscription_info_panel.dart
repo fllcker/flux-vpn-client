@@ -8,7 +8,6 @@ import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/subscription.dart';
 import 'flatten_leaves.dart';
-import 'reset_subscription_order.dart';
 import 'right_panel_view.dart';
 import 'routing_rules_dialog.dart';
 import 'server_icon.dart';
@@ -41,13 +40,13 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
     super.dispose();
   }
 
-  Future<void> _refresh(Subscription subscription) async {
+  Future<void> _refresh(Subscription subscription, {bool resetOrder = false}) async {
     setState(() {
       _refreshing = true;
       _refreshError = null;
     });
 
-    final result = await refreshSubscription(subscription);
+    final result = await refreshSubscription(subscription, resetOrder: resetOrder);
     if (!mounted) return;
 
     switch (result) {
@@ -211,15 +210,9 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
             ),
             const SizedBox(height: 12),
             ShadButton.outline(
-              onPressed: () {
-                final root = subscription.root;
-                if (root is! ServerGroup) return;
-                ref
-                    .read(coreConfigProvider.notifier)
-                    .updateSubscription(
-                      subscription.copyWith(root: rebuildDefaultOrder(root)),
-                    );
-              },
+              onPressed: _refreshing
+                  ? null
+                  : () => _refresh(subscription, resetOrder: true),
               leading: const Icon(LucideIcons.rotateCcw, size: 14),
               child: const Text('Сбросить сортировку'),
             ),

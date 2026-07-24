@@ -192,4 +192,173 @@ void main() {
       'new-variant-xhttp',
     );
   });
+
+  test('mergeSubscriptionTree preserves manual drag-and-drop order/grouping across refresh', () {
+    // Пользователь перетащил Poland 1 в группу Germany (см. ROADMAP.md,
+    // трек 6) — структура старого дерева не совпадает с тем, что дал бы
+    // свежий импорт.
+    final oldRoot = ServerGroup(
+      id: 'old-root',
+      name: 'Sub',
+      children: [
+        ServerGroup(
+          id: 'old-germany-group',
+          name: 'Germany',
+          children: [
+            const AutoSelectMarker(id: 'old-auto'),
+            _germanyLeaf,
+            _polandLeaf,
+          ],
+        ),
+      ],
+    );
+    // Свежий источник по-прежнему считает их разными группами.
+    final newRoot = ServerGroup(
+      id: 'new-root',
+      name: 'Sub',
+      children: [
+        ServerGroup(
+          id: 'new-germany-group',
+          name: 'Germany',
+          children: [
+            const ServerLeaf(
+              id: 'new-germany',
+              name: 'Germany 1',
+              variants: [_germanyVariant],
+            ),
+          ],
+        ),
+        ServerGroup(
+          id: 'new-poland-group',
+          name: 'Poland',
+          children: [
+            const ServerLeaf(
+              id: 'new-poland',
+              name: 'Poland 1',
+              variants: [_polandVariant],
+            ),
+          ],
+        ),
+      ],
+    );
+
+    final merged = mergeSubscriptionTree(oldRoot, newRoot) as ServerGroup;
+
+    // Старая структура (одна группа "Germany" с обоими серверами) сохранена
+    // как есть, а не переопределена свежей группировкой источника.
+    expect(merged.children, hasLength(1));
+    final germanyGroup = merged.children.single as ServerGroup;
+    expect(germanyGroup.id, 'old-germany-group');
+    expect(
+      germanyGroup.children.map((c) => c.id).toList(),
+      ['old-auto', 'old-germany', 'old-poland'],
+    );
+  });
+
+  test('mergeSubscriptionTree appends a genuinely new server into a same-named existing group', () {
+    final oldRoot = ServerGroup(
+      id: 'old-root',
+      name: 'Sub',
+      children: [
+        ServerGroup(
+          id: 'old-germany-group',
+          name: 'Germany',
+          children: [_germanyLeaf],
+        ),
+      ],
+    );
+    final newRoot = ServerGroup(
+      id: 'new-root',
+      name: 'Sub',
+      children: [
+        ServerGroup(
+          id: 'new-germany-group',
+          name: 'Germany',
+          children: [
+            const ServerLeaf(
+              id: 'new-germany',
+              name: 'Germany 1',
+              variants: [_germanyVariant],
+            ),
+            const ServerLeaf(
+              id: 'new-germany-2',
+              name: 'Germany 2',
+              variants: [
+                ConnectionVariant(
+                  id: 'v-de2',
+                  label: 'TCP Reality',
+                  config: VlessConfig(
+                    address: 'de2.example.com',
+                    port: 443,
+                    uuid: 'u-de2',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+
+    final merged = mergeSubscriptionTree(oldRoot, newRoot) as ServerGroup;
+
+    expect(merged.children, hasLength(1));
+    final germanyGroup = merged.children.single as ServerGroup;
+    expect(germanyGroup.id, 'old-germany-group');
+    expect(
+      germanyGroup.children.whereType<ServerLeaf>().map((l) => l.id),
+      containsAll(['old-germany', 'new-germany-2']),
+    );
+  });
+
+  test('resetSubscriptionOrder discards old structure and follows the fresh grouping', () {
+    // Старое дерево — плоский список без группировки (например, после
+    // ручной сортировки).
+    final oldRoot = ServerGroup(
+      id: 'old-root',
+      name: 'Sub',
+      children: [_germanyLeaf, _polandLeaf],
+    );
+    // Свежий источник группирует их по странам.
+    final newRoot = ServerGroup(
+      id: 'new-root',
+      name: 'Sub',
+      children: [
+        ServerGroup(
+          id: 'new-germany-group',
+          name: 'Germany',
+          children: [
+            const ServerLeaf(
+              id: 'new-germany',
+              name: 'Germany 1',
+              variants: [_germanyVariant],
+            ),
+          ],
+        ),
+        ServerGroup(
+          id: 'new-poland-group',
+          name: 'Poland',
+          children: [
+            const ServerLeaf(
+              id: 'new-poland',
+              name: 'Poland 1',
+              variants: [_polandVariant],
+            ),
+          ],
+        ),
+      ],
+    );
+
+    final result = resetSubscriptionOrder(oldRoot, newRoot) as ServerGroup;
+
+    expect(result.id, 'new-root');
+    expect(result.children, hasLength(2));
+    expect(result.children.whereType<ServerGroup>().map((g) => g.name), [
+      'Germany',
+      'Poland',
+    ]);
+    // hidden всё равно переносится по адресу, несмотря на сброс структуры.
+    final germanyGroup = result.children.first as ServerGroup;
+    expect((germanyGroup.children.single as ServerLeaf).hidden, isTrue);
+  });
 }
