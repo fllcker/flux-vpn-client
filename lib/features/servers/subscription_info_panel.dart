@@ -70,6 +70,17 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
           _refreshing = false;
           _refreshError = 'Ссылка подписки больше не отдаёт подписку';
         });
+      case MjImportResultOk():
+        // refreshSubscription() сам разворачивает MjSubscriptionsPayload в
+        // SubscriptionImportResultOk (см. subscription_import.dart) — сюда
+        // долетает только если сервис вдруг прислал 'nodes' вместо
+        // 'subscriptions' на URL этой подписки, тогда refreshSubscription
+        // уже вернул LinkImportFailure, а не это. Ветка нужна только чтобы
+        // switch был исчерпывающим по типу.
+        setState(() {
+          _refreshing = false;
+          _refreshError = 'Неожиданный ответ Magic JSON';
+        });
     }
   }
 

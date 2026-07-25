@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
+import '../../core_abstraction/mj_payload.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/subscription.dart';
 import 'base64_subscription_parser.dart';
@@ -34,6 +35,15 @@ class SubscriptionImportResultOk extends LinkImportResult {
   final Subscription subscription;
   final List<ImportSkipped> skipped;
   const SubscriptionImportResultOk(this.subscription, this.skipped);
+}
+
+/// URL отдал Magic JSON напрямую (см. `core_abstraction/mj_payload.dart`,
+/// docs/magic_json.md) вместо xray-json/base64-подписки — сервис-генератор,
+/// который знает про Flux, может прислать уже готовые `Subscription`/
+/// `ProxyNode` вместо конвертации в чужой формат и обратно.
+class MjImportResultOk extends LinkImportResult {
+  final MjPayload payload;
+  const MjImportResultOk(this.payload);
 }
 
 class LinkImportFailure extends LinkImportResult {
@@ -95,6 +105,21 @@ Future<LinkImportResult> importLink(
   }
 
   final trimmedBody = body.trim();
+
+  // Magic JSON — проверяем раньше xray-json: оба формата начинаются с `{`,
+  // но MJ-конверт узнаётся по `schemaVersion`/`type` на верхнем уровне,
+  // которых у xray-json (`remarks`/`outbounds`) нет.
+  if (trimmedBody.startsWith('{')) {
+    final decoded = _tryDecodeJsonObject(trimmedBody);
+    if (decoded != null && MjPayload.looksLikePayload(decoded)) {
+      try {
+        return MjImportResultOk(MjPayload.fromJson(decoded));
+      } on FormatException catch (e) {
+        return LinkImportFailure('Некорректный Magic JSON: ${e.message}');
+      }
+    }
+  }
+
   final parsed = trimmedBody.startsWith('{') || trimmedBody.startsWith('[')
       ? _tryParseXray(trimmedBody)
       : parseBase64Subscription(trimmedBody);
@@ -148,9 +173,47 @@ Future<LinkImportResult> refreshSubscription(
   bool resetOrder = false,
 }) async {
   final result = await importLink(subscription.url, autoGroup: autoGroup);
+
+  // URL, добавленный как MJ 'subscriptions', продолжает возвращать тот же
+  // конверт на рефреше (сервис — источник правды, не xray-json) — находим
+  // в присланном наборе элемент с тем же id, что и у обновляемой подписки,
+  // и просто дальше идём общим путём слияния дерева (merge/reset), как если
+  // бы это был обычный `SubscriptionImportResultOk`. Остальные подписки из
+  // того же конверта (если сервис прислал сразу несколько) молча
+  // игнорируются здесь — точечный рефреш трогает только ту, что попросили.
+  if (result case MjImportResultOk(payload: MjSubscriptionsPayload(:final subscriptions))) {
+    final match = subscriptions.where((s) => s.id == subscription.id).firstOrNull;
+    if (match == null) {
+      return const LinkImportFailure(
+        'Эта подписка больше не входит в Magic JSON, отдаваемый этим URL',
+      );
+    }
+    return _mergeSubscription(subscription, match, const [], resetOrder: resetOrder);
+  }
+  if (result is MjImportResultOk) {
+    return const LinkImportFailure(
+      'URL этой подписки теперь отдаёт Magic JSON с узлами, а не подписку — '
+      'добавьте его заново через диалог добавления сервера',
+    );
+  }
+
   if (result is! SubscriptionImportResultOk) return result;
 
   final fetched = result.subscription;
+  return _mergeSubscription(
+    subscription,
+    fetched,
+    result.skipped,
+    resetOrder: resetOrder,
+  );
+}
+
+LinkImportResult _mergeSubscription(
+  Subscription subscription,
+  Subscription fetched,
+  List<ImportSkipped> skipped, {
+  required bool resetOrder,
+}) {
   final root = resetOrder
       ? resetSubscriptionOrder(subscription.root, fetched.root)
       : mergeSubscriptionTree(subscription.root, fetched.root);
@@ -167,7 +230,7 @@ Future<LinkImportResult> refreshSubscription(
     customFields: fetched.customFields,
     root: root,
   );
-  return SubscriptionImportResultOk(merged, result.skipped);
+  return SubscriptionImportResultOk(merged, skipped);
 }
 
 /// Ищет подписку с идентичным (посимвольно) URL — так можно держать в
@@ -262,6 +325,15 @@ Map<String, String> _parseCustomFields(Map<String, String> headers) {
   }
 }
 
+Map<String, dynamic>? _tryDecodeJsonObject(String body) {
+  try {
+    final decoded = jsonDecode(body);
+    return decoded is Map<String, dynamic> ? decoded : null;
+  } on FormatException {
+    return null;
+  }
+}
+
 SubscriptionImportResult _tryParseXray(String body) {
   try {
     return parseXraySubscription(body);
@@ -271,4 +343,8 @@ SubscriptionImportResult _tryParseXray(String body) {
       skipped: [ImportSkipped(label: 'xray-json', reason: e.message)],
     );
   }
+}
+
+extension<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }

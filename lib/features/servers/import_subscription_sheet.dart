@@ -5,6 +5,7 @@ import '../../app/dialog_style.dart';
 import '../../core_abstraction/app_settings_provider.dart';
 import '../../core_abstraction/core_config_provider.dart';
 import '../../widgets/port_ui/port_ui.dart';
+import 'apply_mj_payload.dart';
 import 'subscription_import.dart';
 
 /// Небольшой диалог по центру окна для добавления `vless://` ссылки или
@@ -71,6 +72,9 @@ class _ImportSubscriptionSheetState
         } else {
           ref.read(coreConfigProvider.notifier).addSubscription(subscription);
         }
+        Navigator.of(context).pop();
+      case MjImportResultOk(:final payload):
+        applyMjPayload(ref, payload);
         Navigator.of(context).pop();
       case LinkImportFailure(:final reason):
         setState(() {

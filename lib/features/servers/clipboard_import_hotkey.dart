@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core_abstraction/app_settings_provider.dart';
 import '../../core_abstraction/core_config_provider.dart';
 import '../../widgets/port_ui/port_ui.dart';
+import 'apply_mj_payload.dart';
 import 'subscription_import.dart';
 
 /// Глобальная вставка по Ctrl+V (Cmd+V на macOS): если в буфере обмена
@@ -109,6 +110,9 @@ class _ClipboardImportHotkeyState
             ref.read(coreConfigProvider.notifier).addSubscription(subscription);
             _showToast('Подписка добавлена из буфера обмена', subscription.name);
           }
+        case MjImportResultOk(:final payload):
+          final summary = applyMjPayload(ref, payload);
+          _showToast('Magic JSON из буфера обмена', summary);
         case LinkImportFailure(:final reason):
           _showErrorToast(reason);
       }
