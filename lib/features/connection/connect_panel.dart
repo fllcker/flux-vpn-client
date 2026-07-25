@@ -4,6 +4,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../app/dialog_style.dart';
 import '../../app/layout_breakpoints.dart';
+import '../../l10n/strings.dart';
 import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
@@ -58,7 +59,7 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
     if (selectedLeaf == null) {
       return Center(
         child: Text(
-          'Выберите сервер слева, чтобы подключиться.',
+          S.selectServerHint,
           style: PortText.muted,
         ),
       );
@@ -111,7 +112,10 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
                             children: [
                               Text(
                                 selectedLeaf.name,
-                                style: PortText.large.copyWith(height: 1),
+                                style: PortText.large.copyWith(
+                                  fontSize: 15,
+                                  height: 1,
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 1),
@@ -170,19 +174,16 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
       context: context,
       barrierColor: dialogBarrierColor,
       builder: (context) => PortDialog.alert(
-        title: const Text('Нужны права администратора'),
-        description: const Text(
-          'Режим TUN требует прав администратора. Перезапустить '
-          'приложение с повышенными правами?',
-        ),
+        title: Text(S.adminRightsNeededTitle),
+        description: Text(S.adminRightsNeededDescription),
         actions: [
           PortButton.outline(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Отмена'),
+            child: Text(S.cancel),
           ),
           PortButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Перезапустить'),
+            child: Text(S.restart),
           ),
         ],
       ),
@@ -221,10 +222,10 @@ class _StatusText extends StatelessWidget {
     }
 
     final text = switch (state) {
-      ConnectionIdle() => 'Отключено',
-      ConnectionConnecting() => 'Подключение...',
-      ConnectionStopping() => 'Отключение...',
-      ConnectionError(message: final message) => 'Ошибка: $message',
+      ConnectionIdle() => S.disconnected,
+      ConnectionConnecting() => S.connectingStatus,
+      ConnectionStopping() => S.disconnectingStatus,
+      ConnectionError(message: final message) => S.connectionError(message),
       ConnectionConnected() => '', // обработано выше
     };
     return Text(text, style: PortText.muted.copyWith(height: 1));

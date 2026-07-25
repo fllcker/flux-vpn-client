@@ -208,7 +208,7 @@ class ProxyTreeList extends ConsumerWidget {
           child: hovering
               ? DecoratedBox(
                   decoration: BoxDecoration(
-                    border: const Border(
+                    border: Border(
                       top: BorderSide(
                         color: PortColors.primary,
                         width: 2,
@@ -325,7 +325,7 @@ class _AutoRowState extends State<_AutoRow> {
           ),
           child: Row(
             children: [
-              const Icon(LucideIcons.zap, size: 15, color: PortColors.mutedForeground),
+              Icon(LucideIcons.zap, size: 15, color: PortColors.mutedForeground),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(

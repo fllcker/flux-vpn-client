@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../app/dialog_style.dart';
 import '../../core_abstraction/proxy_node.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/port_ui/port_ui.dart';
 
 /// Одно редактируемое правило в UI — каждое поле формы создаёт свой
@@ -90,7 +91,7 @@ class _RoutingRulesDialogState extends State<RoutingRulesDialog> {
             if (_rules.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('Правил пока нет', style: PortText.muted),
+                child: Text(S.noRulesYet, style: PortText.muted),
               )
             else
               ConstrainedBox(
@@ -112,13 +113,13 @@ class _RoutingRulesDialogState extends State<RoutingRulesDialog> {
                     onChanged: (value) {
                       if (value != null) setState(() => _kind = value);
                     },
-                    options: const [
-                      PortSelectOption(value: _RuleKind.domain, child: Text('Домен')),
-                      PortSelectOption(value: _RuleKind.ip, child: Text('IP')),
+                    options: [
+                      PortSelectOption(value: _RuleKind.domain, child: Text(S.domain)),
+                      const PortSelectOption(value: _RuleKind.ip, child: Text('IP')),
                     ],
                     selectedOptionBuilder: (context, value) => Text(
                       switch (value) {
-                        _RuleKind.domain => 'Домен',
+                        _RuleKind.domain => S.domain,
                         _RuleKind.ip => 'IP',
                       },
                     ),
@@ -143,16 +144,16 @@ class _RoutingRulesDialogState extends State<RoutingRulesDialog> {
                     onChanged: (value) {
                       if (value != null) setState(() => _outboundTag = value);
                     },
-                    options: const [
-                      PortSelectOption(value: 'proxy', child: Text('Через прокси')),
-                      PortSelectOption(value: 'direct', child: Text('Напрямую')),
-                      PortSelectOption(value: 'block', child: Text('Блокировать')),
+                    options: [
+                      PortSelectOption(value: 'proxy', child: Text(S.throughProxy)),
+                      PortSelectOption(value: 'direct', child: Text(S.direct)),
+                      PortSelectOption(value: 'block', child: Text(S.block)),
                     ],
                     selectedOptionBuilder: (context, value) => Text(_tagLabel(value)),
                   ),
                 ),
                 const SizedBox(width: 8),
-                PortButton(onPressed: _addRule, child: const Text('Добавить')),
+                PortButton(onPressed: _addRule, child: Text(S.add)),
               ],
             ),
             const SizedBox(height: 20),
@@ -161,10 +162,10 @@ class _RoutingRulesDialogState extends State<RoutingRulesDialog> {
               children: [
                 PortButton.outline(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Отмена'),
+                  child: Text(S.cancel),
                 ),
                 const SizedBox(width: 8),
-                PortButton(onPressed: _save, child: const Text('Сохранить')),
+                PortButton(onPressed: _save, child: Text(S.save)),
               ],
             ),
           ],
@@ -182,7 +183,7 @@ class _RuleTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (kindLabel, values, outboundTag) = switch (rule) {
-      DomainRule(:final values, :final outboundTag) => ('Домен', values, outboundTag),
+      DomainRule(:final values, :final outboundTag) => (S.domain, values, outboundTag),
       IpRule(:final values, :final outboundTag) => ('IP', values, outboundTag),
     };
 
@@ -198,12 +199,12 @@ class _RuleTile extends StatelessWidget {
                 children: [
                   TextSpan(
                     text: '$kindLabel  ',
-                    style: const TextStyle(color: PortColors.mutedForeground),
+                    style: TextStyle(color: PortColors.mutedForeground),
                   ),
                   TextSpan(text: values.join(', ')),
                   TextSpan(
                     text: '  → ${_tagLabel(outboundTag)}',
-                    style: const TextStyle(color: PortColors.mutedForeground),
+                    style: TextStyle(color: PortColors.mutedForeground),
                   ),
                 ],
               ),
@@ -220,9 +221,9 @@ class _RuleTile extends StatelessWidget {
 }
 
 String _tagLabel(String outboundTag) => switch (outboundTag) {
-  'direct' => 'Напрямую',
-  'block' => 'Блокировать',
-  _ => 'Через прокси',
+  'direct' => S.direct,
+  'block' => S.block,
+  _ => S.throughProxy,
 };
 
 /// Показывает диалог редактирования правил роутинга одного сервера/подписки

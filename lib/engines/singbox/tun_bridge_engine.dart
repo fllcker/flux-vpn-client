@@ -4,6 +4,7 @@ import 'dart:io';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/core_config.dart';
 import '../../core_abstraction/core_engine.dart';
+import '../../l10n/strings.dart';
 import '../xray/windows_elevation.dart';
 import '../xray/xray_engine_windows.dart';
 import 'singbox_engine_windows.dart';
@@ -77,9 +78,7 @@ class TunBridgeEngine implements CoreEngine {
 
     if (!isRunningElevated()) {
       _statusController.add(EngineStatus.error);
-      throw StateError(
-        'TUN-режим требует прав администратора — приложение запущено без них',
-      );
+      throw StateError(S.tunRequiresAdminRights);
     }
 
     // Половина моста без второй — это не "выключено", а тихо оборванный

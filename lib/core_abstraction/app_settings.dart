@@ -1,6 +1,9 @@
 /// Тема оформления — `system` следует настройке ОС, см. [AppSettings].
 enum AppThemeMode { system, light, dark }
 
+/// Язык интерфейса — `system` следует локали ОС, см. [AppSettings].
+enum AppLanguage { system, ru, en }
+
 /// Фон главного экрана подключения (за карточкой Off/Proxy/TUN).
 /// `simpleGradient`/`colorBends`/`galaxy` — шейдерные фоны, см.
 /// ROADMAP.md, "Фон — шейдерные эффекты".
@@ -49,6 +52,7 @@ const defaultTunDnsServer = '8.8.8.8';
 /// было бы поделиться. Хранятся в своём файле, см. `app_settings_storage.dart`.
 class AppSettings {
   final AppThemeMode themeMode;
+  final AppLanguage language;
   final HomeBackground homeBackground;
   final PingMode pingMode;
   final String pingTestUrl;
@@ -73,6 +77,7 @@ class AppSettings {
 
   const AppSettings({
     this.themeMode = AppThemeMode.dark,
+    this.language = AppLanguage.system,
     this.homeBackground = HomeBackground.galaxy,
     this.pingMode = PingMode.viaProxy,
     this.pingTestUrl = _defaultPingTestUrl,
@@ -89,7 +94,12 @@ class AppSettings {
     themeMode: _enumFromJson(
       AppThemeMode.values,
       json['themeMode'],
-      AppThemeMode.system,
+      AppThemeMode.dark,
+    ),
+    language: _enumFromJson(
+      AppLanguage.values,
+      json['language'],
+      AppLanguage.system,
     ),
     homeBackground: _enumFromJson(
       HomeBackground.values,
@@ -121,6 +131,7 @@ class AppSettings {
 
   Map<String, dynamic> toJson() => {
     'themeMode': themeMode.name,
+    'language': language.name,
     'homeBackground': homeBackground.name,
     'pingMode': pingMode.name,
     'pingTestUrl': pingTestUrl,
@@ -135,6 +146,7 @@ class AppSettings {
 
   AppSettings copyWith({
     AppThemeMode? themeMode,
+    AppLanguage? language,
     HomeBackground? homeBackground,
     PingMode? pingMode,
     String? pingTestUrl,
@@ -148,6 +160,7 @@ class AppSettings {
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
+      language: language ?? this.language,
       homeBackground: homeBackground ?? this.homeBackground,
       pingMode: pingMode ?? this.pingMode,
       pingTestUrl: pingTestUrl ?? this.pingTestUrl,

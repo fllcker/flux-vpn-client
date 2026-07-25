@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core_abstraction/app_settings_provider.dart';
 import '../../core_abstraction/core_config_provider.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/port_ui/port_ui.dart';
 import 'apply_mj_payload.dart';
 import 'subscription_import.dart';
@@ -88,7 +89,7 @@ class _ClipboardImportHotkeyState
       switch (result) {
         case SingleServerImportResult(:final leaf):
           ref.read(coreConfigProvider.notifier).addServers([leaf]);
-          _showToast('Сервер добавлен из буфера обмена', leaf.name);
+          _showToast(S.serverAddedFromClipboard, leaf.name);
         case SubscriptionImportResultOk(:final subscription):
           final existing = findSubscriptionByUrl(
             ref.read(coreConfigProvider).subscriptions,
@@ -104,15 +105,15 @@ class _ClipboardImportHotkeyState
               ref
                   .read(coreConfigProvider.notifier)
                   .updateSubscription(subscription);
-              _showToast('Подписка обновлена', subscription.name);
+              _showToast(S.subscriptionUpdated, subscription.name);
             }
           } else {
             ref.read(coreConfigProvider.notifier).addSubscription(subscription);
-            _showToast('Подписка добавлена из буфера обмена', subscription.name);
+            _showToast(S.subscriptionAddedFromClipboard, subscription.name);
           }
         case MjImportResultOk(:final payload):
           final summary = applyMjPayload(ref, payload);
-          _showToast('Magic JSON из буфера обмена', summary);
+          _showToast(S.magicJsonFromClipboard, summary);
         case LinkImportFailure(:final reason):
           _showErrorToast(reason);
       }
@@ -132,7 +133,7 @@ class _ClipboardImportHotkeyState
     if (!mounted) return;
     PortToaster.of(context).show(
       PortToast.destructive(
-        title: const Text('Не удалось добавить из буфера обмена'),
+        title: Text(S.clipboardImportFailedTitle),
         description: Text(reason),
       ),
     );

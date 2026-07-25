@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../core_abstraction/mj_payload.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/subscription.dart';
+import '../../l10n/strings.dart';
 import 'base64_subscription_parser.dart';
 import 'group_leaves_by_name.dart';
 import 'hysteria2_link_parser.dart';
@@ -85,9 +86,7 @@ Future<LinkImportResult> importLink(
   }
 
   if (!link.startsWith('http://') && !link.startsWith('https://')) {
-    return const LinkImportFailure(
-      'Ожидается ссылка: vless://.../hysteria2://... или http(s)://ссылка-на-подписку',
-    );
+    return LinkImportFailure(S.expectedLinkError);
   }
 
   final String body;
@@ -95,13 +94,11 @@ Future<LinkImportResult> importLink(
   try {
     response = await http.get(Uri.parse(link));
     if (response.statusCode != 200) {
-      return LinkImportFailure(
-        'Не удалось скачать подписку: HTTP ${response.statusCode}',
-      );
+      return LinkImportFailure(S.downloadFailedHttp(response.statusCode));
     }
     body = response.body;
   } catch (e) {
-    return LinkImportFailure('Не удалось скачать подписку: $e');
+    return LinkImportFailure(S.downloadFailedGeneric(e));
   }
 
   final trimmedBody = body.trim();
@@ -115,7 +112,7 @@ Future<LinkImportResult> importLink(
       try {
         return MjImportResultOk(MjPayload.fromJson(decoded));
       } on FormatException catch (e) {
-        return LinkImportFailure('Некорректный Magic JSON: ${e.message}');
+        return LinkImportFailure(S.invalidMagicJson(e.message));
       }
     }
   }
@@ -125,13 +122,11 @@ Future<LinkImportResult> importLink(
       : parseBase64Subscription(trimmedBody);
 
   if (parsed.servers.isEmpty) {
-    return const LinkImportFailure(
-      'В подписке не нашлось ни одного поддерживаемого сервера',
-    );
+    return LinkImportFailure(S.noSupportedServersFound);
   }
 
   final leaves = importedServersToLeaves(parsed.servers);
-  final name = Uri.tryParse(link)?.host ?? 'Подписка';
+  final name = Uri.tryParse(link)?.host ?? S.defaultSubscriptionName;
   final userinfo = _parseSubscriptionUserinfo(response.headers);
   final announce = _parseAnnounce(response.headers);
   final customFields = _parseCustomFields(response.headers);
@@ -184,17 +179,12 @@ Future<LinkImportResult> refreshSubscription(
   if (result case MjImportResultOk(payload: MjSubscriptionsPayload(:final subscriptions))) {
     final match = subscriptions.where((s) => s.id == subscription.id).firstOrNull;
     if (match == null) {
-      return const LinkImportFailure(
-        'Эта подписка больше не входит в Magic JSON, отдаваемый этим URL',
-      );
+      return LinkImportFailure(S.subscriptionNoLongerInMj);
     }
     return _mergeSubscription(subscription, match, const [], resetOrder: resetOrder);
   }
   if (result is MjImportResultOk) {
-    return const LinkImportFailure(
-      'URL этой подписки теперь отдаёт Magic JSON с узлами, а не подписку — '
-      'добавьте его заново через диалог добавления сервера',
-    );
+    return LinkImportFailure(S.urlNowReturnsMjNodes);
   }
 
   if (result is! SubscriptionImportResultOk) return result;

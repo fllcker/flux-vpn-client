@@ -32,6 +32,7 @@
     (см. ниже)
 17. ~~CI: автосборка релиза при бампе версии~~ — сделано
     (`.github/workflows/release.yml`, см. ниже)
+18. ~~Светлая тема + локализация RU/EN~~ — сделано (см. ниже)
 
 Явно не делаем сейчас: другие платформы (Android/iOS/macOS/Linux).
 
@@ -963,3 +964,104 @@ proxy/TUN самостоятельно):
 (сам `.iss`-скрипт) тоже до сих пор не проверен локальной компиляцией, так
 что первый реальный релиз через этот CI будет заодно первой проверкой
 обоих треков разом.
+
+---
+
+## 18. Светлая тема + локализация RU/EN — сделано
+
+**Апдейт:** светлая тема залочена на Dark — визуально недоработана
+(в частности `accent`, см. ниже), доводить её сейчас не стали. Дефолт
+`themeMode` — `dark` (был бы `system` через `fromJson`, теперь тоже `dark`,
+согласовано с дефолтом конструктора). Селектор в `settings_page.dart`
+показывает только вариант "Тёмная" (тот же приём, что у "Ядро TUN-режима" —
+единственный вариант в списке), `main.dart` хардкодит
+`PortBrightness.current = Brightness.dark` независимо от
+`settings.themeMode` — сам switch по `AppThemeMode` закомментирован рядом,
+не удалён, раскомментировать, когда светлую тему доведут. Локализация
+(трек ниже) эта пометка не касается — она осталась как есть, полностью
+рабочая.
+
+### Светлая тема
+
+`AppThemeMode` (system/light/dark) существовала в настройках и раньше, но
+не была подключена — вся палитра в `PortColors`
+(`lib/widgets/port_ui/port_tokens.dart`) была захардкожена под тёмную.
+Переключение сделано без протаскивания `context`/`Theme.of` через весь
+`port_ui` (там ~40+ мест обращаются к `PortColors.xxx`/`PortText.xxx` как к
+статическим геттерам) — вместо этого:
+
+1. `lib/widgets/port_ui/port_theme.dart` — `PortBrightness.current`,
+   глобальный статический `Brightness`.
+2. `main.dart`, `_FluxAppState.build()` — вычисляет эффективную яркость
+   (`AppThemeMode.system` → `View.of(context).platformDispatcher.platformBrightness`,
+   иначе прямое значение) и присваивает `PortBrightness.current`
+   синхронно перед сборкой поддерева — весь дочерний UI в этом же кадре
+   уже видит новое значение. `WidgetsBindingObserver.didChangePlatformBrightness`
+   триггерит `setState` для смены системной темы на лету.
+3. `PortColors` — каждое поле стало `static Color get xxx => _isLight ? ... : ...`,
+   тёмные значения не тронуты, светлые — та же shadcn/ui `neutral`
+   OKLCH-палитра (`:root`, не `.dark`), пересчитанная тем же способом.
+   Исключение — `accent` светлой темы: взят чуть темнее `secondary`/`muted`
+   по аналогии с тёмной (там тоже не совпадает с ними) — на глаз, без
+   точного OKLCH-пересчёта, можно поправить при визуальной сверке.
+4. Побочный эффект: ~10 мест, где `PortColors.xxx` использовался внутри
+   `const` конструкторов (`const TextStyle(color: PortColors.foreground)` и
+   т.п.), перестали компилироваться — геттер не константа. Везде убран
+   `const` у обёртки; `PortSwitch.trackBaseColor` стал `Color?` (был
+   `= PortColors.background` значением по умолчанию параметра — тоже
+   должно быть константой).
+5. Шейдерные фоны (Galaxy/Color Bends/градиент) на главном экране — не
+   тронуты, решили не адаптировать под тему (это отдельная творческая
+   задача, не часть UI-темизации).
+
+### Локализация RU/EN
+
+Свой модуль (без ARB/gen-l10n/пакетов) — по образцу `PortText`/`PortColors`,
+тот же паттерн, что и `port_ui` (собственный порт shadcn/ui вместо пакета —
+не из-за экономии на зависимостях, а потому что готовые пакеты были так
+себе по качеству).
+
+1. `AppSettings.language` (`AppLanguage { system, ru, en }`, дефолт
+   `system`) — тот же паттерн, что `themeMode`.
+2. `lib/l10n/app_locale.dart` — `AppLocale.effective` (`AppLanguage`, уже
+   не `system`), обновляется в `main.dart` рядом с `PortBrightness.current`:
+   `system` резолвится в `ru`/`en` по `View.of(context).platformDispatcher.locale.languageCode`.
+   `WidgetsBindingObserver.didChangeLocales` триггерит rebuild при смене
+   системной локали на лету.
+3. `lib/l10n/strings.dart` — класс `S`, статические геттеры/функции,
+   RU/EN пара на каждую строку, сгруппированные комментариями по
+   экрану/файлу-источнику (~15 файлов, ~150 строк:
+   `connect_panel.dart`, `tray.dart`, `server_list_panel.dart`,
+   `server_row.dart`, `subscription_info_panel.dart`,
+   `import_subscription_sheet.dart`, `routing_rules_dialog.dart`,
+   `settings_page.dart` (крупнейший), `clipboard_import_hotkey.dart`,
+   `subscription_import.dart`, `connection_controller.dart`, плюс по ходу
+   нашлись ещё пользовательские строки не в изначальной инвентаризации:
+   `vless_link_parser.dart`/`hysteria2_link_parser.dart` (сообщения
+   `FormatException`, всплывающие как `LinkImportFailure.reason`),
+   `apply_mj_payload.dart` (сводка для тоста), `tun_bridge_engine.dart`
+   (`StateError`, если TUN стартует без прав администратора)).
+4. Не переводится: имена серверов/подписок (данные, не литералы),
+   протокольные/технические токены (TCP, ICMP, sing-box, xray-core,
+   Magic JSON, DNS, HTTP, UAC, `Simple Gradient`/`Color Bends`/`Galaxy` —
+   имена шейдерных фонов), селектор Off/Proxy/TUN
+   (`off_proxy_tun_selector.dart` — там и так английские литералы,
+   независимо от языка интерфейса), названия языков в самом селекторе
+   языка (`Русский`/`English` показываются на родном языке всегда).
+   Сознательно не тронуты (см. `import_result.dart`/`ImportSkipped.reason`
+   в `base64_subscription_parser.dart`/`xray_subscription_parser.dart`) —
+   список пропущенных при импорте серверов нигде в UI сейчас не
+   отображается, переводить нечего показывающее пользователю.
+5. Склонения (правило/правила/правил, день/дня/дней в
+   `subscription_info_panel.dart`) — существующие приватные хелперы
+   расширены веткой на `AppLocale.effective == AppLanguage.en` (простая
+   английская форма `1 rule`/`N rules`), а не централизованы в `S`.
+6. `settings_page.dart` — новый `PortSelect<AppLanguage>` в секции
+   "Персонализация" рядом с темой, тот же `_SettingRow`.
+
+Проверено: `flutter analyze` (0 замечаний), `flutter test` (86/86,
+`test/widget_test.dart` обновлён — язык в пресете настроек теперь задан
+явно (`AppLanguage.ru`), иначе тест зависел бы от локали тестового
+окружения). Не проверено вживую (см. `CLAUDE.md`) — переключить
+тему/язык в настройках и глазами сверить обе темы (тёмная должна выглядеть
+пиксель-в-пиксель как раньше) и оба языка на всех экранах.

@@ -136,7 +136,7 @@ class _PortSelectState<T> extends State<PortSelect<T>> with SingleTickerProvider
               children: [
                 Flexible(
                   child: DefaultTextStyle.merge(
-                    style: const TextStyle(color: PortColors.foreground, fontSize: 14, height: 1),
+                    style: TextStyle(color: PortColors.foreground, fontSize: 14, height: 1),
                     child: _value == null ? const SizedBox.shrink() : widget.selectedOptionBuilder(context, _value as T),
                   ),
                 ),
@@ -236,7 +236,7 @@ class _SelectItemState<T> extends State<_SelectItem<T>> {
                 child: widget.option.child,
               ),
               if (widget.selected)
-                const Positioned(
+                Positioned(
                   right: -24,
                   top: 0,
                   bottom: 0,

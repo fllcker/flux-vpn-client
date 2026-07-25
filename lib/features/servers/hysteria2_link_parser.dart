@@ -1,4 +1,5 @@
 import '../../core_abstraction/server_config.dart';
+import '../../l10n/strings.dart';
 
 class ParsedHysteria2Link {
   final String name;
@@ -22,20 +23,18 @@ class Hysteria2LinkFormatException implements Exception {
 ParsedHysteria2Link parseHysteria2Link(String link) {
   final uri = Uri.tryParse(link.trim());
   if (uri == null || (uri.scheme != 'hysteria2' && uri.scheme != 'hy2')) {
-    throw const Hysteria2LinkFormatException(
-      'Ссылка должна начинаться с hysteria2:// или hy2://',
-    );
+    throw Hysteria2LinkFormatException(S.hysteria2LinkMustStartWith);
   }
 
   final auth = uri.userInfo;
   if (auth.isEmpty) {
-    throw const Hysteria2LinkFormatException('В ссылке отсутствует пароль');
+    throw Hysteria2LinkFormatException(S.linkMissingPassword);
   }
 
   final host = uri.host;
   final port = uri.port;
   if (host.isEmpty || port == 0) {
-    throw const Hysteria2LinkFormatException('В ссылке отсутствует адрес или порт');
+    throw Hysteria2LinkFormatException(S.linkMissingAddressOrPort);
   }
 
   final params = uri.queryParameters;

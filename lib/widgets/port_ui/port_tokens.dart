@@ -2,29 +2,53 @@ part of 'port_ui.dart';
 
 /// :root .dark, base color "neutral" — https://ui.shadcn.com. OKLCH-токены
 /// из apps/v4/registry/new-york-v4, пересчитанные в sRGB вручную (OKLab ->
-/// linear -> gamma). Светлая тема не портирована — см. заметку в port_ui.dart.
+/// linear -> gamma). Тёмные значения ниже — не трогать, светлые — тот же
+/// источник (:root, не .dark), пересчитанные тем же способом; `accent`
+/// светлой темы — единственное исключение, взято чуть темнее `muted`/
+/// `secondary` по аналогии с тёмной темой (там `accent` тоже заметно темнее
+/// `secondary`/`muted`, а не совпадает с ними, как в оригинальном шаблоне).
+///
+/// Выбор темы читается из [PortBrightness.current] (см. `port_theme.dart`)
+/// каждым геттером заново — react на смену темы без `Theme.of(context)`.
 abstract final class PortColors {
-  static const background = Color(0xFF0A0A0A);
-  static const foreground = Color(0xFFFAFAFA);
-  static const card = Color(0xFF171717);
-  static const popover = card;
-  static const popoverForeground = foreground;
-  static const primary = Color(0xFFE5E5E5);
-  static const primaryForeground = Color(0xFF171717);
-  static const secondary = Color(0xFF262626);
-  static const secondaryForeground = Color(0xFFFAFAFA);
-  static const muted = Color(0xFF262626);
-  static const mutedForeground = Color(0xFFA1A1A1);
-  static const accent = Color(0xFF404040);
-  static const accentForeground = Color(0xFFFAFAFA);
-  static const destructive = Color(0xFFFF6466);
-  static const ring = Color(0xFF737373);
+  static bool get _isLight => PortBrightness.current == Brightness.light;
+
+  static Color get background =>
+      _isLight ? const Color(0xFFFFFFFF) : const Color(0xFF0A0A0A);
+  static Color get foreground =>
+      _isLight ? const Color(0xFF0A0A0A) : const Color(0xFFFAFAFA);
+  static Color get card => _isLight ? const Color(0xFFFFFFFF) : const Color(0xFF171717);
+  static Color get popover => card;
+  static Color get popoverForeground => foreground;
+  static Color get primary =>
+      _isLight ? const Color(0xFF171717) : const Color(0xFFE5E5E5);
+  static Color get primaryForeground =>
+      _isLight ? const Color(0xFFFAFAFA) : const Color(0xFF171717);
+  static Color get secondary =>
+      _isLight ? const Color(0xFFF5F5F5) : const Color(0xFF262626);
+  static Color get secondaryForeground =>
+      _isLight ? const Color(0xFF171717) : const Color(0xFFFAFAFA);
+  static Color get muted => _isLight ? const Color(0xFFF5F5F5) : const Color(0xFF262626);
+  static Color get mutedForeground =>
+      _isLight ? const Color(0xFF737373) : const Color(0xFFA1A1A1);
+  static Color get accent => _isLight ? const Color(0xFFE0E0E0) : const Color(0xFF404040);
+  static Color get accentForeground =>
+      _isLight ? const Color(0xFF171717) : const Color(0xFFFAFAFA);
+  static Color get destructive =>
+      _isLight ? const Color(0xFFDC2626) : const Color(0xFFFF6466);
+  static Color get ring => _isLight ? const Color(0xFFA1A1A1) : const Color(0xFF737373);
 
   // --border/--input в CSS хранятся уже С альфой (oklch(1 0 0 / 10%) и
   // /15%). Модификатор Tailwind bg-input/30 делает color-mix(input 30%,
   // transparent) -> итоговая альфа = 0.15 * 0.30, не 30% сама по себе.
-  static const border = Color.fromRGBO(255, 255, 255, 0.10);
-  static const inputBorder = Color.fromRGBO(255, 255, 255, 0.15);
+  // В светлой теме та же логика, но альфа накладывается на чёрный, а не
+  // белый — граница должна быть чуть темнее фона, а не чуть светлее.
+  static Color get border => _isLight
+      ? const Color.fromRGBO(0, 0, 0, 0.10)
+      : const Color.fromRGBO(255, 255, 255, 0.10);
+  static Color get inputBorder => _isLight
+      ? const Color.fromRGBO(0, 0, 0, 0.15)
+      : const Color.fromRGBO(255, 255, 255, 0.15);
 }
 
 /// Типографика shadcn/ui (стандартная документированная шкала —

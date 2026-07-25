@@ -25,7 +25,7 @@ Future<T?> showPortBottomSheet<T>({
         ),
         child: Container(
           width: double.infinity,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: PortColors.background,
             border: Border(
               top: BorderSide(color: PortColors.border),

@@ -4,9 +4,12 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/subscription.dart';
+import '../../l10n/app_locale.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/port_ui/port_ui.dart';
 import 'flatten_leaves.dart';
 import 'right_panel_view.dart';
@@ -68,7 +71,7 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
       case SingleServerImportResult():
         setState(() {
           _refreshing = false;
-          _refreshError = 'Ссылка подписки больше не отдаёт подписку';
+          _refreshError = S.subscriptionNoLongerServing;
         });
       case MjImportResultOk():
         // refreshSubscription() сам разворачивает MjSubscriptionsPayload в
@@ -79,7 +82,7 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
         // switch был исчерпывающим по типу.
         setState(() {
           _refreshing = false;
-          _refreshError = 'Неожиданный ответ Magic JSON';
+          _refreshError = S.unexpectedMagicJsonResponse;
         });
     }
   }
@@ -106,7 +109,7 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
         .firstOrNull;
 
     if (subscription == null) {
-      return Center(child: Text('Подписка удалена', style: PortText.muted));
+      return Center(child: Text(S.subscriptionDeleted, style: PortText.muted));
     }
 
     final allLeaves = flattenLeaves([subscription.root]);
@@ -173,7 +176,7 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Icon(
+                      Icon(
                         LucideIcons.pencil,
                         size: 12,
                         color: PortColors.mutedForeground,
@@ -191,25 +194,25 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
                 ),
               ],
               const SizedBox(height: 20),
-              _InfoRow(label: 'Серверов', value: '$serverCount'),
+              _InfoRow(label: S.servers, value: '$serverCount'),
               if (subscription.lastRefreshedAt != null)
                 _InfoRow(
-                  label: 'Обновлено',
+                  label: S.updated,
                   value: _formatDateTime(subscription.lastRefreshedAt!),
                 ),
               if (subscription.expiresAt != null) ...[
                 _InfoRow(
-                  label: 'Истекает',
+                  label: S.expiresLabel,
                   value: _formatDateTime(subscription.expiresAt!),
                 ),
                 _InfoRow(
-                  label: 'Осталось',
+                  label: S.remaining,
                   value: _formatDaysLeft(subscription.expiresAt!),
                 ),
               ],
               if (subscription.traffic case final traffic?)
                 _InfoRow(
-                  label: 'Трафик',
+                  label: S.traffic,
                   value:
                       '${_formatBytes(traffic.usedBytes)} / '
                       '${_formatBytes(traffic.totalBytes)}',
@@ -224,7 +227,7 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
               const SizedBox(height: 20),
               PortSwitch(
                 value: subscription.autoRefreshOnStartup,
-                label: const Text('Обновлять при запуске приложения'),
+                label: Text(S.refreshOnStartup),
                 onChanged: (value) => ref
                     .read(coreConfigProvider.notifier)
                     .updateSubscription(
@@ -237,12 +240,12 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
                     ? null
                     : () => _refresh(subscription, resetOrder: true),
                 leading: const Icon(LucideIcons.rotateCcw, size: 14),
-                child: const Text('Сбросить сортировку'),
+                child: Text(S.resetSorting),
               ),
               if (hiddenLeaves.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 Text(
-                  'Скрытые серверы',
+                  S.hiddenServers,
                   style: PortText.small.copyWith(
                     fontWeight: FontWeight.w600,
                     color: PortColors.mutedForeground,
@@ -267,7 +270,7 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
                           onPressed: () => ref
                               .read(coreConfigProvider.notifier)
                               .setHidden(leaf.id, false),
-                          child: const Text('Вернуть'),
+                          child: Text(S.restore),
                         ),
                       ],
                     ),
@@ -283,7 +286,7 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
                       .removeSubscription(widget.subscriptionId);
                   ref.read(rightPanelViewProvider.notifier).showConnect();
                 },
-                child: const Text('Удалить подписку'),
+                child: Text(S.deleteSubscription),
               ),
             ],
           ),
@@ -315,7 +318,7 @@ class _RoutingSection extends ConsumerWidget {
     void editCommon() {
       showRoutingRulesDialog(
         context,
-        title: 'Роутинг — ${subscription.name}',
+        title: S.routingTitleFor(subscription.name),
         initialRules: identical ? first : const [],
         onSave: (rules) => ref
             .read(coreConfigProvider.notifier)
@@ -330,7 +333,7 @@ class _RoutingSection extends ConsumerWidget {
           children: [
             Expanded(
               child: Text(
-                'Роутинг',
+                S.routing,
                 style: PortText.small.copyWith(
                   fontWeight: FontWeight.w600,
                   color: PortColors.mutedForeground,
@@ -348,16 +351,16 @@ class _RoutingSection extends ConsumerWidget {
         if (identical)
           Text(
             first.isEmpty
-                ? 'Правил нет — весь трафик через прокси'
+                ? S.noRulesAllViaProxy
                 : '${first.length} ${_ruleWord(first.length)}',
             style: PortText.muted,
           )
         else ...[
-          Text('Правила различаются по серверам', style: PortText.muted),
+          Text(S.rulesDifferBetweenServers, style: PortText.muted),
           const SizedBox(height: 8),
           PortButton.outline(
             onPressed: editCommon,
-            child: const Text('Задать одинаковые правила для всех'),
+            child: Text(S.setSameRulesForAll),
           ),
         ],
       ],
@@ -374,6 +377,7 @@ bool _rulesEqual(List<RoutingRule> a, List<RoutingRule> b) {
 }
 
 String _ruleWord(int count) {
+  if (AppLocale.effective == AppLanguage.en) return count == 1 ? 'rule' : 'rules';
   final lastDigit = count % 10;
   final lastTwoDigits = count % 100;
   if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return 'правил';
@@ -411,8 +415,11 @@ String _formatDateTime(DateTime dt) {
 
 String _formatDaysLeft(DateTime expiresAt) {
   final days = expiresAt.difference(DateTime.now()).inDays;
-  if (days < 0) return 'истекла';
-  if (days == 0) return 'меньше дня';
+  if (days < 0) return S.expired;
+  if (days == 0) return S.lessThanADay;
+  if (AppLocale.effective == AppLanguage.en) {
+    return '$days ${days == 1 ? 'day' : 'days'}';
+  }
   final lastDigit = days % 10;
   final lastTwoDigits = days % 100;
   final word = (lastTwoDigits >= 11 && lastTwoDigits <= 14)

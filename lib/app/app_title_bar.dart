@@ -49,7 +49,7 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
   Widget build(BuildContext context) {
     return Container(
       height: 40,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: PortColors.background,
         border: Border(bottom: BorderSide(color: PortColors.border)),
       ),
