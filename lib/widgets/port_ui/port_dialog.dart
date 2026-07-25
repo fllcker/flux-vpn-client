@@ -80,7 +80,7 @@ class PortDialog extends StatelessWidget {
                     return AnimatedOpacity(
                       duration: _kDuration,
                       opacity: hovered ? 1 : 0.7,
-                      child: const Icon(Icons.close, size: 16, color: PortColors.foreground),
+                      child: Icon(Icons.close, size: 16, color: PortColors.foreground),
                     );
                   },
                 ),

@@ -9,10 +9,11 @@
 /// под реальные нужды приложения (generic Select, Toast-контроллер,
 /// ContextMenu с leading-иконками, Input с controller и т.п.).
 ///
-/// Светлая тема ПОКА не портирована — все цвета захардкожены под тёмную
-/// (см. PortColors). `AppThemeMode` в настройках по-прежнему сохраняется,
-/// но визуально ни на что не влияет, пока светлая тема не будет добавлена
-/// отдельно.
+/// Тёмная и светлая темы — см. `PortColors`/`PortBrightness`. Переключение
+/// не через `Theme.of(context)`, а через глобальный статический флаг
+/// `PortBrightness.current`, который обновляет `main.dart` при смене
+/// `AppThemeMode`/системной темы ОС — так не пришлось протаскивать context
+/// через весь `port_ui`.
 library;
 
 import 'dart:async';
@@ -24,6 +25,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+part 'port_theme.dart';
 part 'port_tokens.dart';
 part 'port_button.dart';
 part 'port_input.dart';

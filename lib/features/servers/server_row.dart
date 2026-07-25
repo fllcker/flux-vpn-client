@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core_abstraction/proxy_node.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/port_ui/port_ui.dart';
 import 'server_icon.dart';
 
@@ -66,13 +67,13 @@ class _ServerRowState extends State<ServerRow> {
           PortContextMenuItem(
             leading: const Icon(LucideIcons.route, size: 14),
             onPressed: onEditRouting,
-            child: const Text('Роутинг'),
+            child: Text(S.routing),
           ),
         if (onHide != null)
           PortContextMenuItem(
             leading: const Icon(LucideIcons.eyeOff, size: 14),
             onPressed: onHide,
-            child: const Text('Скрыть'),
+            child: Text(S.hide),
           ),
       ],
       child: row,
@@ -262,7 +263,7 @@ class _VariantRowState extends State<VariantRow> {
                 ),
               ),
               if (widget.active)
-                const Icon(
+                Icon(
                   LucideIcons.check,
                   size: 13,
                   color: PortColors.primary,

@@ -5,6 +5,7 @@ import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../core_abstraction/core_config_provider.dart';
+import '../l10n/strings.dart';
 import '../features/connection/connection_controller.dart';
 import '../features/connection/connection_state.dart';
 import '../features/servers/flatten_leaves.dart';
@@ -42,10 +43,10 @@ class FluxTray with TrayListener {
     await trayManager.setContextMenu(
       Menu(
         items: [
-          MenuItem(key: 'show', label: 'Открыть'),
-          MenuItem(key: 'toggle', label: connected ? 'Отключить' : 'Подключить'),
+          MenuItem(key: 'show', label: S.trayOpen),
+          MenuItem(key: 'toggle', label: connected ? S.trayDisconnect : S.trayConnect),
           MenuItem.separator(),
-          MenuItem(key: 'exit', label: 'Выход'),
+          MenuItem(key: 'exit', label: S.trayExit),
         ],
       ),
     );

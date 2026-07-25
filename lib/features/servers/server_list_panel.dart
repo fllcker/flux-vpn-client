@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/port_ui/port_ui.dart';
 import '../ping/ping_all.dart';
 import '../ping/ping_cache.dart';
@@ -41,7 +42,7 @@ class ServerListPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 260,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(right: BorderSide(color: PortColors.border)),
       ),
       child: const ServerListContent(),
@@ -94,7 +95,7 @@ class ServerListContent extends ConsumerWidget {
       if (leaf == null) return;
       showRoutingRulesDialog(
         context,
-        title: 'Роутинг — ${leaf.name}',
+        title: S.routingTitleFor(leaf.name),
         initialRules: leaf.routingRules,
         onSave: (rules) =>
             ref.read(coreConfigProvider.notifier).setRoutingRules(leafId, rules),
@@ -106,12 +107,9 @@ class ServerListContent extends ConsumerWidget {
 
     void showTunPingBlockedToast() {
       PortToaster.of(context).show(
-        const PortToast(
-          title: Text('Нельзя пинговать в TUN-режиме'),
-          description: Text(
-            'Измерение задержки мешает активному TUN-соединению — '
-            'отключитесь или переключитесь на Proxy, чтобы пинговать.',
-          ),
+        PortToast(
+          title: Text(S.cannotPingInTun),
+          description: Text(S.pingBlocksTunDescription),
         ),
       );
     }
@@ -162,7 +160,7 @@ class ServerListContent extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(14, 0, 10, 12),
             child: Row(
               children: [
-                Expanded(child: Text('Серверы', style: PortText.h4)),
+                Expanded(child: Text(S.servers, style: PortText.h4)),
                 if (allLeaves.isNotEmpty)
                   PortIconButton.ghost(
                     icon: const Icon(LucideIcons.activity, size: 16),
@@ -180,7 +178,7 @@ class ServerListContent extends ConsumerWidget {
                 ? Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: Text(
-                      'Пока нет серверов — добавьте подписку или ссылку.',
+                      S.noServersYet,
                       style: PortText.muted,
                     ),
                   )
@@ -283,7 +281,7 @@ class _SubscriptionHeaderState extends State<_SubscriptionHeader> {
                   ),
                 ),
               ),
-              const Icon(
+              Icon(
                 LucideIcons.info,
                 size: 12,
                 color: PortColors.mutedForeground,

@@ -118,7 +118,14 @@ class _PresetAppSettingsController extends AppSettingsController {
   // сервера, и третье из них — подпись маркера на глобусе, то есть тест
   // молча зависит от того, какой фон включён. Со сменой умолчания на galaxy
   // он и упал.
+  //
+  // Язык задан явно (не `system`) — тест ищет русский текст по значению, а
+  // локаль тестового окружения Flutter не обязательно `ru` (см.
+  // `l10n/app_locale.dart`), так что `system` резолвился бы в английский и
+  // ломал сравнение.
   @override
-  AppSettings build() =>
-      const AppSettings(homeBackground: HomeBackground.globe);
+  AppSettings build() => const AppSettings(
+    homeBackground: HomeBackground.globe,
+    language: AppLanguage.ru,
+  );
 }

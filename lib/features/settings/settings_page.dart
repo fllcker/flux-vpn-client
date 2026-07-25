@@ -7,21 +7,31 @@ import '../../app/layout_breakpoints.dart';
 import '../../app/windows_autostart.dart';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/port_ui/port_ui.dart';
 import 'about_info.dart';
 
 enum _SettingsSection {
-  personalization('Персонализация', LucideIcons.palette),
-  ping('Пинг', LucideIcons.activity),
-  tun('TUN', LucideIcons.network),
-  subscription('Подписка', LucideIcons.rss),
-  system('Система', LucideIcons.settings),
-  logs('Логи', LucideIcons.fileText),
-  about('О программе', LucideIcons.info);
+  personalization(LucideIcons.palette),
+  ping(LucideIcons.activity),
+  tun(LucideIcons.network),
+  subscription(LucideIcons.rss),
+  system(LucideIcons.settings),
+  logs(LucideIcons.fileText),
+  about(LucideIcons.info);
 
-  final String label;
   final IconData icon;
-  const _SettingsSection(this.label, this.icon);
+  const _SettingsSection(this.icon);
+
+  String get label => switch (this) {
+    _SettingsSection.personalization => S.sectionPersonalization,
+    _SettingsSection.ping => S.sectionPing,
+    _SettingsSection.tun => 'TUN',
+    _SettingsSection.subscription => S.sectionSubscription,
+    _SettingsSection.system => S.sectionSystem,
+    _SettingsSection.logs => S.sectionLogs,
+    _SettingsSection.about => S.sectionAbout,
+  };
 }
 
 /// Настройки приложения — отдельная страница (заменяет `home` вместо
@@ -61,14 +71,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         Container(
           height: 48,
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             border: Border(bottom: BorderSide(color: PortColors.border)),
           ),
           child: Row(
             children: [
               PortIconButton.ghost(icon: const Icon(LucideIcons.arrowLeft), onPressed: widget.onBack),
               const SizedBox(width: 8),
-              Text('Настройки', style: PortText.large),
+              Text(S.settingsTitle, style: PortText.large),
             ],
           ),
         ),
@@ -171,35 +181,50 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _SettingRow(
-            label: 'Тема',
+            label: S.themeLabel,
+            // Залочено на Dark — светлая палитра ещё не доведена (см.
+            // ROADMAP.md, трек 18; main.dart, PortBrightness.current
+            // хардкожен в Brightness.dark независимо от этой настройки).
+            // System/Light временно убраны из списка вариантов — тот же
+            // приём, что и у "Ядро TUN-режима" ниже, где вариант тоже пока
+            // единственный.
             child: PortSelect<AppThemeMode>(
-              initialValue: settings.themeMode,
+              initialValue: AppThemeMode.dark,
               onChanged: (value) {
                 if (value != null) {
                   notifier.update((s) => s.copyWith(themeMode: value));
                 }
               },
-              options: const [
-                PortSelectOption(value: AppThemeMode.system, child: Text('Системная')),
-                PortSelectOption(value: AppThemeMode.light, child: Text('Светлая')),
-                PortSelectOption(value: AppThemeMode.dark, child: Text('Тёмная')),
+              options: [
+                PortSelectOption(value: AppThemeMode.dark, child: Text(S.themeDark)),
               ],
               selectedOptionBuilder: (context, value) => Text(_themeModeLabel(value)),
             ),
           ),
-          const SizedBox(height: 6),
-          // Настройка сохраняется, но пока ни на что не влияет — светлая
-          // тема ещё не портирована (см. ROADMAP.md, трек 10). Явная
-          // пометка вместо тихой заглушки, чтобы не создавать у
-          // пользователя ложное ожидание от переключателя.
-          Text(
-            'Пока без эффекта — приложение всегда в тёмной теме, '
-            'светлая ещё в разработке.',
-            style: PortText.small.copyWith(color: PortColors.mutedForeground),
+          const SizedBox(height: 12),
+          _SettingRow(
+            label: S.languageLabel,
+            child: PortSelect<AppLanguage>(
+              initialValue: settings.language,
+              onChanged: (value) {
+                if (value != null) {
+                  notifier.update((s) => s.copyWith(language: value));
+                }
+              },
+              // Названия языков всегда на своём родном языке (не через S) —
+              // так принято в language-переключателях, не зависит от того,
+              // на каком языке сейчас сам интерфейс.
+              options: [
+                PortSelectOption(value: AppLanguage.system, child: Text(S.languageSystem)),
+                const PortSelectOption(value: AppLanguage.ru, child: Text('Русский')),
+                const PortSelectOption(value: AppLanguage.en, child: Text('English')),
+              ],
+              selectedOptionBuilder: (context, value) => Text(_languageLabel(value)),
+            ),
           ),
           const SizedBox(height: 12),
           _SettingRow(
-            label: 'Фон на главной',
+            label: S.homeBackgroundLabel,
             child: PortSelect<HomeBackground>(
               initialValue: settings.homeBackground,
               onChanged: (value) {
@@ -207,18 +232,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   notifier.update((s) => s.copyWith(homeBackground: value));
                 }
               },
-              options: const [
-                PortSelectOption(value: HomeBackground.none, child: Text('Нет')),
-                PortSelectOption(value: HomeBackground.globe, child: Text('Планета')),
-                PortSelectOption(
+              options: [
+                PortSelectOption(value: HomeBackground.none, child: Text(S.backgroundNone)),
+                PortSelectOption(value: HomeBackground.globe, child: Text(S.backgroundGlobe)),
+                const PortSelectOption(
                   value: HomeBackground.simpleGradient,
                   child: Text('Simple Gradient'),
                 ),
-                PortSelectOption(
+                const PortSelectOption(
                   value: HomeBackground.colorBends,
                   child: Text('Color Bends'),
                 ),
-                PortSelectOption(value: HomeBackground.galaxy, child: Text('Galaxy')),
+                const PortSelectOption(value: HomeBackground.galaxy, child: Text('Galaxy')),
               ],
               selectedOptionBuilder: (context, value) => Text(_homeBackgroundLabel(value)),
             ),
@@ -229,7 +254,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _SettingRow(
-            label: 'Способ проверки',
+            label: S.checkMethodLabel,
             child: PortSelect<PingMode>(
               initialValue: settings.pingMode,
               onChanged: (value) {
@@ -237,16 +262,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   notifier.update((s) => s.copyWith(pingMode: value));
                 }
               },
-              options: const [
-                PortSelectOption(value: PingMode.viaProxy, child: Text('Через прокси')),
-                PortSelectOption(value: PingMode.tcp, child: Text('TCP')),
-                PortSelectOption(value: PingMode.icmp, child: Text('ICMP')),
+              options: [
+                PortSelectOption(value: PingMode.viaProxy, child: Text(S.throughProxy)),
+                const PortSelectOption(value: PingMode.tcp, child: Text('TCP')),
+                const PortSelectOption(value: PingMode.icmp, child: Text('ICMP')),
               ],
               selectedOptionBuilder: (context, value) => Text(_pingModeLabel(value)),
             ),
           ),
           const SizedBox(height: 12),
-          Text('URL для проверки (через прокси)', style: PortText.small),
+          Text(S.checkUrlLabel, style: PortText.small),
           const SizedBox(height: 6),
           PortInput(
             initialValue: settings.pingTestUrl,
@@ -265,7 +290,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           const SizedBox(height: 12),
           PortSwitch(
             value: settings.pingAllOnStartup,
-            label: const Text('Пинговать все серверы при открытии'),
+            label: Text(S.pingAllOnStartupLabel),
             onChanged: (value) =>
                 notifier.update((s) => s.copyWith(pingAllOnStartup: value)),
           ),
@@ -275,7 +300,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _SettingRow(
-            label: 'Ядро TUN-режима',
+            label: S.tunCoreLabel,
             child: PortSelect<TunCoreType>(
               initialValue: settings.tunCoreType,
               onChanged: (value) {
@@ -290,7 +315,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
           ),
           const SizedBox(height: 12),
-          Text('DNS-сервер (только TUN)', style: PortText.small),
+          Text(S.tunDnsLabel, style: PortText.small),
           const SizedBox(height: 6),
           PortInput(
             initialValue: settings.tunDnsServer,
@@ -309,22 +334,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           // Proxy-режиме xray домены не резолвит вообще, а передаёт
           // серверу, который резолвит их у себя.
           Text(
-            'Адресом, а не именем — резолвить сам резолвер было бы '
-            'замкнутым кругом. В Proxy-режиме имена резолвит сервер, '
-            'поэтому настройка на него не влияет.',
+            S.proxyDnsNote,
             style: PortText.small.copyWith(color: PortColors.mutedForeground),
           ),
         ],
       ),
       _SettingsSection.subscription => PortSwitch(
         value: settings.autoGroupSubscriptions,
-        label: const Text('Автоматическая разбивка по группам'),
+        label: Text(S.autoGroupLabel),
         onChanged: (value) =>
             notifier.update((s) => s.copyWith(autoGroupSubscriptions: value)),
       ),
       _SettingsSection.system => PortSwitch(
         value: settings.autoStartOnBoot,
-        label: const Text('Запускать при старте Windows'),
+        label: Text(S.autoStartLabel),
         onChanged: (value) {
           setAutoStartOnBoot(value);
           notifier.update((s) => s.copyWith(autoStartOnBoot: value));
@@ -334,7 +357,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _SettingRow(
-            label: 'Подробность',
+            label: S.verbosityLabel,
             child: PortSelect<CoreLogLevel>(
               initialValue: settings.coreLogLevel,
               onChanged: (value) {
@@ -342,28 +365,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   notifier.update((s) => s.copyWith(coreLogLevel: value));
                 }
               },
-              options: const [
-                PortSelectOption(value: CoreLogLevel.error, child: Text('Только ошибки')),
-                PortSelectOption(value: CoreLogLevel.warn, child: Text('Предупреждения')),
-                PortSelectOption(value: CoreLogLevel.info, child: Text('Подробно')),
-                PortSelectOption(value: CoreLogLevel.debug, child: Text('Отладка')),
+              options: [
+                PortSelectOption(value: CoreLogLevel.error, child: Text(S.logErrorsOnly)),
+                PortSelectOption(value: CoreLogLevel.warn, child: Text(S.logWarnings)),
+                PortSelectOption(value: CoreLogLevel.info, child: Text(S.logDetailed)),
+                PortSelectOption(value: CoreLogLevel.debug, child: Text(S.logDebug)),
               ],
               selectedOptionBuilder: (context, value) => Text(_logLevelLabel(value)),
             ),
           ),
           const SizedBox(height: 6),
           Text(
-            'Уровень применяется при следующем подключении. На «Отладке» '
-            'видно каждое соединение и решения роутинга — этим и '
-            'разбираются проблемы TUN, но лог растёт на сотни килобайт '
-            'за минуты.',
+            S.logLevelNote,
             style: PortText.small.copyWith(color: PortColors.mutedForeground),
           ),
           const SizedBox(height: 10),
           PortButton.outline(
             leading: const Icon(LucideIcons.folderOpen, size: 16),
             onPressed: openFluxLogDirectory,
-            child: const Text('Открыть папку с логами'),
+            child: Text(S.openLogsFolder),
           ),
         ],
       ),
@@ -372,21 +392,29 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   String _themeModeLabel(AppThemeMode mode) => switch (mode) {
-    AppThemeMode.system => 'Системная',
-    AppThemeMode.light => 'Светлая',
-    AppThemeMode.dark => 'Тёмная',
+    AppThemeMode.system => S.themeSystem,
+    AppThemeMode.light => S.themeLight,
+    AppThemeMode.dark => S.themeDark,
+  };
+
+  // Русский/English — родные названия языков, не переводятся через S (см.
+  // комментарий у селектора выше).
+  String _languageLabel(AppLanguage language) => switch (language) {
+    AppLanguage.system => S.languageSystem,
+    AppLanguage.ru => 'Русский',
+    AppLanguage.en => 'English',
   };
 
   String _homeBackgroundLabel(HomeBackground bg) => switch (bg) {
-    HomeBackground.none => 'Нет',
-    HomeBackground.globe => 'Планета',
+    HomeBackground.none => S.backgroundNone,
+    HomeBackground.globe => S.backgroundGlobe,
     HomeBackground.simpleGradient => 'Simple Gradient',
     HomeBackground.colorBends => 'Color Bends',
     HomeBackground.galaxy => 'Galaxy',
   };
 
   String _pingModeLabel(PingMode mode) => switch (mode) {
-    PingMode.viaProxy => 'Через прокси',
+    PingMode.viaProxy => S.throughProxy,
     PingMode.tcp => 'TCP',
     PingMode.icmp => 'ICMP',
   };
@@ -396,10 +424,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   };
 
   String _logLevelLabel(CoreLogLevel level) => switch (level) {
-    CoreLogLevel.error => 'Только ошибки',
-    CoreLogLevel.warn => 'Предупреждения',
-    CoreLogLevel.info => 'Подробно',
-    CoreLogLevel.debug => 'Отладка',
+    CoreLogLevel.error => S.logErrorsOnly,
+    CoreLogLevel.warn => S.logWarnings,
+    CoreLogLevel.info => S.logDetailed,
+    CoreLogLevel.debug => S.logDebug,
   };
 }
 
@@ -414,7 +442,7 @@ class _SettingsNav extends StatelessWidget {
     return Container(
       width: 200,
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(right: BorderSide(color: PortColors.border)),
       ),
       child: Column(
@@ -508,19 +536,19 @@ class _AboutSection extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _AboutRow('Flux', _appVersionText(value)),
-          _AboutRow('Собрано', _buildDateText(value.builtAt)),
-          _AboutRow('xray-core', value.xrayVersion ?? 'не найден'),
-          _AboutRow('sing-box', value.singBoxVersion ?? 'не найден'),
+          _AboutRow(S.built, _buildDateText(value.builtAt)),
+          _AboutRow('xray-core', value.xrayVersion ?? S.notFound),
+          _AboutRow('sing-box', value.singBoxVersion ?? S.notFound),
         ],
       ),
-      AsyncError() => const _AboutRow('Версии', 'не удалось определить'),
-      _ => const Column(
+      AsyncError() => _AboutRow(S.versionsLabel, S.couldNotDetermine),
+      _ => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _AboutRow('Flux', '—'),
-          _AboutRow('Собрано', '—'),
-          _AboutRow('xray-core', '—'),
-          _AboutRow('sing-box', '—'),
+          const _AboutRow('Flux', '—'),
+          _AboutRow(S.built, '—'),
+          const _AboutRow('xray-core', '—'),
+          const _AboutRow('sing-box', '—'),
         ],
       ),
     };
@@ -529,10 +557,10 @@ class _AboutSection extends ConsumerWidget {
   String _appVersionText(AboutInfo info) =>
       info.buildNumber.isEmpty
       ? info.appVersion
-      : '${info.appVersion} (сборка ${info.buildNumber})';
+      : '${info.appVersion} (${S.buildNumberSuffix(info.buildNumber)})';
 
   String _buildDateText(DateTime? builtAt) {
-    if (builtAt == null) return 'неизвестно';
+    if (builtAt == null) return S.unknown;
     final local = builtAt.toLocal();
     String two(int value) => value.toString().padLeft(2, '0');
     return '${two(local.day)}.${two(local.month)}.${local.year} '

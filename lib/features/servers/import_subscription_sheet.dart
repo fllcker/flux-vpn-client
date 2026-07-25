@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/dialog_style.dart';
 import '../../core_abstraction/app_settings_provider.dart';
 import '../../core_abstraction/core_config_provider.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/port_ui/port_ui.dart';
 import 'apply_mj_payload.dart';
 import 'subscription_import.dart';
@@ -87,12 +88,12 @@ class _ImportSubscriptionSheetState
   @override
   Widget build(BuildContext context) {
     return PortDialog(
-      title: const Text('Добавить сервер'),
-      description: const Text('Ссылка на подписку или vless:// ссылка'),
+      title: Text(S.addServer),
+      description: Text(S.subscriptionOrVlessLinkDescription),
       actions: [
         PortButton(
           onPressed: _loading ? null : _submit,
-          child: Text(_loading ? 'Добавление...' : 'Добавить'),
+          child: Text(_loading ? S.adding : S.add),
         ),
       ],
       child: SizedBox(
@@ -103,7 +104,7 @@ class _ImportSubscriptionSheetState
           children: [
             PortInput(
               controller: _linkController,
-              placeholder: 'https://... или vless://...',
+              placeholder: S.linkPlaceholder,
               enabled: !_loading,
               autofocus: true,
               onSubmitted: (_) => _submit(),

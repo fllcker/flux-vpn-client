@@ -8,15 +8,18 @@ class PortSwitch extends StatelessWidget {
   final ValueChanged<bool>? onChanged;
   final Widget? label;
   // Фон, НАД которым лежит трек — нужен для альфа-блендинга unchecked-цвета
-  // (dark:bg-input/80 компонует альфу поверх реального фона позади).
-  final Color trackBaseColor;
+  // (dark:bg-input/80 компонует альфу поверх реального фона позади). `null`
+  // — использовать `PortColors.background` (нельзя сделать значением по
+  // умолчанию параметра напрямую — это геттер, а не константа, см.
+  // `port_theme.dart`).
+  final Color? trackBaseColor;
 
   const PortSwitch({
     super.key,
     required this.value,
     this.onChanged,
     this.label,
-    this.trackBaseColor = PortColors.background,
+    this.trackBaseColor,
   });
 
   static const _w = 32.0;
@@ -32,7 +35,7 @@ class PortSwitch extends StatelessWidget {
       builder: (context, {required hovered, required focused, required pressed}) {
         final trackColor = value
             ? PortColors.primary
-            : Color.lerp(trackBaseColor, Colors.white, 0.15 * 0.8)!;
+            : Color.lerp(trackBaseColor ?? PortColors.background, Colors.white, 0.15 * 0.8)!;
         final thumbColor = value ? PortColors.primaryForeground : PortColors.foreground;
         return AnimatedContainer(
           duration: _kDuration,

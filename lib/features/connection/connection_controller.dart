@@ -12,6 +12,7 @@ import '../../core_abstraction/proxy_node.dart';
 import '../../engines/singbox/singbox_engine_windows.dart';
 import '../../engines/singbox/tun_bridge_engine.dart';
 import '../../engines/xray/xray_engine_windows.dart';
+import '../../l10n/strings.dart';
 import 'connection_state.dart';
 
 final connectionControllerProvider =
@@ -105,7 +106,7 @@ class ConnectionController extends Notifier<ConnectionUiState> {
             mode: mode,
           );
         case EngineStatus.error:
-          state = const ConnectionError('Ядро завершилось с ошибкой');
+          state = ConnectionError(S.engineFailedWithError);
         case EngineStatus.stopped:
           state = const ConnectionIdle();
         case EngineStatus.starting:

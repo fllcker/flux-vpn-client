@@ -1,4 +1,5 @@
 import '../../core_abstraction/server_config.dart';
+import '../../l10n/strings.dart';
 
 class ParsedVlessLink {
   final String name;
@@ -21,18 +22,18 @@ class VlessLinkFormatException implements Exception {
 ParsedVlessLink parseVlessLink(String link) {
   final uri = Uri.tryParse(link.trim());
   if (uri == null || uri.scheme != 'vless') {
-    throw const VlessLinkFormatException('Ссылка должна начинаться с vless://');
+    throw VlessLinkFormatException(S.vlessLinkMustStartWith);
   }
 
   final uuid = uri.userInfo;
   if (uuid.isEmpty) {
-    throw const VlessLinkFormatException('В ссылке отсутствует UUID');
+    throw VlessLinkFormatException(S.linkMissingUuid);
   }
 
   final host = uri.host;
   final port = uri.port;
   if (host.isEmpty || port == 0) {
-    throw const VlessLinkFormatException('В ссылке отсутствует адрес или порт');
+    throw VlessLinkFormatException(S.linkMissingAddressOrPort);
   }
 
   final params = uri.queryParameters;
@@ -41,7 +42,7 @@ ParsedVlessLink parseVlessLink(String link) {
   final network = switch (networkParam) {
     'tcp' => VlessNetwork.tcp,
     'xhttp' => VlessNetwork.xhttp,
-    _ => throw VlessLinkFormatException('Неподдерживаемый транспорт: $networkParam'),
+    _ => throw VlessLinkFormatException(S.unsupportedTransport(networkParam)),
   };
 
   final securityParam = params['security'] ?? 'none';
@@ -49,7 +50,7 @@ ParsedVlessLink parseVlessLink(String link) {
     'none' => VlessSecurity.none,
     'tls' => VlessSecurity.tls,
     'reality' => VlessSecurity.reality,
-    _ => throw VlessLinkFormatException('Неподдерживаемый security: $securityParam'),
+    _ => throw VlessLinkFormatException(S.unsupportedSecurity(securityParam)),
   };
 
   final flow = params['flow'];

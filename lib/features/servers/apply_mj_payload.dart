@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/mj_payload.dart';
+import '../../l10n/strings.dart';
 import 'merge_subscription_tree.dart';
 
 /// Применяет распарсенный MJ-конверт (см. `mj_payload.dart`) к профилю —
@@ -32,13 +33,13 @@ String applyMjPayload(WidgetRef ref, MjPayload payload) {
         }
       }
       return switch ((added, updated)) {
-        (final a, 0) => 'Добавлено подписок: $a',
-        (0, final u) => 'Обновлено подписок: $u',
-        (final a, final u) => 'Добавлено: $a, обновлено: $u',
+        (final a, 0) => S.subscriptionsAdded(a),
+        (0, final u) => S.subscriptionsUpdated(u),
+        (final a, final u) => S.subscriptionsAddedAndUpdated(a, u),
       };
     case MjNodesPayload(:final nodes):
       notifier.applyMjNodes(nodes);
-      return 'Серверов из Magic JSON: ${nodes.length}';
+      return S.serversFromMagicJson(nodes.length);
   }
 }
 

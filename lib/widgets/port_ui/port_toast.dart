@@ -124,7 +124,7 @@ class _ToastCardState extends State<_ToastCard> with SingleTickerProviderStateMi
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     DefaultTextStyle.merge(
-                      style: const TextStyle(color: PortColors.popoverForeground, fontSize: 14, fontWeight: FontWeight.w600),
+                      style: TextStyle(color: PortColors.popoverForeground, fontSize: 14, fontWeight: FontWeight.w600),
                       child: widget.toast.title,
                     ),
                     if (widget.toast.description != null) ...[

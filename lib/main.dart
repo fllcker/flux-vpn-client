@@ -9,10 +9,13 @@ import 'app/app_title_bar.dart';
 import 'app/deep_link.dart';
 import 'app/single_instance.dart';
 import 'app/tray.dart';
+import 'core_abstraction/app_settings.dart';
+import 'core_abstraction/app_settings_provider.dart';
 import 'features/connection/connection_screen.dart';
 import 'features/servers/clipboard_import_hotkey.dart';
 import 'features/servers/import_subscription_sheet.dart';
 import 'features/settings/settings_page.dart';
+import 'l10n/app_locale.dart';
 import 'widgets/port_ui/port_ui.dart';
 
 final _navigatorKey = GlobalKey<NavigatorState>();
@@ -112,7 +115,8 @@ class FluxApp extends ConsumerStatefulWidget {
   ConsumerState<FluxApp> createState() => _FluxAppState();
 }
 
-class _FluxAppState extends ConsumerState<FluxApp> with WindowListener {
+class _FluxAppState extends ConsumerState<FluxApp>
+    with WindowListener, WidgetsBindingObserver {
   StreamSubscription<String>? _deepLinkSub;
   bool _settingsOpen = false;
 
@@ -120,6 +124,7 @@ class _FluxAppState extends ConsumerState<FluxApp> with WindowListener {
   void initState() {
     super.initState();
     windowManager.addListener(this);
+    WidgetsBinding.instance.addObserver(this);
     _deepLinkSub = widget.incomingDeepLinks.listen(_handleIncomingDeepLink);
     if (widget.initialDeepLink case final link?) {
       WidgetsBinding.instance.addPostFrameCallback(
@@ -131,9 +136,20 @@ class _FluxAppState extends ConsumerState<FluxApp> with WindowListener {
   @override
   void dispose() {
     windowManager.removeListener(this);
+    WidgetsBinding.instance.removeObserver(this);
     _deepLinkSub?.cancel();
     super.dispose();
   }
+
+  // Реагируем на смену темы/языка ОС на лету — только для
+  // AppThemeMode.system/AppLanguage.system, см. build(). Без rebuild здесь
+  // изменение системной темы/локали подхватилось бы только при следующей
+  // перестройке дерева по другой причине.
+  @override
+  void didChangePlatformBrightness() => setState(() {});
+
+  @override
+  void didChangeLocales(List<Locale>? locales) => setState(() {});
 
   // Срабатывает только когда `windowManager.setPreventClose(true)` (см.
   // main.dart) — обычное закрытие ОС не завершает событийный цикл, вместо
@@ -159,8 +175,31 @@ class _FluxAppState extends ConsumerState<FluxApp> with WindowListener {
 
   @override
   Widget build(BuildContext context) {
-    // Тема настроек (AppThemeMode) пока сохраняется, но не применяется —
-    // светлая тема ещё не портирована (см. docs/shadcn/PLAN.md).
+    final settings = ref.watch(appSettingsProvider);
+
+    // Присваивается синхронно перед сборкой поддерева — PortColors/S читают
+    // эти статики каждый вызов геттера, отдельный InheritedWidget не нужен
+    // (см. widgets/port_ui/port_theme.dart, l10n/app_locale.dart).
+    //
+    // Светлая тема временно залочена на Dark независимо от settings.themeMode
+    // (селектор в настройках тоже залочен, см. settings_page.dart) — светлая
+    // палитра требует визуальной доводки (см. ROADMAP.md, трек 18), пока не
+    // готова. Раскомментировать switch ниже, когда светлую тему доведут.
+    PortBrightness.current = Brightness.dark;
+    // PortBrightness.current = switch (settings.themeMode) {
+    //   AppThemeMode.light => Brightness.light,
+    //   AppThemeMode.dark => Brightness.dark,
+    //   AppThemeMode.system => View.of(context).platformDispatcher.platformBrightness,
+    // };
+    AppLocale.effective = switch (settings.language) {
+      AppLanguage.ru => AppLanguage.ru,
+      AppLanguage.en => AppLanguage.en,
+      AppLanguage.system =>
+        View.of(context).platformDispatcher.locale.languageCode == 'ru'
+            ? AppLanguage.ru
+            : AppLanguage.en,
+    };
+
     return PortApp(
       navigatorKey: widget.navigatorKey,
       title: 'Flux',
