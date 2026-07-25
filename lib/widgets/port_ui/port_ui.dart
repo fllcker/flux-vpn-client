@@ -18,7 +18,8 @@ library;
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Colors, Icons, InputBorder, InputDecoration, Material, TextField;
+import 'package:flutter/material.dart'
+    show Colors, Icons, InputBorder, InputDecoration, Material, MaterialType, TextField;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';

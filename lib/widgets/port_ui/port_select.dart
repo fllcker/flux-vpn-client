@@ -131,11 +131,12 @@ class _PortSelectState<T> extends State<PortSelect<T>> with SingleTickerProvider
             // justify-between в исходнике — контент слева, шеврон прижат
             // вправо.
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Flexible(
                   child: DefaultTextStyle.merge(
-                    style: const TextStyle(color: PortColors.foreground, fontSize: 14),
+                    style: const TextStyle(color: PortColors.foreground, fontSize: 14, height: 1),
                     child: _value == null ? const SizedBox.shrink() : widget.selectedOptionBuilder(context, _value as T),
                   ),
                 ),

@@ -62,19 +62,22 @@ class _PortInputState extends State<PortInput> {
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12), // px-3
       alignment: Alignment.centerLeft,
-      child: TextField(
-        controller: _controller,
-        focusNode: _focusNode,
-        enabled: widget.enabled,
-        autofocus: widget.autofocus,
-        onSubmitted: widget.onSubmitted,
-        style: const TextStyle(color: PortColors.foreground, fontSize: 14),
-        cursorColor: PortColors.primary,
-        decoration: InputDecoration(
-          isDense: true,
-          border: InputBorder.none,
-          hintText: widget.placeholder,
-          hintStyle: const TextStyle(color: PortColors.mutedForeground, fontSize: 14),
+      child: Material(
+        type: MaterialType.transparency,
+        child: TextField(
+          controller: _controller,
+          focusNode: _focusNode,
+          enabled: widget.enabled,
+          autofocus: widget.autofocus,
+          onSubmitted: widget.onSubmitted,
+          style: const TextStyle(color: PortColors.foreground, fontSize: 14),
+          cursorColor: PortColors.primary,
+          decoration: InputDecoration(
+            isDense: true,
+            border: InputBorder.none,
+            hintText: widget.placeholder,
+            hintStyle: const TextStyle(color: PortColors.mutedForeground, fontSize: 14),
+          ),
         ),
       ),
     );

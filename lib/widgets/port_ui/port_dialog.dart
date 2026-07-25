@@ -30,7 +30,10 @@ class PortDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 420),
+        constraints: BoxConstraints(
+          maxWidth: 420,
+          maxHeight: MediaQuery.sizeOf(context).height - 64,
+        ),
         padding: const EdgeInsets.all(24), // p-6
         decoration: BoxDecoration(
           color: PortColors.background,
@@ -41,29 +44,31 @@ class PortDialog extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                DefaultTextStyle.merge(style: PortText.large, child: title),
-                if (description != null) ...[
-                  const SizedBox(height: 8),
-                  DefaultTextStyle.merge(style: PortText.muted, child: description!),
-                ],
-                if (child != null) ...[const SizedBox(height: 16), child!],
-                if (actions.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      for (var i = 0; i < actions.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 8),
-                        actions[i],
+            SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DefaultTextStyle.merge(style: PortText.large, child: title),
+                  if (description != null) ...[
+                    const SizedBox(height: 8),
+                    DefaultTextStyle.merge(style: PortText.muted, child: description!),
+                  ],
+                  if (child != null) ...[const SizedBox(height: 16), child!],
+                  if (actions.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        for (var i = 0; i < actions.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 8),
+                          actions[i],
+                        ],
                       ],
-                    ],
-                  ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
             if (showCloseButton)
               Positioned(

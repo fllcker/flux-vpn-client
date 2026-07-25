@@ -19,7 +19,30 @@ enum PingMode { viaProxy, tcp, icmp }
 /// контроллера подключения.
 enum TunCoreType { singBox }
 
+/// Подробность логов ядер. Значения общие для xray и sing-box, хотя называют
+/// они их по-разному — маппинг в [CoreLogLevel.singBoxName]/[xrayName].
+///
+/// `debug` осмысленно держать под рукой, а не только в исходниках: почти вся
+/// диагностика TUN-режима (что с чем не соединилось, куда ушёл резолв, сколько
+/// жило соединение) видна только на нём, а на `warn` ядро про обычный трафик
+/// молчит вовсе. Платой идёт объём — счёт идёт на сотни килобайт за минуты.
+enum CoreLogLevel { error, warn, info, debug }
+
+extension CoreLogLevelNames on CoreLogLevel {
+  String get singBoxName => name;
+
+  /// xray называет этот уровень `warning`, остальные совпадают.
+  String get xrayName => this == CoreLogLevel.warn ? 'warning' : name;
+}
+
 const _defaultPingTestUrl = 'https://www.gstatic.com/generate_204';
+
+/// DNS по умолчанию для TUN-режима. Обращение к нему идёт по IP (резолвить
+/// сам резолвер было бы замкнутым кругом), а DoT поверх этого держится на том,
+/// что сертификат `dns.google` выписан в том числе на 8.8.8.8 — у
+/// произвольного провайдера так может и не быть, см.
+/// `singbox_config_mapper.dart`.
+const defaultTunDnsServer = '8.8.8.8';
 
 /// Настройки приложения — отдельно от [CoreConfig] (серверы/подписки):
 /// это предпочтения интерфейса и поведения, не часть профиля, которым можно
@@ -34,15 +57,24 @@ class AppSettings {
   final bool autoStartOnBoot;
   final TunCoreType tunCoreType;
 
+  /// Апстрим-резолвер TUN-режима. В Proxy-режиме не используется намеренно:
+  /// там xray домены вообще не резолвит, а отдаёт их серверу, который и
+  /// резолвит на своей стороне — настройка «DNS для прокси» была бы ручкой,
+  /// которая ни на что не влияет.
+  final String tunDnsServer;
+  final CoreLogLevel coreLogLevel;
+
   const AppSettings({
     this.themeMode = AppThemeMode.dark,
-    this.homeBackground = HomeBackground.globe,
+    this.homeBackground = HomeBackground.galaxy,
     this.pingMode = PingMode.viaProxy,
     this.pingTestUrl = _defaultPingTestUrl,
     this.pingAllOnStartup = false,
     this.autoGroupSubscriptions = true,
     this.autoStartOnBoot = false,
     this.tunCoreType = TunCoreType.singBox,
+    this.tunDnsServer = defaultTunDnsServer,
+    this.coreLogLevel = CoreLogLevel.warn,
   });
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -54,7 +86,7 @@ class AppSettings {
     homeBackground: _enumFromJson(
       HomeBackground.values,
       json['homeBackground'],
-      HomeBackground.globe,
+      HomeBackground.galaxy,
     ),
     pingMode: _enumFromJson(
       PingMode.values,
@@ -70,6 +102,12 @@ class AppSettings {
       json['tunCoreType'],
       TunCoreType.singBox,
     ),
+    tunDnsServer: json['tunDnsServer'] as String? ?? defaultTunDnsServer,
+    coreLogLevel: _enumFromJson(
+      CoreLogLevel.values,
+      json['coreLogLevel'],
+      CoreLogLevel.warn,
+    ),
   );
 
   Map<String, dynamic> toJson() => {
@@ -81,6 +119,8 @@ class AppSettings {
     'autoGroupSubscriptions': autoGroupSubscriptions,
     'autoStartOnBoot': autoStartOnBoot,
     'tunCoreType': tunCoreType.name,
+    'tunDnsServer': tunDnsServer,
+    'coreLogLevel': coreLogLevel.name,
   };
 
   AppSettings copyWith({
@@ -92,6 +132,8 @@ class AppSettings {
     bool? autoGroupSubscriptions,
     bool? autoStartOnBoot,
     TunCoreType? tunCoreType,
+    String? tunDnsServer,
+    CoreLogLevel? coreLogLevel,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -103,6 +145,8 @@ class AppSettings {
           autoGroupSubscriptions ?? this.autoGroupSubscriptions,
       autoStartOnBoot: autoStartOnBoot ?? this.autoStartOnBoot,
       tunCoreType: tunCoreType ?? this.tunCoreType,
+      tunDnsServer: tunDnsServer ?? this.tunDnsServer,
+      coreLogLevel: coreLogLevel ?? this.coreLogLevel,
     );
   }
 }

@@ -74,6 +74,7 @@ dependencies:
 
   # Иконка в системном трее + меню (см. ROADMAP.md, трек 7)
   tray_manager: ^0.5.3
+  package_info_plus: ^10.2.1
 
 dev_dependencies:
   flutter_test:
