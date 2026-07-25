@@ -11,6 +11,14 @@ enum HomeBackground { none, globe, simpleGradient, colorBends, galaxy }
 /// TCP до `address:port` сервера (без ядра), или ICMP-эхо.
 enum PingMode { viaProxy, tcp, icmp }
 
+/// Какое ядро отвечает за TUN-адаптер/маршруты — не то же самое, что
+/// протокольное ядро (VLESS/Hysteria2 всегда говорит xray, см.
+/// `lib/engines/singbox/tun_bridge_engine.dart`). Пока единственный
+/// вариант — sing-box, но точка расширения сделана явной специально: enum,
+/// а не хардкод, чтобы второй вариант добавлялся без переписывания
+/// контроллера подключения.
+enum TunCoreType { singBox }
+
 const _defaultPingTestUrl = 'https://www.gstatic.com/generate_204';
 
 /// Настройки приложения — отдельно от [CoreConfig] (серверы/подписки):
@@ -24,6 +32,7 @@ class AppSettings {
   final bool pingAllOnStartup;
   final bool autoGroupSubscriptions;
   final bool autoStartOnBoot;
+  final TunCoreType tunCoreType;
 
   const AppSettings({
     this.themeMode = AppThemeMode.dark,
@@ -33,6 +42,7 @@ class AppSettings {
     this.pingAllOnStartup = false,
     this.autoGroupSubscriptions = true,
     this.autoStartOnBoot = false,
+    this.tunCoreType = TunCoreType.singBox,
   });
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -55,6 +65,11 @@ class AppSettings {
     pingAllOnStartup: json['pingAllOnStartup'] as bool? ?? false,
     autoGroupSubscriptions: json['autoGroupSubscriptions'] as bool? ?? true,
     autoStartOnBoot: json['autoStartOnBoot'] as bool? ?? false,
+    tunCoreType: _enumFromJson(
+      TunCoreType.values,
+      json['tunCoreType'],
+      TunCoreType.singBox,
+    ),
   );
 
   Map<String, dynamic> toJson() => {
@@ -65,6 +80,7 @@ class AppSettings {
     'pingAllOnStartup': pingAllOnStartup,
     'autoGroupSubscriptions': autoGroupSubscriptions,
     'autoStartOnBoot': autoStartOnBoot,
+    'tunCoreType': tunCoreType.name,
   };
 
   AppSettings copyWith({
@@ -75,6 +91,7 @@ class AppSettings {
     bool? pingAllOnStartup,
     bool? autoGroupSubscriptions,
     bool? autoStartOnBoot,
+    TunCoreType? tunCoreType,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -85,6 +102,7 @@ class AppSettings {
       autoGroupSubscriptions:
           autoGroupSubscriptions ?? this.autoGroupSubscriptions,
       autoStartOnBoot: autoStartOnBoot ?? this.autoStartOnBoot,
+      tunCoreType: tunCoreType ?? this.tunCoreType,
     );
   }
 }

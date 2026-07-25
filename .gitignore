@@ -48,3 +48,8 @@ app.*.map.json
 # not checked into git (see assets/xray/SOURCE.md).
 /assets/xray/*
 !/assets/xray/SOURCE.md
+
+# sing-box binary — fetched by scripts/fetch_sing_box.ps1, not checked into
+# git (see assets/sing-box/SOURCE.md).
+/assets/sing-box/*
+!/assets/sing-box/SOURCE.md

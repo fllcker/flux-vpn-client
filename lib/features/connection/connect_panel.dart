@@ -188,6 +188,14 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
 
     final launched = relaunchElevated();
     if (launched) {
+      // Без этого close() перехватывается WindowListener.onWindowClose
+      // (см. main.dart, setPreventClose(true) для сворачивания в трей) и
+      // просто прячет окно вместо выхода — старый неповышенный процесс
+      // остаётся жить в трее и держит лок единственного инстанса, из-за
+      // чего новая elevated-копия тут же завершается как "вторичный
+      // инстанс" (см. single_instance.dart), а из трея открывается снова
+      // тот же неповышенный процесс — TUN опять просит права.
+      await windowManager.setPreventClose(false);
       await windowManager.close();
     }
   }

@@ -2,20 +2,26 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config.dart';
 import '../../core_abstraction/core_engine.dart';
 import '../../core_abstraction/proxy_node.dart';
 import 'child_process_job.dart';
-import 'windows_elevation.dart';
 import 'windows_system_proxy.dart';
 import 'xray_config_mapper.dart';
 
 /// Windows-реализация [CoreEngine] для xray-core: управляет `xray.exe` как
 /// подпроцессом — см. PLAN.md, "Ядро №1: xray-core" → "Стратегия для
-/// Windows". Поддерживает оба режима: Proxy (Вариант B — системный
-/// SOCKS/HTTP) и TUN (Вариант A — весь трафик через `wintun`, требует прав
-/// администратора).
+/// Windows". Всегда поднимает Proxy-конфиг (SOCKS/HTTP на локальных
+/// портах) — раньше умел ещё и TUN-режим напрямую, но актуальный
+/// xray-core на Windows физически не настраивает ни IP, ни маршруты на
+/// созданном `tun`-адаптере (см. docs/fix_tun/), поэтому TUN теперь
+/// собирается отдельно, через sing-box поверх уже поднятого здесь
+/// SOCKS-порта — см. `lib/engines/singbox/tun_bridge_engine.dart`. Этот
+/// класс используется и напрямую (самостоятельный Proxy-режим), и как
+/// внутренний бэкенд [TunBridgeEngine] — конфиг в обоих случаях один и тот
+/// же, поэтому [manageSystemProxy] позволяет второму не трогать реестр
+/// системного прокси (это по-прежнему только забота самостоятельного
+/// Proxy-режима).
 class XrayEngineWindows implements CoreEngine {
   XrayEngineWindows({
     required this.id,
@@ -36,7 +42,7 @@ class XrayEngineWindows implements CoreEngine {
 
   Process? _process;
   File? _configFile;
-  ConnectionMode? _activeMode;
+  bool _manageSystemProxy = true;
 
   final _statusController = StreamController<EngineStatus>.broadcast();
   final _statsController = StreamController<EngineStats>.broadcast();
@@ -48,18 +54,9 @@ class XrayEngineWindows implements CoreEngine {
   Stream<EngineStats> get statsStream => _statsController.stream;
 
   @override
-  Future<void> start(
-    CoreConfig config, {
-    ConnectionMode mode = ConnectionMode.proxy,
-  }) async {
+  Future<void> start(CoreConfig config, {bool manageSystemProxy = true}) async {
     _statusController.add(EngineStatus.starting);
-
-    if (mode == ConnectionMode.tun && !isRunningElevated()) {
-      _statusController.add(EngineStatus.error);
-      throw StateError(
-        'TUN-режим требует прав администратора — приложение запущено без них',
-      );
-    }
+    _manageSystemProxy = manageSystemProxy;
 
     final leaf = _firstLeafWithConfig(config);
     final server = leaf?.activeVariant?.config;
@@ -68,17 +65,12 @@ class XrayEngineWindows implements CoreEngine {
       throw StateError('CoreConfig has no server to connect to');
     }
 
-    final xrayConfig = switch (mode) {
-      ConnectionMode.proxy => buildXrayConfig(
-        server,
-        socksPort: socksPort,
-        httpPort: httpPort,
-        routingRules: leaf.routingRules,
-      ),
-      ConnectionMode.tun =>
-        buildXrayTunConfig(server, routingRules: leaf.routingRules),
-    };
-    _activeMode = mode;
+    final xrayConfig = buildXrayConfig(
+      server,
+      socksPort: socksPort,
+      httpPort: httpPort,
+      routingRules: leaf.routingRules,
+    );
 
     final configFile = await File(
       '${Directory.systemTemp.path}/flux_xray_$id.json',
@@ -92,17 +84,18 @@ class XrayEngineWindows implements CoreEngine {
     ]);
     _process = process;
     tieChildProcessLifetimeToApp(process);
+    unawaited(_pipeLogs(process));
 
     unawaited(
       process.exitCode.then((_) {
         // Процесс мог упасть сам по себе (не через stop()) — прокси всё
         // равно нужно снять, иначе пользователь тихо теряет интернет.
-        if (_activeMode == ConnectionMode.proxy) disableWindowsSystemProxy();
+        if (_manageSystemProxy) disableWindowsSystemProxy();
         _statusController.add(EngineStatus.stopped);
       }),
     );
 
-    if (mode == ConnectionMode.proxy) {
+    if (_manageSystemProxy) {
       enableWindowsSystemProxy(httpPort: httpPort);
     }
     _statusController.add(EngineStatus.connected);
@@ -111,11 +104,10 @@ class XrayEngineWindows implements CoreEngine {
   @override
   Future<void> stop() async {
     _statusController.add(EngineStatus.stopping);
-    if (_activeMode == ConnectionMode.proxy) disableWindowsSystemProxy();
+    if (_manageSystemProxy) disableWindowsSystemProxy();
     _process?.kill();
     await _process?.exitCode;
     _process = null;
-    _activeMode = null;
     await _configFile?.delete();
     _configFile = null;
     _statusController.add(EngineStatus.stopped);
@@ -126,6 +118,25 @@ class XrayEngineWindows implements CoreEngine {
     // Stats API xray-core (gRPC/HTTP) пока не подключён — см. "Открытые
     // вопросы" в PLAN.md.
     return const EngineStats(uploadBytes: 0, downloadBytes: 0);
+  }
+
+  /// `xray.exe`'s own stdout/stderr (route/adapter errors, dial errors,
+  /// ...) was going nowhere — the engine only ever looked at the process
+  /// exit code, so a session that "connects" but silently misbehaves left
+  /// no trace to diagnose from. Mirror both streams into a log file next
+  /// to the generated config so a failed session can be inspected
+  /// afterwards.
+  Future<void> _pipeLogs(Process process) async {
+    final logFile = File('${Directory.systemTemp.path}/flux_xray_$id.log');
+    final sink = logFile.openWrite(mode: FileMode.write);
+    try {
+      await Future.wait([
+        process.stdout.transform(const SystemEncoding().decoder).forEach(sink.write),
+        process.stderr.transform(const SystemEncoding().decoder).forEach(sink.write),
+      ]);
+    } finally {
+      await sink.close();
+    }
   }
 
   ServerLeaf? _firstLeafWithConfig(CoreConfig config) {
@@ -152,9 +163,13 @@ class XrayEngineWindows implements CoreEngine {
 }
 
 /// Путь к `xray.exe`, полученному через `scripts/fetch_xray.ps1` (см.
-/// assets/xray/SOURCE.md). При запуске через `flutter run`/собранный .exe
-/// рабочая директория — корень проекта/каталог с приложением, где рядом
-/// лежит `assets/`; итоговая упаковка бинарника при сборке релиза — открытый
-/// вопрос из PLAN.md.
+/// assets/xray/SOURCE.md). Раньше строился от `Directory.current.path` —
+/// под `flutter run` это случайно совпадало с корнем проекта, но при
+/// запуске собранного .exe напрямую (двойной клик, elevated-перезапуск
+/// через ShellExecute) рабочая директория не гарантирована и реально
+/// ловилась `ProcessException: system cannot find the file specified`.
+/// Берём каталог самого исполняемого файла — он не зависит от того, как и
+/// откуда процесс был запущен; `windows/CMakeLists.txt` копирует
+/// `assets/xray` рядом с ним при каждой сборке.
 String defaultXrayExecutablePath() =>
-    '${Directory.current.path}/assets/xray/xray.exe';
+    '${File(Platform.resolvedExecutable).parent.path}/assets/xray/xray.exe';

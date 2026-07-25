@@ -1,12 +1,6 @@
 import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/server_config.dart';
 
-/// Фиксированное имя TUN-адаптера — без этого xray-core генерирует
-/// случайное имя ("utunN") при каждом запуске, и в системе постепенно
-/// накапливаются адаптеры-призраки от прошлых сессий вместо переиспользования
-/// одного и того же.
-const tunInterfaceName = 'flux0';
-
 /// Строит xray-core JSON-конфиг для одного VLESS-сервера в Proxy-режиме
 /// (Вариант B — локальный SOCKS/HTTP). Полноценный экспорт из дерева
 /// ProxyNode/роутинга появится вместе с поддержкой групп и правил
@@ -30,47 +24,6 @@ Map<String, dynamic> buildXrayConfig(
         'listen': '127.0.0.1',
         'port': httpPort,
         'protocol': 'http',
-      },
-    ],
-    'outbounds': [_outbound(server), _directOutbound, _blockOutbound],
-    if (routingRules.isNotEmpty) 'routing': _routing(routingRules),
-  };
-}
-
-/// Строит xray-core JSON-конфиг в TUN-режиме (Вариант A — полноценный VPN
-/// через `wintun`, встроенный в xray-core inbound `tun`, см. PLAN.md,
-/// "Системная интеграция VPN на Windows"). Требует прав администратора —
-/// это проверяется до вызова, на уровне UI/контроллера подключения.
-///
-/// `autoOutboundsInterface: "auto"` обязателен — без него исходящий трафик
-/// самого xray к VLESS-серверу тоже завернётся в TUN, получится петля.
-///
-/// IPv6-адрес и маршрут `::/0` обязательны, даже если апстрим не умеет в
-/// IPv6: без них TUN ставит только IPv4-маршрут по умолчанию, а Windows по
-/// RFC 6724 предпочитает IPv6, если он есть у провайдера — весь трафик к
-/// dual-stack сайтам уходит напрямую мимо TUN, показывая настоящий IP,
-/// хотя приложение считает себя подключённым (см. PLAN.md баг про утечку
-/// в TUN-режиме). Лучше "закрыть" IPv6 в туннель и уронить такие
-/// соединения, чем молча слить их в обход VPN.
-Map<String, dynamic> buildXrayTunConfig(
-  ServerConfig server, {
-  List<RoutingRule> routingRules = const [],
-}) {
-  return {
-    'log': {'loglevel': 'warning'},
-    'inbounds': [
-      {
-        'tag': 'tun-in',
-        'port': 0,
-        'protocol': 'tun',
-        'settings': {
-          'name': tunInterfaceName,
-          'mtu': 1500,
-          'gateway': ['10.10.10.1/24', 'fdfe:dcba:9876::1/126'],
-          'dns': ['1.1.1.1', '8.8.8.8'],
-          'autoSystemRoutingTable': ['0.0.0.0/0', '::/0'],
-          'autoOutboundsInterface': 'auto',
-        },
       },
     ],
     'outbounds': [_outbound(server), _directOutbound, _blockOutbound],

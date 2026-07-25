@@ -106,3 +106,22 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
+
+# Bundle xray-core (fetched by scripts/fetch_xray.ps1, see
+# assets/xray/SOURCE.md) next to the exe — it's a plain external binary, not
+# a Flutter asset, so it has to be copied here explicitly. Without this the
+# app only finds it by accident under `flutter run` (whose cwd happens to be
+# the project root); a double-clicked or elevated-relaunched build couldn't
+# find it at all (see lib/engines/xray/xray_engine_windows.dart,
+# defaultXrayExecutablePath).
+install(DIRECTORY "${CMAKE_SOURCE_DIR}/../assets/xray"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/assets"
+  COMPONENT Runtime)
+
+# Same as above, for sing-box (fetched by scripts/fetch_sing_box.ps1, see
+# assets/sing-box/SOURCE.md) — used only as a TUN packet-capture bridge in
+# front of xray's SOCKS listener on Windows, see
+# lib/engines/singbox/tun_bridge_engine.dart.
+install(DIRECTORY "${CMAKE_SOURCE_DIR}/../assets/sing-box"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/assets"
+  COMPONENT Runtime)
