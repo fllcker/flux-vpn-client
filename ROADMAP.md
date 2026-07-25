@@ -30,9 +30,10 @@
 16. Адаптивность через resize окна — первый шаг сделан (мобильная раскладка
     `ConnectionScreen`), остальные экраны и TV-раскладка не тронуты
     (см. ниже)
+17. ~~CI: автосборка релиза при бампе версии~~ — сделано
+    (`.github/workflows/release.yml`, см. ниже)
 
-Явно не делаем сейчас: второе ядро (sing-box), CI, другие платформы
-(Android/iOS/macOS/Linux).
+Явно не делаем сейчас: другие платформы (Android/iOS/macOS/Linux).
 
 ---
 
@@ -926,3 +927,39 @@ proxy/TUN самостоятельно):
 `ConnectionScreen` — кнопка списка открывает bottom sheet, выбор сервера в
 нём закрывает лист и применяется на главном экране, кнопка не наезжает на
 карточку сервера при длинных именах.
+
+---
+
+## 17. CI: автосборка релиза при бампе версии — сделано
+
+`.github/workflows/release.yml`, триггер — push в `master`, задевающий
+`pubspec.yaml`.
+
+1. `check-version` (ubuntu, дешёвый) — достаёт `version:` из `pubspec.yaml`
+   (без `+build`-суффикса) и через `gh release view v<version>` проверяет,
+   существует ли уже такой релиз. Если да — `should_release=false`, сборка
+   не запускается (обычные пуши в master без бампа версии проходят мимо,
+   не гоняя полную Windows-сборку каждый раз).
+2. `build-windows` (windows-latest, только если `should_release=true`):
+   - `scripts/fetch_xray.ps1` / `scripts/fetch_sing_box.ps1` — те же
+     скрипты, что и для локальной сборки, тянут бинарники ядер перед
+     `flutter build windows`, чтобы `windows/CMakeLists.txt`'s
+     `install()`-правила подхватили их в `Release`-папку.
+   - `flutter build windows --release` — один и тот же build использован и
+     для portable-zip, и для установщика (CMake install-таргет уже
+     прогоняется внутри, отдельно ничего не собирается дважды).
+   - Portable — `Compress-Archive` всей `Release`-папки в
+     `Flux-<version>-windows-portable.zip`.
+   - Установщик — Inno Setup **не предустановлен** на `windows-latest`
+     (проверено: issue в `actions/runner-images` до сих пор открыт с
+     просьбой добавить), ставится через `choco install innosetup`
+     (chocolatey на раннере есть из коробки), дальше вызывается тот же
+     `windows/installer/flux.iss` из трека 13 через `ISCC.exe
+     /DAppVersion=...`.
+   - `gh release create v<version>` — публикует релиз с обоими файлами и
+     автосгенерированными notes (`--generate-notes`).
+
+Не проверено реальным пушем версии (только синтаксис workflow) — трек 13
+(сам `.iss`-скрипт) тоже до сих пор не проверен локальной компиляцией, так
+что первый реальный релиз через этот CI будет заодно первой проверкой
+обоих треков разом.
