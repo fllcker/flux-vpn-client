@@ -16,6 +16,19 @@ import 'right_panel_view.dart';
 import 'routing_rules_dialog.dart';
 import 'selected_server_provider.dart';
 
+/// Открывает список серверов выезжающим снизу листом — мобильная раскладка
+/// (см. ROADMAP.md, трек 16), вызывается и плавающей кнопкой в
+/// `connection_screen.dart`, и тапом по карточке выбранного сервера в
+/// `connect_panel.dart`, когда боковая панель скрыта.
+Future<void> openServerListSheet(BuildContext context) {
+  return showPortBottomSheet<void>(
+    context: context,
+    builder: (sheetContext) => ServerListContent(
+      onAfterSelect: () => Navigator.of(sheetContext).pop(),
+    ),
+  );
+}
+
 /// Список серверов в постоянной боковой колонке — десктопная раскладка
 /// (`connection_screen.dart`). На узких окнах (см. ROADMAP.md, трек 16) тот
 /// же список показывается через [showServerListBottomSheet] вместо этой

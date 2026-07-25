@@ -72,15 +72,6 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     pingAllLeaves(ref, flattenAllLeaves(ref.read(coreConfigProvider)));
   }
 
-  void _openServerListSheet(BuildContext context) {
-    showPortBottomSheet<void>(
-      context: context,
-      builder: (sheetContext) => ServerListContent(
-        onAfterSelect: () => Navigator.of(sheetContext).pop(),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final rightPanelView = ref.watch(rightPanelViewProvider);
@@ -158,7 +149,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                   left: 12,
                   child: PortIconButton.secondary(
                     icon: const Icon(LucideIcons.list),
-                    onPressed: () => _openServerListSheet(context),
+                    onPressed: () => openServerListSheet(context),
                   ),
                 ),
               ],
