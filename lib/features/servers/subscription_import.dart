@@ -109,6 +109,7 @@ Future<LinkImportResult> importLink(
   final name = Uri.tryParse(link)?.host ?? 'Подписка';
   final userinfo = _parseSubscriptionUserinfo(response.headers);
   final announce = _parseAnnounce(response.headers);
+  final customFields = _parseCustomFields(response.headers);
 
   final subscription = Subscription(
     id: _uuid.v4(),
@@ -118,6 +119,7 @@ Future<LinkImportResult> importLink(
     traffic: userinfo?.traffic,
     expiresAt: userinfo?.expiresAt,
     lastRefreshedAt: DateTime.now(),
+    customFields: customFields,
     root: insertAutoSelectMarkers(
       ServerGroup(
         id: _uuid.v4(),
@@ -162,6 +164,7 @@ Future<LinkImportResult> refreshSubscription(
     expiresAt: fetched.expiresAt,
     lastRefreshedAt: fetched.lastRefreshedAt,
     autoRefreshOnStartup: subscription.autoRefreshOnStartup,
+    customFields: fetched.customFields,
     root: root,
   );
   return SubscriptionImportResultOk(merged, result.skipped);
@@ -233,6 +236,29 @@ String? _parseAnnounce(Map<String, String> headers) {
     return utf8.decode(base64.decode(base64.normalize(encoded)));
   } catch (_) {
     return header;
+  }
+}
+
+/// Произвольные кастомные поля от сервиса подписки (например
+/// `{"Тариф": "Premium"}`), не описанные заранее в модели — см.
+/// ROADMAP.md, трек 14. В отличие от `Subscription-Userinfo`/`Announce`
+/// (числа/одна строка), значений тут может быть много и они могут быть
+/// произвольным UTF-8 текстом, так что формат `key=value; key=value` из
+/// `Subscription-Userinfo` не подходит — вместо этого целый JSON-объект,
+/// закодированный тем же способом, что и `Announce` (`base64:<...>`).
+Map<String, String> _parseCustomFields(Map<String, String> headers) {
+  final header = headers['profile-custom-fields'];
+  if (header == null || header.isEmpty) return const {};
+
+  final encoded = header.startsWith('base64:')
+      ? header.substring('base64:'.length)
+      : header;
+  try {
+    final decoded = jsonDecode(utf8.decode(base64.decode(base64.normalize(encoded))));
+    if (decoded is! Map) return const {};
+    return decoded.map((k, v) => MapEntry(k.toString(), v.toString()));
+  } catch (_) {
+    return const {};
   }
 }
 

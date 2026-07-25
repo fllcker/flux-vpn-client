@@ -31,6 +31,13 @@ class Subscription {
   final bool autoRefreshOnStartup;
   final ProxyNode root;
 
+  /// Произвольные пары ключ-значение от сервиса подписки (например
+  /// `{"Тариф": "Premium"}`), не описанные заранее в модели — см.
+  /// ROADMAP.md, трек 14. Часть Magic JSON (в отличие от кэша пинга),
+  /// полностью заменяется свежими данными при каждом рефреше, как
+  /// [traffic]/[expiresAt].
+  final Map<String, String> customFields;
+
   const Subscription({
     required this.id,
     required this.name,
@@ -41,6 +48,7 @@ class Subscription {
     this.expiresAt,
     this.lastRefreshedAt,
     this.autoRefreshOnStartup = false,
+    this.customFields = const {},
     required this.root,
   });
 
@@ -61,6 +69,10 @@ class Subscription {
           ? null
           : DateTime.parse(json['lastRefreshedAt'] as String),
       autoRefreshOnStartup: json['autoRefreshOnStartup'] as bool? ?? false,
+      customFields: (json['customFields'] as Map<String, dynamic>?)?.map(
+            (k, v) => MapEntry(k, v as String),
+          ) ??
+          const {},
       root: ProxyNode.fromJson(json['root'] as Map<String, dynamic>),
     );
   }
@@ -76,6 +88,7 @@ class Subscription {
     if (lastRefreshedAt != null)
       'lastRefreshedAt': lastRefreshedAt!.toIso8601String(),
     if (autoRefreshOnStartup) 'autoRefreshOnStartup': autoRefreshOnStartup,
+    if (customFields.isNotEmpty) 'customFields': customFields,
     'root': root.toJson(),
   };
 
@@ -88,6 +101,7 @@ class Subscription {
     DateTime? expiresAt,
     DateTime? lastRefreshedAt,
     bool? autoRefreshOnStartup,
+    Map<String, String>? customFields,
     ProxyNode? root,
   }) {
     return Subscription(
@@ -100,6 +114,7 @@ class Subscription {
       expiresAt: expiresAt ?? this.expiresAt,
       lastRefreshedAt: lastRefreshedAt ?? this.lastRefreshedAt,
       autoRefreshOnStartup: autoRefreshOnStartup ?? this.autoRefreshOnStartup,
+      customFields: customFields ?? this.customFields,
       root: root ?? this.root,
     );
   }

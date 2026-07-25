@@ -193,6 +193,8 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
                     '${_formatBytes(traffic.usedBytes)} / '
                     '${_formatBytes(traffic.totalBytes)}',
               ),
+            for (final entry in subscription.customFields.entries)
+              _InfoRow(label: entry.key, value: entry.value),
             if (subscription.annotation case final annotation?
                 when annotation.isNotEmpty) ...[
               const SizedBox(height: 12),
