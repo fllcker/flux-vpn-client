@@ -26,6 +26,24 @@ class CoreConfigController extends Notifier<CoreConfig> {
     );
   }
 
+  /// Применяет MJ 'nodes' конверт (см. `mj_payload.dart`) — узлы с id,
+  /// совпадающим с уже существующим standalone-узлом, заменяются им целиком
+  /// на месте, новые id дописываются в конец. Не трогает узлы внутри
+  /// подписок — 'nodes' по определению плоский набор без подписки-обёртки.
+  void applyMjNodes(List<ProxyNode> nodes) {
+    _update((config) {
+      final incomingIds = nodes.map((n) => n.id).toSet();
+      final kept = config.standaloneNodes.where(
+        (n) => !incomingIds.contains(n.id),
+      );
+      return CoreConfig(
+        schemaVersion: config.schemaVersion,
+        subscriptions: config.subscriptions,
+        standaloneNodes: [...kept, ...nodes],
+      );
+    });
+  }
+
   void addSubscription(Subscription subscription) {
     _update(
       (config) => CoreConfig(
