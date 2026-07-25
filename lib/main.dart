@@ -1,59 +1,20 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app/app_title_bar.dart';
 import 'app/deep_link.dart';
 import 'app/single_instance.dart';
 import 'app/tray.dart';
-import 'core_abstraction/app_settings.dart';
-import 'core_abstraction/app_settings_provider.dart';
 import 'features/connection/connection_screen.dart';
 import 'features/servers/clipboard_import_hotkey.dart';
 import 'features/servers/import_subscription_sheet.dart';
+import 'widgets/port_ui/port_ui.dart';
 
 final _navigatorKey = GlobalKey<NavigatorState>();
-
-// Дефолтные анимации shadcn_ui (fade+scale, 300ms открытие / 150-300ms
-// закрытие) на десктопе ощущаются вязко — диалоги и контекстные меню должны
-// открываться почти мгновенно. Укорачиваем длительность, оставляя те же
-// fade+scale эффекты, чтобы не менять сам стиль анимации.
-const _fastPopoverTheme = ShadPopoverTheme(
-  effects: [
-    FadeEffect(duration: Duration(milliseconds: 90)),
-    ScaleEffect(
-      duration: Duration(milliseconds: 90),
-      begin: Offset(.95, .95),
-      end: Offset(1, 1),
-    ),
-  ],
-  reverseDuration: Duration(milliseconds: 80),
-);
-
-const _fastDialogTheme = ShadDialogTheme(
-  animateIn: [
-    FadeEffect(duration: Duration(milliseconds: 110)),
-    ScaleEffect(
-      duration: Duration(milliseconds: 110),
-      begin: Offset(.95, .95),
-      end: Offset(1, 1),
-    ),
-  ],
-  animateOut: [
-    FadeEffect(duration: Duration(milliseconds: 90), begin: 1, end: 0),
-    ScaleEffect(
-      duration: Duration(milliseconds: 90),
-      begin: Offset(1, 1),
-      end: Offset(.95, .95),
-    ),
-  ],
-);
 
 void main(List<String> args) async {
   // Windows передаёт зарегистрированный `flux://...` URL как аргумент
@@ -112,7 +73,7 @@ void main(List<String> args) async {
   });
 }
 
-/// Первый показ любого ShadDialog/оверлея заметно лагает (шрифты/лэйаут
+/// Первый показ любого PortDialog/оверлея заметно лагает (шрифты/лэйаут
 /// компилируются впервые для этого поддерева виджетов) — второй и
 /// последующие уже гладкие. Прогреваем это один раз здесь, пока окно ещё
 /// не показано пользователю, чтобы он не видел этот лаг на реальном
@@ -122,7 +83,7 @@ Future<void> _warmUpOverlays() async {
   final context = _navigatorKey.currentContext;
   if (context == null || !context.mounted) return;
 
-  showShadDialog(context: context, builder: (_) => const ImportSubscriptionSheet());
+  showPortDialog(context: context, builder: (_) => const ImportSubscriptionSheet());
   await WidgetsBinding.instance.endOfFrame;
   final navigator = _navigatorKey.currentState;
   if (navigator != null && navigator.canPop()) {
@@ -192,34 +153,11 @@ class _FluxAppState extends ConsumerState<FluxApp> with WindowListener {
 
   @override
   Widget build(BuildContext context) {
-    final themeMode = ref.watch(
-      appSettingsProvider.select((s) => s.themeMode),
-    );
-
-    return ShadApp(
+    // Тема настроек (AppThemeMode) пока сохраняется, но не применяется —
+    // светлая тема ещё не портирована (см. docs/shadcn/PLAN.md).
+    return PortApp(
       navigatorKey: widget.navigatorKey,
       title: 'Flux',
-      themeMode: switch (themeMode) {
-        AppThemeMode.system => ThemeMode.system,
-        AppThemeMode.light => ThemeMode.light,
-        AppThemeMode.dark => ThemeMode.dark,
-      },
-      theme: ShadThemeData(
-        brightness: Brightness.light,
-        colorScheme: const ShadZincColorScheme.light(),
-        textTheme: ShadTextTheme.fromGoogleFont(GoogleFonts.inter),
-        popoverTheme: _fastPopoverTheme,
-        primaryDialogTheme: _fastDialogTheme,
-        alertDialogTheme: _fastDialogTheme,
-      ),
-      darkTheme: ShadThemeData(
-        brightness: Brightness.dark,
-        colorScheme: const ShadZincColorScheme.dark(),
-        textTheme: ShadTextTheme.fromGoogleFont(GoogleFonts.inter),
-        popoverTheme: _fastPopoverTheme,
-        primaryDialogTheme: _fastDialogTheme,
-        alertDialogTheme: _fastDialogTheme,
-      ),
       home: const ClipboardImportHotkey(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

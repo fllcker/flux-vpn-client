@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
+
+import '../../widgets/port_ui/port_ui.dart';
 
 enum ConnectSelection { off, proxy, tun }
 
@@ -20,12 +21,10 @@ class OffProxyTunSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: theme.colorScheme.muted.withValues(alpha: 0.7),
+        color: PortColors.muted.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -74,13 +73,11 @@ class _Segment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-
     final textColor = !enabled
-        ? theme.colorScheme.mutedForeground.withValues(alpha: 0.4)
+        ? PortColors.mutedForeground.withValues(alpha: 0.4)
         : selected
-        ? (activeColor ?? theme.colorScheme.foreground)
-        : theme.colorScheme.mutedForeground;
+        ? (activeColor ?? PortColors.foreground)
+        : PortColors.mutedForeground;
 
     return MouseRegion(
       cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
@@ -91,7 +88,7 @@ class _Segment extends StatelessWidget {
           curve: Curves.easeOut,
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? theme.colorScheme.background : null,
+            color: selected ? PortColors.background : null,
             borderRadius: BorderRadius.circular(8),
             boxShadow: selected
                 ? [
@@ -105,7 +102,7 @@ class _Segment extends StatelessWidget {
           ),
           child: AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 180),
-            style: theme.textTheme.small.copyWith(
+            style: PortText.small.copyWith(
               color: textColor,
               fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
             ),

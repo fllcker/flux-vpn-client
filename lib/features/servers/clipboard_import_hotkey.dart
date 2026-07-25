@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../core_abstraction/app_settings_provider.dart';
 import '../../core_abstraction/core_config_provider.dart';
+import '../../widgets/port_ui/port_ui.dart';
 import 'subscription_import.dart';
 
 /// Глобальная вставка по Ctrl+V (Cmd+V на macOS): если в буфере обмена
@@ -119,22 +119,17 @@ class _ClipboardImportHotkeyState
 
   void _showToast(String title, String description) {
     if (!mounted) return;
-    ShadToaster.of(context).show(
-      ShadToast(
-        title: Text(title),
-        description: Text(description),
-        alignment: Alignment.bottomRight,
-      ),
+    PortToaster.of(context).show(
+      PortToast(title: Text(title), description: Text(description)),
     );
   }
 
   void _showErrorToast(String reason) {
     if (!mounted) return;
-    ShadToaster.of(context).show(
-      ShadToast.destructive(
+    PortToaster.of(context).show(
+      PortToast.destructive(
         title: const Text('Не удалось добавить из буфера обмена'),
         description: Text(reason),
-        alignment: Alignment.bottomRight,
       ),
     );
   }

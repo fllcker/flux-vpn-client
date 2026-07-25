@@ -1,7 +1,7 @@
 import 'package:country_flags/country_flags.dart';
 import 'package:flutter/widgets.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
+import '../../widgets/port_ui/port_ui.dart';
 import 'flag_emoji.dart';
 
 /// Круглая иконка сервера: если [icon] — эмодзи-флаг, рисуем его картинкой
@@ -24,15 +24,14 @@ class ServerIcon extends StatelessWidget {
       );
     }
 
-    final theme = ShadTheme.of(context);
     return Container(
       width: size,
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: theme.colorScheme.background,
-        border: Border.all(color: theme.colorScheme.border),
+        color: PortColors.background,
+        border: Border.all(color: PortColors.border),
       ),
       child: Text(icon ?? '🌐', style: TextStyle(fontSize: size * 0.5)),
     );

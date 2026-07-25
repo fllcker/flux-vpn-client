@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
+
+import '../../widgets/port_ui/port_ui.dart';
 
 /// Секундомер времени подключения — как в Happ. Просто перерисовывается
 /// раз в секунду, само время идёт от [connectedAt], не от локального
@@ -35,7 +36,7 @@ class _ConnectionTimerState extends State<ConnectionTimer> {
   @override
   Widget build(BuildContext context) {
     final elapsed = DateTime.now().difference(widget.connectedAt);
-    return Text(_format(elapsed), style: ShadTheme.of(context).textTheme.muted);
+    return Text(_format(elapsed), style: PortText.muted);
   }
 
   String _format(Duration d) {

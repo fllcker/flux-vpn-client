@@ -2,11 +2,12 @@ import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/subscription.dart';
+import '../../widgets/port_ui/port_ui.dart';
 import 'flatten_leaves.dart';
 import 'right_panel_view.dart';
 import 'routing_rules_dialog.dart';
@@ -82,7 +83,6 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
     final subscriptions = ref.watch(coreConfigProvider).subscriptions;
     final subscription = subscriptions
         .where((s) => s.id == widget.subscriptionId)
@@ -90,7 +90,7 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
 
     if (subscription == null) {
       return Center(
-        child: Text('Подписка удалена', style: theme.textTheme.muted),
+        child: Text('Подписка удалена', style: PortText.muted),
       );
     }
 
@@ -108,14 +108,14 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
             Row(
               children: [
                 Expanded(
-                  child: Text(subscription.name, style: theme.textTheme.h4),
+                  child: Text(subscription.name, style: PortText.h4),
                 ),
-                ShadIconButton.ghost(
+                PortIconButton.ghost(
                   icon: Icon(
                     LucideIcons.refreshCw,
                     size: 16,
                     color: _refreshing
-                        ? theme.colorScheme.mutedForeground
+                        ? PortColors.mutedForeground
                         : null,
                   ),
                   onPressed: _refreshing ? null : () => _refresh(subscription),
@@ -127,13 +127,13 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
               Row(
                 children: [
                   Expanded(
-                    child: ShadInput(
+                    child: PortInput(
                       controller: _urlController,
                       onSubmitted: (_) => _saveUrl(subscription),
                     ),
                   ),
                   const SizedBox(width: 6),
-                  ShadIconButton.ghost(
+                  PortIconButton.ghost(
                     icon: const Icon(LucideIcons.check, size: 16),
                     onPressed: () => _saveUrl(subscription),
                   ),
@@ -147,15 +147,15 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
                     Expanded(
                       child: Text(
                         subscription.url,
-                        style: theme.textTheme.muted,
+                        style: PortText.muted,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Icon(
+                    const Icon(
                       LucideIcons.pencil,
                       size: 12,
-                      color: theme.colorScheme.mutedForeground,
+                      color: PortColors.mutedForeground,
                     ),
                   ],
                 ),
@@ -164,7 +164,7 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
               const SizedBox(height: 6),
               Text(
                 _refreshError!,
-                style: theme.textTheme.muted.copyWith(
+                style: PortText.muted.copyWith(
                   color: const Color(0xFFF87171),
                 ),
               ),
@@ -196,10 +196,10 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
             if (subscription.annotation case final annotation?
                 when annotation.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text(annotation, style: theme.textTheme.small),
+              Text(annotation, style: PortText.small),
             ],
             const SizedBox(height: 20),
-            ShadSwitch(
+            PortSwitch(
               value: subscription.autoRefreshOnStartup,
               label: const Text('Обновлять при запуске приложения'),
               onChanged: (value) => ref
@@ -209,7 +209,7 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
                   ),
             ),
             const SizedBox(height: 12),
-            ShadButton.outline(
+            PortButton.outline(
               onPressed: _refreshing
                   ? null
                   : () => _refresh(subscription, resetOrder: true),
@@ -220,9 +220,9 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
               const SizedBox(height: 20),
               Text(
                 'Скрытые серверы',
-                style: theme.textTheme.small.copyWith(
+                style: PortText.small.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.mutedForeground,
+                  color: PortColors.mutedForeground,
                 ),
               ),
               const SizedBox(height: 8),
@@ -236,11 +236,11 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
                       Expanded(
                         child: Text(
                           leaf.name,
-                          style: theme.textTheme.small,
+                          style: PortText.small,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      ShadButton.ghost(
+                      PortButton.ghost(
                         onPressed: () => ref
                             .read(coreConfigProvider.notifier)
                             .setHidden(leaf.id, false),
@@ -253,7 +253,7 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
             const SizedBox(height: 20),
             _RoutingSection(subscription: subscription, allLeaves: allLeaves),
             const SizedBox(height: 24),
-            ShadButton.destructive(
+            PortButton.destructive(
               onPressed: () {
                 ref
                     .read(coreConfigProvider.notifier)
@@ -281,7 +281,6 @@ class _RoutingSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = ShadTheme.of(context);
     if (allLeaves.isEmpty) return const SizedBox.shrink();
 
     final first = allLeaves.first.routingRules;
@@ -308,14 +307,14 @@ class _RoutingSection extends ConsumerWidget {
             Expanded(
               child: Text(
                 'Роутинг',
-                style: theme.textTheme.small.copyWith(
+                style: PortText.small.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.mutedForeground,
+                  color: PortColors.mutedForeground,
                 ),
               ),
             ),
             if (identical)
-              ShadIconButton.ghost(
+              PortIconButton.ghost(
                 icon: const Icon(LucideIcons.pencil, size: 14),
                 onPressed: editCommon,
               ),
@@ -327,15 +326,15 @@ class _RoutingSection extends ConsumerWidget {
             first.isEmpty
                 ? 'Правил нет — весь трафик через прокси'
                 : '${first.length} ${_ruleWord(first.length)}',
-            style: theme.textTheme.muted,
+            style: PortText.muted,
           )
         else ...[
           Text(
             'Правила различаются по серверам',
-            style: theme.textTheme.muted,
+            style: PortText.muted,
           ),
           const SizedBox(height: 8),
-          ShadButton.outline(
+          PortButton.outline(
             onPressed: editCommon,
             child: const Text('Задать одинаковые правила для всех'),
           ),
@@ -371,14 +370,13 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: theme.textTheme.muted),
-          Text(value, style: theme.textTheme.small),
+          Text(label, style: PortText.muted),
+          Text(value, style: PortText.small),
         ],
       ),
     );

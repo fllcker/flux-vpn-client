@@ -1,7 +1,8 @@
 import 'package:flutter/widgets.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core_abstraction/proxy_node.dart';
+import '../../widgets/port_ui/port_ui.dart';
 import 'server_icon.dart';
 
 /// Строка сервера. Один вариант подключения — клик сразу выбирает сервер.
@@ -48,30 +49,27 @@ class _ServerRowState extends State<ServerRow> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
-
     final background = widget.selected
-        ? scheme.accent
+        ? PortColors.accent
         : _hovered
-        ? scheme.accent.withValues(alpha: 0.5)
+        ? PortColors.accent.withValues(alpha: 0.5)
         : const Color(0x00000000);
 
-    final row = _buildRow(theme, scheme, background);
+    final row = _buildRow(background);
     final onHide = widget.onHide;
     final onEditRouting = widget.onEditRouting;
     if (onHide == null && onEditRouting == null) return row;
 
-    return ShadContextMenuRegion(
+    return PortContextMenuRegion(
       items: [
         if (onEditRouting != null)
-          ShadContextMenuItem(
+          PortContextMenuItem(
             leading: const Icon(LucideIcons.route, size: 14),
             onPressed: onEditRouting,
             child: const Text('Роутинг'),
           ),
         if (onHide != null)
-          ShadContextMenuItem(
+          PortContextMenuItem(
             leading: const Icon(LucideIcons.eyeOff, size: 14),
             onPressed: onHide,
             child: const Text('Скрыть'),
@@ -81,7 +79,7 @@ class _ServerRowState extends State<ServerRow> {
     );
   }
 
-  Widget _buildRow(ShadThemeData theme, ShadColorScheme scheme, Color background) {
+  Widget _buildRow(Color background) {
     final hasVariantChoice = widget.leaf.variants.length > 1;
 
     return MouseRegion(
@@ -111,7 +109,7 @@ class _ServerRowState extends State<ServerRow> {
                 height: hasVariantChoice ? 28 : 20,
                 decoration: BoxDecoration(
                   color: widget.selected
-                      ? scheme.primary
+                      ? PortColors.primary
                       : const Color(0x00000000),
                   borderRadius: BorderRadius.circular(2),
                 ),
@@ -126,13 +124,13 @@ class _ServerRowState extends State<ServerRow> {
                   children: [
                     Text(
                       widget.leaf.name,
-                      style: theme.textTheme.small,
+                      style: PortText.small,
                       overflow: TextOverflow.ellipsis,
                     ),
                     if (hasVariantChoice)
                       Text(
                         widget.leaf.activeVariant?.label ?? '',
-                        style: theme.textTheme.muted.copyWith(fontSize: 11),
+                        style: PortText.muted.copyWith(fontSize: 11),
                         overflow: TextOverflow.ellipsis,
                       ),
                   ],
@@ -150,7 +148,7 @@ class _ServerRowState extends State<ServerRow> {
                       ? LucideIcons.chevronUp
                       : LucideIcons.chevronDown,
                   size: 14,
-                  color: scheme.mutedForeground,
+                  color: PortColors.mutedForeground,
                 ),
             ],
           ),
@@ -177,14 +175,12 @@ class _PingIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-
     if (pinging) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Text(
           '…',
-          style: theme.textTheme.muted.copyWith(fontSize: 11),
+          style: PortText.muted.copyWith(fontSize: 11),
         ),
       );
     }
@@ -195,9 +191,9 @@ class _PingIndicator extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Text(
           latencyMs == null ? '—' : '${latencyMs}ms',
-          style: theme.textTheme.muted.copyWith(
+          style: PortText.muted.copyWith(
             fontSize: 11,
-            color: _latencyColor(latencyMs) ?? theme.colorScheme.mutedForeground,
+            color: _latencyColor(latencyMs) ?? PortColors.mutedForeground,
           ),
         ),
       ),
@@ -236,10 +232,8 @@ class _VariantRowState extends State<VariantRow> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
     final background = _hovered
-        ? scheme.accent.withValues(alpha: 0.5)
+        ? PortColors.accent.withValues(alpha: 0.5)
         : const Color(0x00000000);
 
     return MouseRegion(
@@ -260,15 +254,15 @@ class _VariantRowState extends State<VariantRow> {
               Expanded(
                 child: Text(
                   widget.variant.label,
-                  style: theme.textTheme.small,
+                  style: PortText.small,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (widget.active)
-                Icon(
+                const Icon(
                   LucideIcons.check,
                   size: 13,
-                  color: scheme.primary,
+                  color: PortColors.primary,
                 ),
             ],
           ),

@@ -1,9 +1,10 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
+import '../../widgets/port_ui/port_ui.dart';
 import '../ping/ping_all.dart';
 import '../ping/ping_cache.dart';
 import '../ping/pick_best_by_latency.dart';
@@ -20,7 +21,6 @@ class ServerListPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = ShadTheme.of(context);
     final config = ref.watch(coreConfigProvider);
     final allLeaves = flattenAllLeaves(config);
     final selectedId =
@@ -90,8 +90,8 @@ class ServerListPanel extends ConsumerWidget {
     return Container(
       width: 260,
       padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        border: Border(right: BorderSide(color: theme.colorScheme.border)),
+      decoration: const BoxDecoration(
+        border: Border(right: BorderSide(color: PortColors.border)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -100,15 +100,15 @@ class ServerListPanel extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(14, 0, 10, 12),
             child: Row(
               children: [
-                Expanded(child: Text('Серверы', style: theme.textTheme.h4)),
+                Expanded(child: Text('Серверы', style: PortText.h4)),
                 if (allLeaves.isNotEmpty)
-                  ShadIconButton.ghost(
+                  PortIconButton.ghost(
                     icon: const Icon(LucideIcons.activity, size: 16),
                     onPressed: pingingLeafIds.isEmpty
                         ? () => pingAllLeaves(ref, allLeaves)
                         : null,
                   ),
-                ShadIconButton.ghost(
+                PortIconButton.ghost(
                   icon: const Icon(LucideIcons.plus, size: 18),
                   onPressed: () => showAddServerDialog(context),
                 ),
@@ -121,7 +121,7 @@ class ServerListPanel extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: Text(
                       'Пока нет серверов — добавьте подписку или ссылку.',
-                      style: theme.textTheme.muted,
+                      style: PortText.muted,
                     ),
                   )
                 : ListView(
@@ -195,7 +195,6 @@ class _SubscriptionHeaderState extends State<_SubscriptionHeader> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
     final highlighted = widget.active || _hovered;
 
     return MouseRegion(
@@ -208,7 +207,7 @@ class _SubscriptionHeaderState extends State<_SubscriptionHeader> {
           margin: const EdgeInsets.only(top: 10, bottom: 4),
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
           decoration: BoxDecoration(
-            color: highlighted ? theme.colorScheme.accent : null,
+            color: highlighted ? PortColors.accent : null,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Row(
@@ -217,17 +216,17 @@ class _SubscriptionHeaderState extends State<_SubscriptionHeader> {
                 child: Text(
                   widget.title.toUpperCase(),
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.muted.copyWith(
+                  style: PortText.muted.copyWith(
                     fontSize: 11,
                     letterSpacing: 0.4,
-                    color: widget.active ? theme.colorScheme.foreground : null,
+                    color: widget.active ? PortColors.foreground : null,
                   ),
                 ),
               ),
-              Icon(
+              const Icon(
                 LucideIcons.info,
                 size: 12,
-                color: theme.colorScheme.mutedForeground,
+                color: PortColors.mutedForeground,
               ),
             ],
           ),

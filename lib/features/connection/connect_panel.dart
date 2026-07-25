@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../app/dialog_style.dart';
@@ -8,6 +7,7 @@ import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../engines/xray/windows_elevation.dart';
+import '../../widgets/port_ui/port_ui.dart';
 import '../servers/flatten_leaves.dart';
 import '../servers/selected_server_provider.dart';
 import '../servers/server_icon.dart';
@@ -41,7 +41,6 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback(_measureSelectorWidth);
-    final theme = ShadTheme.of(context);
     final leaves = flattenAllLeaves(ref.watch(coreConfigProvider));
     final selectedId =
         ref.watch(selectedServerIdProvider) ??
@@ -58,7 +57,7 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
       return Center(
         child: Text(
           'Выберите сервер слева, чтобы подключиться.',
-          style: theme.textTheme.muted,
+          style: PortText.muted,
         ),
       );
     }
@@ -87,7 +86,7 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.muted.withValues(alpha: 0.7),
+                    color: PortColors.muted.withValues(alpha: 0.7),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -102,7 +101,7 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
                           children: [
                             Text(
                               selectedLeaf.name,
-                              style: theme.textTheme.large,
+                              style: PortText.large,
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 1),
@@ -156,22 +155,21 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
   }
 
   Future<void> _promptElevateForTun(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showShadDialog<bool>(
+    final confirmed = await showPortDialog<bool>(
       context: context,
       barrierColor: dialogBarrierColor,
-      opaque: false,
-      builder: (context) => ShadDialog.alert(
+      builder: (context) => PortDialog.alert(
         title: const Text('Нужны права администратора'),
         description: const Text(
           'Режим TUN требует прав администратора. Перезапустить '
           'приложение с повышенными правами?',
         ),
         actions: [
-          ShadButton.outline(
+          PortButton.outline(
             onPressed: () => Navigator.of(context).pop(false),
             child: const Text('Отмена'),
           ),
-          ShadButton(
+          PortButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Перезапустить'),
           ),
@@ -218,7 +216,7 @@ class _StatusText extends StatelessWidget {
       ConnectionError(message: final message) => 'Ошибка: $message',
       ConnectionConnected() => '', // обработано выше
     };
-    return Text(text, style: ShadTheme.of(context).textTheme.muted);
+    return Text(text, style: PortText.muted);
   }
 }
 

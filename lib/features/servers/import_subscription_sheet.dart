@@ -1,15 +1,15 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../app/dialog_style.dart';
 import '../../core_abstraction/app_settings_provider.dart';
 import '../../core_abstraction/core_config_provider.dart';
+import '../../widgets/port_ui/port_ui.dart';
 import 'subscription_import.dart';
 
 /// Небольшой диалог по центру окна для добавления `vless://` ссылки или
-/// подписки — обычный `ShadDialog`, а не `ShadSheet` на всю ширину: так
-/// привычнее выглядит и не отвлекает на весь экран ради одного поля ввода.
+/// подписки — обычный `PortDialog`, а не полноразмерный Sheet: так привычнее
+/// выглядит и не отвлекает на весь экран ради одного поля ввода.
 ///
 /// [initialLink] позволяет предзаполнить поле — используется диплинком
 /// `flux://add/...` и глобальной вставкой по Ctrl+V.
@@ -82,13 +82,11 @@ class _ImportSubscriptionSheetState
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-
-    return ShadDialog(
+    return PortDialog(
       title: const Text('Добавить сервер'),
       description: const Text('Ссылка на подписку или vless:// ссылка'),
       actions: [
-        ShadButton(
+        PortButton(
           onPressed: _loading ? null : _submit,
           child: Text(_loading ? 'Добавление...' : 'Добавить'),
         ),
@@ -99,9 +97,9 @@ class _ImportSubscriptionSheetState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            ShadInput(
+            PortInput(
               controller: _linkController,
-              placeholder: const Text('https://... или vless://...'),
+              placeholder: 'https://... или vless://...',
               enabled: !_loading,
               autofocus: true,
               onSubmitted: (_) => _submit(),
@@ -110,7 +108,7 @@ class _ImportSubscriptionSheetState
               const SizedBox(height: 10),
               Text(
                 _error!,
-                style: theme.textTheme.muted.copyWith(
+                style: PortText.muted.copyWith(
                   color: const Color(0xFFF87171),
                 ),
               ),
@@ -127,10 +125,9 @@ Future<void> showAddServerDialog(
   BuildContext context, {
   String? initialLink,
 }) {
-  return showShadDialog(
+  return showPortDialog(
     context: context,
     barrierColor: dialogBarrierColor,
-    opaque: false,
     builder: (_) => ImportSubscriptionSheet(initialLink: initialLink),
   );
 }

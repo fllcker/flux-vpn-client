@@ -1,8 +1,9 @@
 import 'package:flutter/widgets.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../features/settings/settings_dialog.dart';
+import '../widgets/port_ui/port_ui.dart';
 
 /// Кастомный тайтлбар вместо системного — окно создаётся как frameless
 /// (см. main.dart, `TitleBarStyle.hidden`), поэтому перетаскивание и
@@ -40,13 +41,11 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-
     return Container(
       height: 40,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.background,
-        border: Border(bottom: BorderSide(color: theme.colorScheme.border)),
+      decoration: const BoxDecoration(
+        color: PortColors.background,
+        border: Border(bottom: BorderSide(color: PortColors.border)),
       ),
       child: Row(
         children: [
@@ -60,11 +59,11 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
                       'assets/icon.png',
                       width: 20,
                       height: 20,
-                      color: theme.colorScheme.foreground,
+                      color: PortColors.foreground,
                       colorBlendMode: BlendMode.srcIn,
                     ),
                     const SizedBox(width: 8),
-                    Text('Flux', style: theme.textTheme.small),
+                    Text('Flux', style: PortText.small),
                   ],
                 ),
               ),
@@ -123,13 +122,12 @@ class _TitleBarButtonState extends State<_TitleBarButton> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
     final background = _hovered
-        ? (widget.hoverColor ?? theme.colorScheme.accent)
+        ? (widget.hoverColor ?? PortColors.accent)
         : const Color(0x00000000);
     final iconColor = _hovered && widget.hoverColor != null
         ? const Color(0xFFFFFFFF)
-        : theme.colorScheme.foreground;
+        : PortColors.foreground;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
