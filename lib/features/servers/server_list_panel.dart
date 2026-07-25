@@ -16,8 +16,35 @@ import 'right_panel_view.dart';
 import 'routing_rules_dialog.dart';
 import 'selected_server_provider.dart';
 
-class ServerListPanel extends ConsumerWidget {
+/// Список серверов в постоянной боковой колонке — десктопная раскладка
+/// (`connection_screen.dart`). На узких окнах (см. ROADMAP.md, трек 16) тот
+/// же список показывается через [showServerListBottomSheet] вместо этой
+/// колонки — вся реальная логика вынесена в [ServerListContent], этот виджет
+/// лишь оборачивает её в боковую панель фиксированной ширины.
+class ServerListPanel extends StatelessWidget {
   const ServerListPanel({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 260,
+      decoration: const BoxDecoration(
+        border: Border(right: BorderSide(color: PortColors.border)),
+      ),
+      child: const ServerListContent(),
+    );
+  }
+}
+
+/// Содержимое списка серверов без внешней рамки/фиксированной ширины —
+/// переиспользуется и боковой панелью ([ServerListPanel]), и выезжающим
+/// снизу листом на мобильной раскладке ([showServerListBottomSheet]).
+class ServerListContent extends ConsumerWidget {
+  /// Вызывается сразу после выбора сервера/варианта — на bottom sheet это
+  /// закрывает лист, в боковой панели не передаётся (`null` — no-op).
+  final VoidCallback? onAfterSelect;
+
+  const ServerListContent({super.key, this.onAfterSelect});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -35,12 +62,14 @@ class ServerListPanel extends ConsumerWidget {
     void onSelectLeaf(String id) {
       ref.read(selectedServerIdProvider.notifier).select(id);
       ref.read(rightPanelViewProvider.notifier).showConnect();
+      onAfterSelect?.call();
     }
 
     void onSelectVariant(String leafId, String variantId) {
       ref.read(coreConfigProvider.notifier).selectVariant(leafId, variantId);
       ref.read(selectedServerIdProvider.notifier).select(leafId);
       ref.read(rightPanelViewProvider.notifier).showConnect();
+      onAfterSelect?.call();
     }
 
     void onHideLeaf(String leafId) {
@@ -111,12 +140,8 @@ class ServerListPanel extends ConsumerWidget {
       }
     }
 
-    return Container(
-      width: 260,
+    return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: const BoxDecoration(
-        border: Border(right: BorderSide(color: PortColors.border)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

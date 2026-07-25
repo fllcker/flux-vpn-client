@@ -37,9 +37,13 @@ void main(List<String> args) async {
   await windowManager.ensureInitialized();
   registerFluxUriProtocolIfNeeded();
 
+  // Стартовый size — дефолт для десктопа, не трогаем. minimumSize снижен
+  // против прежних 760×480, чтобы окно можно было вручную ужать до
+  // мобильных пропорций и проверить адаптивную раскладку прямо на Windows
+  // resize'ом — см. ROADMAP.md, трек 16.
   const windowOptions = WindowOptions(
     size: Size(960, 620),
-    minimumSize: Size(760, 480),
+    minimumSize: Size(320, 480),
     center: true,
     titleBarStyle: TitleBarStyle.hidden,
   );
