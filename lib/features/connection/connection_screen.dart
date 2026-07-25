@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../app/layout_breakpoints.dart';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
 import '../../core_abstraction/core_config_provider.dart';
@@ -70,6 +72,15 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     pingAllLeaves(ref, flattenAllLeaves(ref.read(coreConfigProvider)));
   }
 
+  void _openServerListSheet(BuildContext context) {
+    showPortBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => ServerListContent(
+        onAfterSelect: () => Navigator.of(sheetContext).pop(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final rightPanelView = ref.watch(rightPanelViewProvider);
@@ -77,65 +88,90 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     final showBackground =
         rightPanelView is ConnectView && homeBackground != HomeBackground.none;
 
-    return ColoredBox(
-      color: PortColors.background,
-      child: Row(
-        children: [
-          const ServerListPanel(),
-          Expanded(
-            child: Stack(
+    final mainContent = Stack(
+      children: [
+        if (showBackground)
+          switch (homeBackground) {
+            HomeBackground.none => const SizedBox.shrink(),
+            HomeBackground.globe => Stack(
               children: [
-                if (showBackground)
-                  switch (homeBackground) {
-                    HomeBackground.none => const SizedBox.shrink(),
-                    HomeBackground.globe => Stack(
-                      children: [
-                        Positioned.fill(
-                          child: Starfield(
-                            color: PortColors.foreground,
-                            rotation: _rotation,
-                          ),
+                Positioned.fill(
+                  child: Starfield(
+                    color: PortColors.foreground,
+                    rotation: _rotation,
+                  ),
+                ),
+                Positioned.fill(
+                  child: Center(
+                    child: SizedBox(
+                      width: 620,
+                      height: 620,
+                      child: SphereGlobe(
+                        color: PortColors.primary.withValues(
+                          alpha: 0.45,
                         ),
-                        Positioned.fill(
-                          child: Center(
-                            child: SizedBox(
-                              width: 620,
-                              height: 620,
-                              child: SphereGlobe(
-                                color: PortColors.primary.withValues(
-                                  alpha: 0.45,
-                                ),
-                                markers: _selectedServerMarker(context, ref),
-                                rotationController: _rotation,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    HomeBackground.simpleGradient => const Positioned.fill(
-                      child: ShaderBackground(
-                        assetPath: 'shaders/simple_gradient.frag',
+                        markers: _selectedServerMarker(context, ref),
+                        rotationController: _rotation,
                       ),
                     ),
-                    HomeBackground.colorBends => const Positioned.fill(
-                      child: ShaderBackground(
-                        assetPath: 'shaders/color_bends.frag',
-                      ),
-                    ),
-                    HomeBackground.galaxy => const Positioned.fill(
-                      child: ShaderBackground(assetPath: 'shaders/galaxy.frag'),
-                    ),
-                  },
-                switch (rightPanelView) {
-                  ConnectView() => const ConnectPanel(),
-                  SubscriptionInfoView(:final subscriptionId) =>
-                    SubscriptionInfoPanel(subscriptionId: subscriptionId),
-                },
+                  ),
+                ),
               ],
             ),
-          ),
-        ],
+            HomeBackground.simpleGradient => const Positioned.fill(
+              child: ShaderBackground(
+                assetPath: 'shaders/simple_gradient.frag',
+              ),
+            ),
+            HomeBackground.colorBends => const Positioned.fill(
+              child: ShaderBackground(
+                assetPath: 'shaders/color_bends.frag',
+              ),
+            ),
+            HomeBackground.galaxy => const Positioned.fill(
+              child: ShaderBackground(assetPath: 'shaders/galaxy.frag'),
+            ),
+          },
+        switch (rightPanelView) {
+          ConnectView() => const ConnectPanel(),
+          SubscriptionInfoView(:final subscriptionId) =>
+            SubscriptionInfoPanel(subscriptionId: subscriptionId),
+        },
+      ],
+    );
+
+    return ColoredBox(
+      color: PortColors.background,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Узкое окно (см. ROADMAP.md, трек 16) — правая часть (фон +
+          // карточка подключения) становится главным экраном на весь
+          // размер, список серверов вместо постоянной боковой колонки
+          // прячется за кнопкой и открывается снизу листом
+          // (`showPortBottomSheet`).
+          if (constraints.maxWidth < kMobileBreakpoint) {
+            return Stack(
+              children: [
+                mainContent,
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  child: PortIconButton.secondary(
+                    icon: const Icon(LucideIcons.list),
+                    onPressed: () => _openServerListSheet(context),
+                  ),
+                ),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              const ServerListPanel(),
+              Expanded(child: mainContent),
+            ],
+          );
+        },
       ),
     );
   }

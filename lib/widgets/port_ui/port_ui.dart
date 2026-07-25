@@ -30,6 +30,7 @@ part 'port_input.dart';
 part 'port_switch.dart';
 part 'port_select.dart';
 part 'port_dialog.dart';
+part 'port_bottom_sheet.dart';
 part 'port_context_menu.dart';
 part 'port_toast.dart';
 part 'port_app.dart';
