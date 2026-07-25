@@ -1,0 +1,88 @@
+name: Release
+
+# Runs on every push to master. Actual release build only happens if the
+# `version:` line in pubspec.yaml changed and no release for that version
+# exists yet — so day-to-day pushes that don't bump the version are a no-op
+# after the cheap check-version job.
+on:
+  push:
+    branches: [master]
+    paths:
+      - pubspec.yaml
+
+permissions:
+  contents: write
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+      should_release: ${{ steps.extract.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version and check for existing release
+        id: extract
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="$(grep -m1 '^version:' pubspec.yaml | sed 's/^version:[[:space:]]*//' | cut -d'+' -f1)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if gh release view "v$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release v$version already exists, skipping."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-windows:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.check-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Fetch xray-core
+        run: ./scripts/fetch_xray.ps1
+
+      - name: Fetch sing-box
+        run: ./scripts/fetch_sing_box.ps1
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Package portable zip
+        run: |
+          $dest = "build\installer\Flux-$env:VERSION-windows-portable.zip"
+          New-Item -ItemType Directory -Path "build\installer" -Force | Out-Null
+          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath $dest
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer with Inno Setup
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc "/DAppVersion=$env:VERSION" "windows\installer\flux.iss"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v$env:VERSION" `
+            --repo $env:GITHUB_REPOSITORY `
+            --title "v$env:VERSION" `
+            --generate-notes `
+            "build\installer\Flux-$env:VERSION-windows-portable.zip" `
+            "build\installer\FluxSetup-$env:VERSION.exe"
