@@ -130,5 +130,6 @@ ServerLeaf _toLeaf(_Entry entry, String? parentGroupName) {
     hidden: leaf.hidden,
     variants: leaf.variants,
     selection: leaf.selection,
+    routingRules: leaf.routingRules,
   );
 }

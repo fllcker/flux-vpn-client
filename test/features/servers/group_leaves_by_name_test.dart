@@ -3,17 +3,19 @@ import 'package:flux/core_abstraction/proxy_node.dart';
 import 'package:flux/core_abstraction/server_config.dart';
 import 'package:flux/features/servers/group_leaves_by_name.dart';
 
-ServerLeaf _leaf(String name) => ServerLeaf(
-  id: name,
-  name: name,
-  variants: [
-    ConnectionVariant(
-      id: '$name-v',
-      label: 'default',
-      config: VlessConfig(address: '$name.example.com', port: 443, uuid: 'u'),
-    ),
-  ],
-);
+ServerLeaf _leaf(String name, {List<RoutingRule> routingRules = const []}) =>
+    ServerLeaf(
+      id: name,
+      name: name,
+      variants: [
+        ConnectionVariant(
+          id: '$name-v',
+          label: 'default',
+          config: VlessConfig(address: '$name.example.com', port: 443, uuid: 'u'),
+        ),
+      ],
+      routingRules: routingRules,
+    );
 
 void main() {
   test('groups a shared first segment, leaves a singleton flat', () {
@@ -77,6 +79,27 @@ void main() {
       'Germany 1',
       'Germany 2',
     ]);
+  });
+
+  test('preserves routingRules on leaves rebuilt during grouping', () {
+    // Регрессия: _toLeaf пересобирал ServerLeaf с новым именем, но забывал
+    // передать routingRules — xray-json подписки с одинаковыми правилами
+    // роутинга на каждом сервере теряли их сразу после группировки по
+    // имени, хотя парсер их находил (см. ROADMAP.md).
+    const rules = [
+      DomainRule(values: ['geosite:category-ru'], outboundTag: 'direct'),
+    ];
+    final leaves = [
+      _leaf('Basic - Germany 1', routingRules: rules),
+      _leaf('Basic - Finland 1', routingRules: rules),
+    ];
+
+    final nodes = groupLeavesByName(leaves);
+
+    final basic = nodes.whereType<ServerGroup>().single;
+    for (final leaf in basic.children.whereType<ServerLeaf>()) {
+      expect(leaf.routingRules, rules);
+    }
   });
 
   test('leaves an ungroupable flat list untouched', () {
