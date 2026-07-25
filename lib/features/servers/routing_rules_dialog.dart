@@ -1,8 +1,9 @@
 import 'package:flutter/widgets.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../app/dialog_style.dart';
 import '../../core_abstraction/proxy_node.dart';
+import '../../widgets/port_ui/port_ui.dart';
 
 /// Одно редактируемое правило в UI — каждое поле формы создаёт свой
 /// [RoutingRule] с одним значением (без группировки нескольких значений под
@@ -78,9 +79,7 @@ class _RoutingRulesDialogState extends State<RoutingRulesDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-
-    return ShadDialog(
+    return PortDialog(
       title: Text(widget.title),
       child: SizedBox(
         width: 420,
@@ -91,7 +90,7 @@ class _RoutingRulesDialogState extends State<RoutingRulesDialog> {
             if (_rules.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('Правил пока нет', style: theme.textTheme.muted),
+                child: Text('Правил пока нет', style: PortText.muted),
               )
             else
               ConstrainedBox(
@@ -108,14 +107,14 @@ class _RoutingRulesDialogState extends State<RoutingRulesDialog> {
               children: [
                 SizedBox(
                   width: 90,
-                  child: ShadSelect<_RuleKind>(
+                  child: PortSelect<_RuleKind>(
                     initialValue: _kind,
                     onChanged: (value) {
                       if (value != null) setState(() => _kind = value);
                     },
                     options: const [
-                      ShadOption(value: _RuleKind.domain, child: Text('Домен')),
-                      ShadOption(value: _RuleKind.ip, child: Text('IP')),
+                      PortSelectOption(value: _RuleKind.domain, child: Text('Домен')),
+                      PortSelectOption(value: _RuleKind.ip, child: Text('IP')),
                     ],
                     selectedOptionBuilder: (context, value) => Text(
                       switch (value) {
@@ -127,9 +126,9 @@ class _RoutingRulesDialogState extends State<RoutingRulesDialog> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: ShadInput(
+                  child: PortInput(
                     controller: _valueController,
-                    placeholder: const Text('example.com / geosite:category-ads'),
+                    placeholder: 'example.com / geosite:category-ads',
                     onSubmitted: (_) => _addRule(),
                   ),
                 ),
@@ -139,33 +138,33 @@ class _RoutingRulesDialogState extends State<RoutingRulesDialog> {
             Row(
               children: [
                 Expanded(
-                  child: ShadSelect<String>(
+                  child: PortSelect<String>(
                     initialValue: _outboundTag,
                     onChanged: (value) {
                       if (value != null) setState(() => _outboundTag = value);
                     },
                     options: const [
-                      ShadOption(value: 'proxy', child: Text('Через прокси')),
-                      ShadOption(value: 'direct', child: Text('Напрямую')),
-                      ShadOption(value: 'block', child: Text('Блокировать')),
+                      PortSelectOption(value: 'proxy', child: Text('Через прокси')),
+                      PortSelectOption(value: 'direct', child: Text('Напрямую')),
+                      PortSelectOption(value: 'block', child: Text('Блокировать')),
                     ],
                     selectedOptionBuilder: (context, value) => Text(_tagLabel(value)),
                   ),
                 ),
                 const SizedBox(width: 8),
-                ShadButton(onPressed: _addRule, child: const Text('Добавить')),
+                PortButton(onPressed: _addRule, child: const Text('Добавить')),
               ],
             ),
             const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                ShadButton.outline(
+                PortButton.outline(
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('Отмена'),
                 ),
                 const SizedBox(width: 8),
-                ShadButton(onPressed: _save, child: const Text('Сохранить')),
+                PortButton(onPressed: _save, child: const Text('Сохранить')),
               ],
             ),
           ],
@@ -182,7 +181,6 @@ class _RuleTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
     final (kindLabel, values, outboundTag) = switch (rule) {
       DomainRule(:final values, :final outboundTag) => ('Домен', values, outboundTag),
       IpRule(:final values, :final outboundTag) => ('IP', values, outboundTag),
@@ -196,22 +194,22 @@ class _RuleTile extends StatelessWidget {
             child: RichText(
               overflow: TextOverflow.ellipsis,
               text: TextSpan(
-                style: theme.textTheme.small,
+                style: PortText.small,
                 children: [
                   TextSpan(
                     text: '$kindLabel  ',
-                    style: TextStyle(color: theme.colorScheme.mutedForeground),
+                    style: const TextStyle(color: PortColors.mutedForeground),
                   ),
                   TextSpan(text: values.join(', ')),
                   TextSpan(
                     text: '  → ${_tagLabel(outboundTag)}',
-                    style: TextStyle(color: theme.colorScheme.mutedForeground),
+                    style: const TextStyle(color: PortColors.mutedForeground),
                   ),
                 ],
               ),
             ),
           ),
-          ShadIconButton.ghost(
+          PortIconButton.ghost(
             icon: const Icon(LucideIcons.trash2, size: 14),
             onPressed: onRemove,
           ),
@@ -236,10 +234,9 @@ Future<void> showRoutingRulesDialog(
   required List<RoutingRule> initialRules,
   required ValueChanged<List<RoutingRule>> onSave,
 }) {
-  return showShadDialog(
+  return showPortDialog(
     context: context,
     barrierColor: dialogBarrierColor,
-    opaque: false,
     builder: (_) => RoutingRulesDialog(
       title: title,
       initialRules: initialRules,

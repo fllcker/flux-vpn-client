@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
@@ -9,6 +8,7 @@ import '../../widgets/globe/country_centroids.dart';
 import '../../widgets/globe/shader_background.dart';
 import '../../widgets/globe/sphere_globe.dart';
 import '../../widgets/globe/starfield.dart';
+import '../../widgets/port_ui/port_ui.dart';
 import '../ping/ping_all.dart';
 import '../servers/flag_emoji.dart';
 import '../servers/flatten_leaves.dart';
@@ -73,13 +73,12 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   @override
   Widget build(BuildContext context) {
     final rightPanelView = ref.watch(rightPanelViewProvider);
-    final theme = ShadTheme.of(context);
     final homeBackground = ref.watch(appSettingsProvider).homeBackground;
     final showBackground =
         rightPanelView is ConnectView && homeBackground != HomeBackground.none;
 
     return ColoredBox(
-      color: theme.colorScheme.background,
+      color: PortColors.background,
       child: Row(
         children: [
           const ServerListPanel(),
@@ -93,7 +92,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                       children: [
                         Positioned.fill(
                           child: Starfield(
-                            color: theme.colorScheme.foreground,
+                            color: PortColors.foreground,
                             rotation: _rotation,
                           ),
                         ),
@@ -103,7 +102,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                               width: 620,
                               height: 620,
                               child: SphereGlobe(
-                                color: theme.colorScheme.primary.withValues(
+                                color: PortColors.primary.withValues(
                                   alpha: 0.45,
                                 ),
                                 markers: _selectedServerMarker(context, ref),
@@ -155,19 +154,18 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     final centroid = isoCode == null ? null : countryCentroids[isoCode];
     if (centroid == null) return const [];
 
-    final theme = ShadTheme.of(context);
     return [
       GlobeMarker(
         lat: centroid.$1,
         lon: centroid.$2,
         label: DecoratedBox(
           decoration: BoxDecoration(
-            color: theme.colorScheme.popover,
+            color: PortColors.popover,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: theme.colorScheme.border),
+            border: Border.all(color: PortColors.border),
             boxShadow: [
               BoxShadow(
-                color: theme.colorScheme.primary.withValues(alpha: 0.25),
+                color: PortColors.primary.withValues(alpha: 0.25),
                 blurRadius: 16,
                 spreadRadius: 1,
               ),
@@ -180,7 +178,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
               children: [
                 ServerIcon(icon: leaf.icon, size: 16),
                 const SizedBox(width: 6),
-                Text(leaf.name, style: theme.textTheme.small),
+                Text(leaf.name, style: PortText.small),
               ],
             ),
           ),

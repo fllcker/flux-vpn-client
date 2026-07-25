@@ -1,9 +1,10 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core_abstraction/core_config_provider.dart' show standaloneParentId;
 import '../../core_abstraction/proxy_node.dart';
+import '../../widgets/port_ui/port_ui.dart';
 import 'expanded_nodes_provider.dart';
 import 'flatten_leaves.dart';
 import 'server_icon.dart';
@@ -207,9 +208,9 @@ class ProxyTreeList extends ConsumerWidget {
           child: hovering
               ? DecoratedBox(
                   decoration: BoxDecoration(
-                    border: Border(
+                    border: const Border(
                       top: BorderSide(
-                        color: ShadTheme.of(context).colorScheme.primary,
+                        color: PortColors.primary,
                         width: 2,
                       ),
                     ),
@@ -241,7 +242,7 @@ class _TrailingDropZone extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 4),
           decoration: BoxDecoration(
             color: hovering
-                ? ShadTheme.of(context).colorScheme.accent.withValues(alpha: 0.5)
+                ? PortColors.accent.withValues(alpha: 0.5)
                 : null,
             borderRadius: BorderRadius.circular(6),
           ),
@@ -258,15 +259,14 @@ class _DragFeedback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.popover,
+        color: PortColors.popover,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: theme.colorScheme.border),
+        border: Border.all(color: PortColors.border),
         boxShadow: [
           BoxShadow(
-            color: theme.colorScheme.primary.withValues(alpha: 0.2),
+            color: PortColors.primary.withValues(alpha: 0.2),
             blurRadius: 12,
           ),
         ],
@@ -278,7 +278,7 @@ class _DragFeedback extends StatelessWidget {
           children: [
             ServerIcon(icon: icon, size: 18),
             const SizedBox(width: 8),
-            Text(label, style: theme.textTheme.small),
+            Text(label, style: PortText.small),
           ],
         ),
       ),
@@ -306,10 +306,8 @@ class _AutoRowState extends State<_AutoRow> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
     final background = _hovered
-        ? scheme.accent.withValues(alpha: 0.5)
+        ? PortColors.accent.withValues(alpha: 0.5)
         : const Color(0x00000000);
 
     return MouseRegion(
@@ -327,12 +325,12 @@ class _AutoRowState extends State<_AutoRow> {
           ),
           child: Row(
             children: [
-              Icon(LucideIcons.zap, size: 15, color: scheme.mutedForeground),
+              const Icon(LucideIcons.zap, size: 15, color: PortColors.mutedForeground),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   widget.marker.name,
-                  style: theme.textTheme.small,
+                  style: PortText.small,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -366,10 +364,8 @@ class _GroupRowState extends State<_GroupRow> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
     final background = _hovered
-        ? scheme.accent.withValues(alpha: 0.5)
+        ? PortColors.accent.withValues(alpha: 0.5)
         : const Color(0x00000000);
 
     return MouseRegion(
@@ -390,13 +386,13 @@ class _GroupRowState extends State<_GroupRow> {
               Icon(
                 widget.expanded ? LucideIcons.folderOpen : LucideIcons.folder,
                 size: 15,
-                color: scheme.mutedForeground,
+                color: PortColors.mutedForeground,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   widget.group.name,
-                  style: theme.textTheme.small.copyWith(
+                  style: PortText.small.copyWith(
                     fontWeight: FontWeight.w500,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -407,7 +403,7 @@ class _GroupRowState extends State<_GroupRow> {
                     ? LucideIcons.chevronUp
                     : LucideIcons.chevronDown,
                 size: 14,
-                color: scheme.mutedForeground,
+                color: PortColors.mutedForeground,
               ),
             ],
           ),

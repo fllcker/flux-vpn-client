@@ -1,11 +1,11 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../app/dialog_style.dart';
 import '../../app/windows_autostart.dart';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
+import '../../widgets/port_ui/port_ui.dart';
 
 /// Настройки приложения — центрированный диалог с тремя разделами:
 /// персонализация, пинг, подписки. Каждый контрол применяется и сохраняется
@@ -19,7 +19,7 @@ class SettingsDialog extends ConsumerWidget {
     final settings = ref.watch(appSettingsProvider);
     final notifier = ref.read(appSettingsProvider.notifier);
 
-    return ShadDialog(
+    return PortDialog(
       title: const Text('Настройки'),
       child: SizedBox(
         width: 420,
@@ -31,7 +31,7 @@ class SettingsDialog extends ConsumerWidget {
             const SizedBox(height: 10),
             _SettingRow(
               label: 'Тема',
-              child: ShadSelect<AppThemeMode>(
+              child: PortSelect<AppThemeMode>(
                 initialValue: settings.themeMode,
                 onChanged: (value) {
                   if (value != null) {
@@ -39,9 +39,9 @@ class SettingsDialog extends ConsumerWidget {
                   }
                 },
                 options: const [
-                  ShadOption(value: AppThemeMode.system, child: Text('Системная')),
-                  ShadOption(value: AppThemeMode.light, child: Text('Светлая')),
-                  ShadOption(value: AppThemeMode.dark, child: Text('Тёмная')),
+                  PortSelectOption(value: AppThemeMode.system, child: Text('Системная')),
+                  PortSelectOption(value: AppThemeMode.light, child: Text('Светлая')),
+                  PortSelectOption(value: AppThemeMode.dark, child: Text('Тёмная')),
                 ],
                 selectedOptionBuilder: (context, value) =>
                     Text(_themeModeLabel(value)),
@@ -50,7 +50,7 @@ class SettingsDialog extends ConsumerWidget {
             const SizedBox(height: 12),
             _SettingRow(
               label: 'Фон на главной',
-              child: ShadSelect<HomeBackground>(
+              child: PortSelect<HomeBackground>(
                 initialValue: settings.homeBackground,
                 onChanged: (value) {
                   if (value != null) {
@@ -58,17 +58,17 @@ class SettingsDialog extends ConsumerWidget {
                   }
                 },
                 options: const [
-                  ShadOption(value: HomeBackground.none, child: Text('Нет')),
-                  ShadOption(value: HomeBackground.globe, child: Text('Планета')),
-                  ShadOption(
+                  PortSelectOption(value: HomeBackground.none, child: Text('Нет')),
+                  PortSelectOption(value: HomeBackground.globe, child: Text('Планета')),
+                  PortSelectOption(
                     value: HomeBackground.simpleGradient,
                     child: Text('Simple Gradient'),
                   ),
-                  ShadOption(
+                  PortSelectOption(
                     value: HomeBackground.colorBends,
                     child: Text('Color Bends'),
                   ),
-                  ShadOption(value: HomeBackground.galaxy, child: Text('Galaxy')),
+                  PortSelectOption(value: HomeBackground.galaxy, child: Text('Galaxy')),
                 ],
                 selectedOptionBuilder: (context, value) =>
                     Text(_homeBackgroundLabel(value)),
@@ -79,7 +79,7 @@ class SettingsDialog extends ConsumerWidget {
             const SizedBox(height: 10),
             _SettingRow(
               label: 'Способ проверки',
-              child: ShadSelect<PingMode>(
+              child: PortSelect<PingMode>(
                 initialValue: settings.pingMode,
                 onChanged: (value) {
                   if (value != null) {
@@ -87,20 +87,20 @@ class SettingsDialog extends ConsumerWidget {
                   }
                 },
                 options: const [
-                  ShadOption(value: PingMode.viaProxy, child: Text('Через прокси')),
-                  ShadOption(value: PingMode.tcp, child: Text('TCP')),
-                  ShadOption(value: PingMode.icmp, child: Text('ICMP')),
+                  PortSelectOption(value: PingMode.viaProxy, child: Text('Через прокси')),
+                  PortSelectOption(value: PingMode.tcp, child: Text('TCP')),
+                  PortSelectOption(value: PingMode.icmp, child: Text('ICMP')),
                 ],
                 selectedOptionBuilder: (context, value) =>
                     Text(_pingModeLabel(value)),
               ),
             ),
             const SizedBox(height: 12),
-            Text('URL для проверки (через прокси)', style: ShadTheme.of(context).textTheme.small),
+            Text('URL для проверки (через прокси)', style: PortText.small),
             const SizedBox(height: 6),
-            ShadInput(
+            PortInput(
               initialValue: settings.pingTestUrl,
-              placeholder: const Text('https://www.gstatic.com/generate_204'),
+              placeholder: 'https://www.gstatic.com/generate_204',
               onSubmitted: (value) {
                 final url = value.trim();
                 notifier.update(
@@ -113,7 +113,7 @@ class SettingsDialog extends ConsumerWidget {
               },
             ),
             const SizedBox(height: 12),
-            ShadSwitch(
+            PortSwitch(
               value: settings.pingAllOnStartup,
               label: const Text('Пинговать все серверы при открытии'),
               onChanged: (value) =>
@@ -124,7 +124,7 @@ class SettingsDialog extends ConsumerWidget {
             const SizedBox(height: 10),
             _SettingRow(
               label: 'Ядро TUN-режима',
-              child: ShadSelect<TunCoreType>(
+              child: PortSelect<TunCoreType>(
                 initialValue: settings.tunCoreType,
                 onChanged: (value) {
                   if (value != null) {
@@ -132,7 +132,7 @@ class SettingsDialog extends ConsumerWidget {
                   }
                 },
                 options: const [
-                  ShadOption(value: TunCoreType.singBox, child: Text('sing-box')),
+                  PortSelectOption(value: TunCoreType.singBox, child: Text('sing-box')),
                 ],
                 selectedOptionBuilder: (context, value) =>
                     Text(_tunCoreTypeLabel(value)),
@@ -141,7 +141,7 @@ class SettingsDialog extends ConsumerWidget {
             const SizedBox(height: 20),
             const _SectionLabel('Подписка'),
             const SizedBox(height: 10),
-            ShadSwitch(
+            PortSwitch(
               value: settings.autoGroupSubscriptions,
               label: const Text('Автоматическая разбивка по группам'),
               onChanged: (value) =>
@@ -150,7 +150,7 @@ class SettingsDialog extends ConsumerWidget {
             const SizedBox(height: 20),
             const _SectionLabel('Система'),
             const SizedBox(height: 10),
-            ShadSwitch(
+            PortSwitch(
               value: settings.autoStartOnBoot,
               label: const Text('Запускать при старте Windows'),
               onChanged: (value) {
@@ -195,12 +195,11 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
     return Text(
       text,
-      style: theme.textTheme.small.copyWith(
+      style: PortText.small.copyWith(
         fontWeight: FontWeight.w600,
-        color: theme.colorScheme.mutedForeground,
+        color: PortColors.mutedForeground,
       ),
     );
   }
@@ -213,10 +212,9 @@ class _SettingRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
     return Row(
       children: [
-        Expanded(child: Text(label, style: theme.textTheme.p)),
+        Expanded(child: Text(label, style: PortText.p)),
         child,
       ],
     );
@@ -225,10 +223,9 @@ class _SettingRow extends StatelessWidget {
 
 /// Показывает диалог настроек по центру окна.
 Future<void> showSettingsDialog(BuildContext context) {
-  return showShadDialog(
+  return showPortDialog(
     context: context,
     barrierColor: dialogBarrierColor,
-    opaque: false,
     builder: (_) => const SettingsDialog(),
   );
 }

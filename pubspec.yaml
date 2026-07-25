@@ -30,6 +30,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Локализации для WidgetsApp (PortApp) — TextField внутри PortInput
+  # требует MaterialLocalizations в дереве (см. docs/shadcn/PLAN.md).
+  flutter_localizations:
+    sdk: flutter
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -53,9 +57,10 @@ dependencies:
   # PLAN.md, "UI-стек")
   window_manager: ^0.5.2
 
-  # Основной UI-кит (см. PLAN.md, "UI-стек") — вместо стокового Material/Fluent.
-  # Реэкспортирует lucide_icons_flutter — те же иконки, что на сайте shadcn/ui.
-  shadcn_ui: ^0.55.0
+  # Иконки — те же, что на сайте shadcn/ui. Раньше приходил транзитивно
+  # через shadcn_ui (см. docs/shadcn/PLAN.md — вместо shadcn_ui теперь
+  # lib/widgets/port_ui/, собственный порт).
+  lucide_icons_flutter: ^3.0.0
 
   # Запись системного прокси Windows в реестр (см. windows_system_proxy.dart)
   win32_registry: ^3.0.3
