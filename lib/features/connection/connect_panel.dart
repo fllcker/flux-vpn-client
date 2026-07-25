@@ -101,7 +101,7 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
                           children: [
                             Text(
                               selectedLeaf.name,
-                              style: PortText.large,
+                              style: PortText.large.copyWith(height: 1),
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 1),
@@ -216,7 +216,7 @@ class _StatusText extends StatelessWidget {
       ConnectionError(message: final message) => 'Ошибка: $message',
       ConnectionConnected() => '', // обработано выше
     };
-    return Text(text, style: PortText.muted);
+    return Text(text, style: PortText.muted.copyWith(height: 1));
   }
 }
 

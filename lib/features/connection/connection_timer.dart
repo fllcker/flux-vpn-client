@@ -36,7 +36,7 @@ class _ConnectionTimerState extends State<ConnectionTimer> {
   @override
   Widget build(BuildContext context) {
     final elapsed = DateTime.now().difference(widget.connectedAt);
-    return Text(_format(elapsed), style: PortText.muted);
+    return Text(_format(elapsed), style: PortText.muted.copyWith(height: 1));
   }
 
   String _format(Duration d) {

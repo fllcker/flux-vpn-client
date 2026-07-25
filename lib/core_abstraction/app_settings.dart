@@ -64,6 +64,13 @@ class AppSettings {
   final String tunDnsServer;
   final CoreLogLevel coreLogLevel;
 
+  /// Id последнего выбранного сервера (`ServerLeaf.id`) — предпочтение этой
+  /// машины, не часть Magic JSON-профиля, которым можно поделиться (см.
+  /// ROADMAP.md, трек 9). Восстанавливается на старте, но только если id ещё
+  /// существует в текущем дереве — сервер могли удалить из подписки между
+  /// запусками.
+  final String? lastSelectedServerId;
+
   const AppSettings({
     this.themeMode = AppThemeMode.dark,
     this.homeBackground = HomeBackground.galaxy,
@@ -75,6 +82,7 @@ class AppSettings {
     this.tunCoreType = TunCoreType.singBox,
     this.tunDnsServer = defaultTunDnsServer,
     this.coreLogLevel = CoreLogLevel.warn,
+    this.lastSelectedServerId,
   });
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -108,6 +116,7 @@ class AppSettings {
       json['coreLogLevel'],
       CoreLogLevel.warn,
     ),
+    lastSelectedServerId: json['lastSelectedServerId'] as String?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -121,6 +130,7 @@ class AppSettings {
     'tunCoreType': tunCoreType.name,
     'tunDnsServer': tunDnsServer,
     'coreLogLevel': coreLogLevel.name,
+    if (lastSelectedServerId != null) 'lastSelectedServerId': lastSelectedServerId,
   };
 
   AppSettings copyWith({
@@ -134,6 +144,7 @@ class AppSettings {
     TunCoreType? tunCoreType,
     String? tunDnsServer,
     CoreLogLevel? coreLogLevel,
+    String? lastSelectedServerId,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -147,6 +158,7 @@ class AppSettings {
       tunCoreType: tunCoreType ?? this.tunCoreType,
       tunDnsServer: tunDnsServer ?? this.tunDnsServer,
       coreLogLevel: coreLogLevel ?? this.coreLogLevel,
+      lastSelectedServerId: lastSelectedServerId ?? this.lastSelectedServerId,
     );
   }
 }
