@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../app/dialog_style.dart';
+import '../../app/layout_breakpoints.dart';
 import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
@@ -11,6 +12,7 @@ import '../../widgets/port_ui/port_ui.dart';
 import '../servers/flatten_leaves.dart';
 import '../servers/selected_server_provider.dart';
 import '../servers/server_icon.dart';
+import '../servers/server_list_panel.dart';
 import 'connection_controller.dart';
 import 'connection_state.dart';
 import 'connection_timer.dart';
@@ -80,36 +82,45 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
             children: [
               SizedBox(
                 width: _selectorWidth,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: PortColors.muted.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ServerIcon(icon: selectedLeaf.icon, size: 32),
-                      const SizedBox(width: 10),
-                      Flexible(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              selectedLeaf.name,
-                              style: PortText.large.copyWith(height: 1),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 1),
-                            _StatusText(state: connectionState),
-                          ],
+                child: GestureDetector(
+                  // Боковая панель со списком серверов скрыта на мобильной
+                  // раскладке (см. ROADMAP.md, трек 16) — тап по карточке
+                  // открывает тот же bottom sheet, что и плавающая кнопка
+                  // сверху, чтобы сменить сервер было можно и отсюда.
+                  onTap: isMobileLayout(context)
+                      ? () => openServerListSheet(context)
+                      : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: PortColors.muted.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ServerIcon(icon: selectedLeaf.icon, size: 32),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                selectedLeaf.name,
+                                style: PortText.large.copyWith(height: 1),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 1),
+                              _StatusText(state: connectionState),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

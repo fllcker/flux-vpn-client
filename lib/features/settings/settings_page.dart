@@ -78,7 +78,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   padding: const EdgeInsets.all(24),
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 480),
-                    child: _buildSection(_section, settings, notifier),
+                    // key заставляет Flutter пересоздавать поддерево целиком
+                    // при смене секции вместо переиспользования Element на
+                    // совпадающей позиции — без него, например, PortInput
+                    // без своего ключа на одной и той же позиции в дереве
+                    // (URL пинга в «Пинге», DNS-сервер в «TUN») делил один и
+                    // тот же State/TextEditingController между секциями:
+                    // typing в одном поле отражался в другом при переключении
+                    // вкладки.
+                    child: KeyedSubtree(
+                      key: ValueKey(_section),
+                      child: _buildSection(_section, settings, notifier),
+                    ),
                   ),
                 ),
               ),
