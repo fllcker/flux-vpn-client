@@ -2,14 +2,20 @@ import 'package:flutter/widgets.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:window_manager/window_manager.dart';
 
-import '../features/settings/settings_dialog.dart';
 import '../widgets/port_ui/port_ui.dart';
 
 /// Кастомный тайтлбар вместо системного — окно создаётся как frameless
 /// (см. main.dart, `TitleBarStyle.hidden`), поэтому перетаскивание и
 /// свёртывание/закрытие теперь целиком на нашей стороне.
 class AppTitleBar extends StatefulWidget {
-  const AppTitleBar({super.key});
+  final bool settingsOpen;
+  final VoidCallback onToggleSettings;
+
+  const AppTitleBar({
+    super.key,
+    required this.settingsOpen,
+    required this.onToggleSettings,
+  });
 
   @override
   State<AppTitleBar> createState() => _AppTitleBarState();
@@ -70,9 +76,10 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
             ),
           ),
           _TitleBarButton(
-            icon: LucideIcons.settings,
+            icon: widget.settingsOpen ? LucideIcons.x : LucideIcons.settings,
             iconSize: 13,
-            onPressed: () => showSettingsDialog(context),
+            active: widget.settingsOpen,
+            onPressed: widget.onToggleSettings,
           ),
           _TitleBarButton(
             icon: LucideIcons.minus,
@@ -104,6 +111,7 @@ class _TitleBarButton extends StatefulWidget {
   final IconData icon;
   final double iconSize;
   final Color? hoverColor;
+  final bool active;
   final VoidCallback onPressed;
 
   const _TitleBarButton({
@@ -111,6 +119,7 @@ class _TitleBarButton extends StatefulWidget {
     required this.onPressed,
     this.iconSize = 14,
     this.hoverColor,
+    this.active = false,
   });
 
   @override
@@ -122,7 +131,7 @@ class _TitleBarButtonState extends State<_TitleBarButton> {
 
   @override
   Widget build(BuildContext context) {
-    final background = _hovered
+    final background = _hovered || widget.active
         ? (widget.hoverColor ?? PortColors.accent)
         : const Color(0x00000000);
     final iconColor = _hovered && widget.hoverColor != null

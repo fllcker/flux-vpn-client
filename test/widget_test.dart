@@ -114,6 +114,11 @@ class _PresetCoreConfigController extends CoreConfigController {
 }
 
 class _PresetAppSettingsController extends AppSettingsController {
+  // Фон задан явно, а не взят по умолчанию: тест считает вхождения имени
+  // сервера, и третье из них — подпись маркера на глобусе, то есть тест
+  // молча зависит от того, какой фон включён. Со сменой умолчания на galaxy
+  // он и упал.
   @override
-  AppSettings build() => const AppSettings();
+  AppSettings build() =>
+      const AppSettings(homeBackground: HomeBackground.globe);
 }

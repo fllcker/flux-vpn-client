@@ -1,3 +1,4 @@
+import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/server_config.dart';
 
@@ -10,9 +11,10 @@ Map<String, dynamic> buildXrayConfig(
   required int socksPort,
   required int httpPort,
   List<RoutingRule> routingRules = const [],
+  CoreLogLevel logLevel = CoreLogLevel.warn,
 }) {
   return {
-    'log': {'loglevel': 'warning'},
+    'log': {'loglevel': logLevel.xrayName},
     'inbounds': [
       {
         'listen': '127.0.0.1',

@@ -2,9 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../../app/app_paths.dart';
+import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/core_config.dart';
 import '../../core_abstraction/core_engine.dart';
 import '../../core_abstraction/proxy_node.dart';
+import '../../core_abstraction/server_config.dart';
 import 'child_process_job.dart';
 import 'windows_system_proxy.dart';
 import 'xray_config_mapper.dart';
@@ -28,6 +31,7 @@ class XrayEngineWindows implements CoreEngine {
     required this.xrayExecutablePath,
     this.socksPort = 10808,
     this.httpPort = 10809,
+    this.logLevel = CoreLogLevel.warn,
   });
 
   @override
@@ -39,10 +43,20 @@ class XrayEngineWindows implements CoreEngine {
   final String xrayExecutablePath;
   final int socksPort;
   final int httpPort;
+  final CoreLogLevel logLevel;
 
   Process? _process;
   File? _configFile;
   bool _manageSystemProxy = true;
+  ServerConfig? _activeServer;
+
+  /// Сервер, к которому подключён текущий (или последний) запуск — выбор
+  /// делается тут, внутри [start], из всего дерева [CoreConfig]. Нужен
+  /// [TunBridgeEngine]: sing-box'у для обхода тоннеля надо знать адрес именно
+  /// того сервера, с которым реально говорит xray (см.
+  /// `singbox_config_mapper.dart`), а повторять здешнюю логику выбора листа у
+  /// себя — значит однажды разойтись с ней и молча обходить не тот адрес.
+  ServerConfig? get activeServer => _activeServer;
 
   final _statusController = StreamController<EngineStatus>.broadcast();
   final _statsController = StreamController<EngineStats>.broadcast();
@@ -65,15 +79,18 @@ class XrayEngineWindows implements CoreEngine {
       throw StateError('CoreConfig has no server to connect to');
     }
 
+    _activeServer = server;
+
     final xrayConfig = buildXrayConfig(
       server,
       socksPort: socksPort,
       httpPort: httpPort,
       routingRules: leaf.routingRules,
+      logLevel: logLevel,
     );
 
     final configFile = await File(
-      '${Directory.systemTemp.path}/flux_xray_$id.json',
+      '${ensureFluxLogDirectory()}/flux_xray_$id.json',
     ).writeAsString(jsonEncode(xrayConfig));
     _configFile = configFile;
 
@@ -127,7 +144,7 @@ class XrayEngineWindows implements CoreEngine {
   /// to the generated config so a failed session can be inspected
   /// afterwards.
   Future<void> _pipeLogs(Process process) async {
-    final logFile = File('${Directory.systemTemp.path}/flux_xray_$id.log');
+    final logFile = File('${ensureFluxLogDirectory()}/flux_xray_$id.log');
     final sink = logFile.openWrite(mode: FileMode.write);
     try {
       await Future.wait([

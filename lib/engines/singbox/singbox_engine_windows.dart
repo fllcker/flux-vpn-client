@@ -2,15 +2,18 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../../app/app_paths.dart';
+import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/core_engine.dart';
 import '../xray/child_process_job.dart';
 import 'singbox_config_mapper.dart';
 
 /// Обёртка над процессом `sing-box.exe`, используемая только изнутри
 /// [TunBridgeEngine] — в отличие от [CoreEngine], этому классу не нужен
-/// [CoreConfig] (sing-box никогда не видит сервер/протокол, только локальный
-/// SOCKS-порт xray, см. `singbox_config_mapper.dart`), поэтому он не
-/// реализует общий интерфейс движка.
+/// [CoreConfig]: из всего профиля sing-box'у нужен локальный SOCKS-порт xray
+/// плюс адрес сервера, и то не чтобы к нему подключаться, а наоборот — чтобы
+/// исключить его из тоннеля (см. `singbox_config_mapper.dart`). Поэтому общий
+/// интерфейс движка он не реализует.
 class SingBoxEngineWindows {
   SingBoxEngineWindows({required this.id, required this.executablePath});
 
@@ -23,12 +26,24 @@ class SingBoxEngineWindows {
   final _statusController = StreamController<EngineStatus>.broadcast();
   Stream<EngineStatus> get statusStream => _statusController.stream;
 
-  Future<void> start({required int socksInPort}) async {
+  Future<void> start({
+    required int socksInPort,
+    required String serverHost,
+    List<String> serverIps = const [],
+    String upstreamDns = defaultTunDnsServer,
+    CoreLogLevel logLevel = CoreLogLevel.warn,
+  }) async {
     _statusController.add(EngineStatus.starting);
 
-    final config = buildSingBoxTunBridgeConfig(socksInPort: socksInPort);
+    final config = buildSingBoxTunBridgeConfig(
+      socksInPort: socksInPort,
+      serverHost: serverHost,
+      serverIps: serverIps,
+      upstreamDns: upstreamDns,
+      logLevel: logLevel,
+    );
     final configFile = await File(
-      '${Directory.systemTemp.path}/flux_singbox_$id.json',
+      '${ensureFluxLogDirectory()}/flux_singbox_$id.json',
     ).writeAsString(jsonEncode(config));
     _configFile = configFile;
 
@@ -64,7 +79,7 @@ class SingBoxEngineWindows {
   /// ошибки поднятия TUN-адаптера (недостающие права, занятое имя интерфейса,
   /// конфликт с существующим wintun-адаптером) некуда посмотреть постфактум.
   Future<void> _pipeLogs(Process process) async {
-    final logFile = File('${Directory.systemTemp.path}/flux_singbox_$id.log');
+    final logFile = File('${ensureFluxLogDirectory()}/flux_singbox_$id.log');
     final sink = logFile.openWrite(mode: FileMode.write);
     try {
       await Future.wait([

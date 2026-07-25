@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 
+import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/core_config.dart';
 import '../../core_abstraction/core_engine.dart';
 import '../xray/windows_elevation.dart';
@@ -11,8 +13,11 @@ import 'singbox_engine_windows.dart';
 /// docs/fix_tun/: xray-core на Windows не умеет сам настроить IP/маршруты
 /// на созданном TUN-адаптере, а sing-box умеет (`auto_route`), поэтому TUN
 /// собирается как: xray в обычном Proxy-режиме (SOCKS-порт) + sing-box
-/// поверх него, который только перехватывает пакеты системы и шлёт их в
-/// этот SOCKS. Реальный протокол (VLESS/Hysteria2) как всегда ведёт xray.
+/// поверх него, который перехватывает пакеты системы и шлёт их в этот SOCKS
+/// (кроме трафика самого xray и резолва адреса сервера — их sing-box наоборот
+/// обязан вывести мимо тоннеля, иначе xray'ю нужен тоннель, чтобы поднять
+/// тоннель; см. `singbox_config_mapper.dart`). Реальный протокол
+/// (VLESS/Hysteria2) как всегда ведёт xray.
 ///
 /// `CoreType.singbox` тут — это "движок TUN-режима", а не буквально
 /// "sing-box как протокольное ядро": единственный текущий потребитель этого
@@ -24,6 +29,8 @@ class TunBridgeEngine implements CoreEngine {
     required this.singBoxExecutablePath,
     this.socksPort = 10808,
     this.httpPort = 10809,
+    this.upstreamDns = defaultTunDnsServer,
+    this.logLevel = CoreLogLevel.warn,
   });
 
   @override
@@ -36,12 +43,15 @@ class TunBridgeEngine implements CoreEngine {
   final String singBoxExecutablePath;
   final int socksPort;
   final int httpPort;
+  final String upstreamDns;
+  final CoreLogLevel logLevel;
 
   late final XrayEngineWindows _xray = XrayEngineWindows(
     id: '${id}_xray',
     xrayExecutablePath: xrayExecutablePath,
     socksPort: socksPort,
     httpPort: httpPort,
+    logLevel: logLevel,
   );
   late final SingBoxEngineWindows _singBox = SingBoxEngineWindows(
     id: '${id}_singbox',
@@ -84,9 +94,36 @@ class TunBridgeEngine implements CoreEngine {
     // sing-box's socks-out дозванивается на socksPort сразу при старте —
     // xray должен уже слушать его к этому моменту.
     await _xray.start(config, manageSystemProxy: false);
-    await _singBox.start(socksInPort: socksPort);
+
+    final serverHost = _xray.activeServer!.address;
+    await _singBox.start(
+      socksInPort: socksPort,
+      serverHost: serverHost,
+      serverIps: await _resolveServerIps(serverHost),
+      upstreamDns: upstreamDns,
+      logLevel: logLevel,
+    );
 
     _statusController.add(EngineStatus.connected);
+  }
+
+  /// Резолвим адрес сервера здесь, между старта xray и старта sing-box, по
+  /// одной причине: это последний момент, когда системный DNS ещё работает
+  /// как обычно. Как только sing-box поднимет TUN, `auto_route` заберёт
+  /// default route, и тот же самый lookup будет уже зависеть от тоннеля,
+  /// который мы этими адресами и пытаемся дать поднять.
+  ///
+  /// Best-effort: пустой список — не ошибка. IP-пиннинг в конфиге sing-box
+  /// это лишь страховка поверх правила по `process_name`, поэтому упавший
+  /// резолв (или адрес-литерал, которому резолв не нужен) не должен ронять
+  /// подключение целиком.
+  Future<List<String>> _resolveServerIps(String host) async {
+    try {
+      final addresses = await InternetAddress.lookup(host);
+      return [for (final address in addresses) address.address];
+    } on SocketException {
+      return const [];
+    }
   }
 
   Future<void> _failAndTeardown() async {

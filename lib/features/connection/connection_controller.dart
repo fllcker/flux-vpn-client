@@ -61,18 +61,21 @@ class ConnectionController extends Notifier<ConnectionUiState> {
     await engineManager.removeEngine(_engineId);
     _engine = null;
 
-    final tunCoreType = ref.read(appSettingsProvider).tunCoreType;
+    final settings = ref.read(appSettingsProvider);
     final coreType = mode == ConnectionMode.tun ? CoreType.singbox : CoreType.xray;
     engineManager.registerFactory(coreType, (id) => switch (mode) {
       ConnectionMode.proxy => XrayEngineWindows(
         id: id,
         xrayExecutablePath: defaultXrayExecutablePath(),
+        logLevel: settings.coreLogLevel,
       ),
-      ConnectionMode.tun => switch (tunCoreType) {
+      ConnectionMode.tun => switch (settings.tunCoreType) {
         TunCoreType.singBox => TunBridgeEngine(
           id: id,
           xrayExecutablePath: defaultXrayExecutablePath(),
           singBoxExecutablePath: defaultSingBoxExecutablePath(),
+          upstreamDns: settings.tunDnsServer,
+          logLevel: settings.coreLogLevel,
         ),
       },
     });

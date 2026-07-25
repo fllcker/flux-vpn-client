@@ -12,6 +12,7 @@ import 'app/tray.dart';
 import 'features/connection/connection_screen.dart';
 import 'features/servers/clipboard_import_hotkey.dart';
 import 'features/servers/import_subscription_sheet.dart';
+import 'features/settings/settings_page.dart';
 import 'widgets/port_ui/port_ui.dart';
 
 final _navigatorKey = GlobalKey<NavigatorState>();
@@ -109,6 +110,7 @@ class FluxApp extends ConsumerStatefulWidget {
 
 class _FluxAppState extends ConsumerState<FluxApp> with WindowListener {
   StreamSubscription<String>? _deepLinkSub;
+  bool _settingsOpen = false;
 
   @override
   void initState() {
@@ -158,10 +160,20 @@ class _FluxAppState extends ConsumerState<FluxApp> with WindowListener {
     return PortApp(
       navigatorKey: widget.navigatorKey,
       title: 'Flux',
-      home: const ClipboardImportHotkey(
+      home: ClipboardImportHotkey(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [AppTitleBar(), Expanded(child: ConnectionScreen())],
+          children: [
+            AppTitleBar(
+              settingsOpen: _settingsOpen,
+              onToggleSettings: () => setState(() => _settingsOpen = !_settingsOpen),
+            ),
+            Expanded(
+              child: _settingsOpen
+                  ? SettingsPage(onBack: () => setState(() => _settingsOpen = false))
+                  : const ConnectionScreen(),
+            ),
+          ],
         ),
       ),
     );
