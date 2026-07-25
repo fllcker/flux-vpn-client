@@ -62,9 +62,33 @@ class ServerListPanel extends ConsumerWidget {
     final pingCache = ref.watch(pingCacheProvider);
     final pingingLeafIds = ref.watch(pingingLeafIdsProvider);
 
+    void showTunPingBlockedToast() {
+      PortToaster.of(context).show(
+        const PortToast(
+          title: Text('Нельзя пинговать в TUN-режиме'),
+          description: Text(
+            'Измерение задержки мешает активному TUN-соединению — '
+            'отключитесь или переключитесь на Proxy, чтобы пинговать.',
+          ),
+        ),
+      );
+    }
+
     void onPingLeaf(String leafId) {
+      if (isTunActive(ref)) {
+        showTunPingBlockedToast();
+        return;
+      }
       final leaf = allLeaves.where((l) => l.id == leafId).firstOrNull;
       if (leaf != null) pingLeaf(ref, leaf);
+    }
+
+    void onPingAll() {
+      if (isTunActive(ref)) {
+        showTunPingBlockedToast();
+        return;
+      }
+      pingAllLeaves(ref, allLeaves);
     }
 
     void onReorder(String draggedId, String targetParentGroupId, int targetIndex) {
@@ -104,9 +128,7 @@ class ServerListPanel extends ConsumerWidget {
                 if (allLeaves.isNotEmpty)
                   PortIconButton.ghost(
                     icon: const Icon(LucideIcons.activity, size: 16),
-                    onPressed: pingingLeafIds.isEmpty
-                        ? () => pingAllLeaves(ref, allLeaves)
-                        : null,
+                    onPressed: pingingLeafIds.isEmpty ? onPingAll : null,
                   ),
                 PortIconButton.ghost(
                   icon: const Icon(LucideIcons.plus, size: 18),
