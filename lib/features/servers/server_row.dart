@@ -130,7 +130,10 @@ class _ServerRowState extends State<ServerRow> {
                     if (hasVariantChoice)
                       Text(
                         widget.leaf.activeVariant?.label ?? '',
-                        style: PortText.muted.copyWith(fontSize: 11),
+                        style: PortText.muted.copyWith(
+                          fontSize: 11,
+                          height: 1,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                   ],
