@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../app/app_paths.dart';
+import '../../app/layout_breakpoints.dart';
 import '../../app/windows_autostart.dart';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
@@ -42,11 +43,17 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   _SettingsSection _section = _SettingsSection.personalization;
+  // На мобильной раскладке нав и контент не помещаются рядом (см.
+  // ROADMAP.md, трек 16) — вместо бокового меню список секций и содержимое
+  // выбранной секции показываются по очереди на весь экран, null значит
+  // "сейчас список секций, ни одна не открыта".
+  _SettingsSection? _mobileOpenSection;
 
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(appSettingsProvider);
     final notifier = ref.read(appSettingsProvider.notifier);
+    final mobile = isMobileLayout(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -66,37 +73,91 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         ),
         Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _SettingsNav(
-                selected: _section,
-                onSelect: (section) => setState(() => _section = section),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 480),
-                    // key заставляет Flutter пересоздавать поддерево целиком
-                    // при смене секции вместо переиспользования Element на
-                    // совпадающей позиции — без него, например, PortInput
-                    // без своего ключа на одной и той же позиции в дереве
-                    // (URL пинга в «Пинге», DNS-сервер в «TUN») делил один и
-                    // тот же State/TextEditingController между секциями:
-                    // typing в одном поле отражался в другом при переключении
-                    // вкладки.
-                    child: KeyedSubtree(
-                      key: ValueKey(_section),
-                      child: _buildSection(_section, settings, notifier),
+          child: mobile
+              ? _buildMobileBody(settings, notifier)
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _SettingsNav(
+                      selected: _section,
+                      onSelect: (section) => setState(() => _section = section),
                     ),
-                  ),
+                    Expanded(
+                      child: _buildSectionScroll(_section, settings, notifier),
+                    ),
+                  ],
                 ),
+        ),
+      ],
+    );
+  }
+
+  /// Мобильная раскладка — нав (200px) и контент (`maxWidth: 480`) рядом не
+  /// помещаются на узких окнах (см. ROADMAP.md, трек 16), поэтому вместо
+  /// бокового меню показываем либо список секций на весь экран, либо
+  /// содержимое одной открытой секции со своей мини-шапкой "назад к списку".
+  Widget _buildMobileBody(AppSettings settings, AppSettingsController notifier) {
+    final openSection = _mobileOpenSection;
+    if (openSection == null) {
+      return ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          for (final section in _SettingsSection.values)
+            _SettingsNavItem(
+              section: section,
+              selected: section == _section,
+              onTap: () => setState(() {
+                _section = section;
+                _mobileOpenSection = section;
+              }),
+            ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 8, 12, 8),
+          child: Row(
+            children: [
+              PortIconButton.ghost(
+                icon: const Icon(LucideIcons.arrowLeft, size: 16),
+                onPressed: () => setState(() => _mobileOpenSection = null),
               ),
+              const SizedBox(width: 4),
+              Text(openSection.label, style: PortText.large),
             ],
           ),
         ),
+        Expanded(child: _buildSectionScroll(openSection, settings, notifier)),
       ],
+    );
+  }
+
+  /// Скроллящаяся обёртка над [_buildSection] — общая для десктопной панели
+  /// и мобильной детальной раскладки.
+  Widget _buildSectionScroll(
+    _SettingsSection section,
+    AppSettings settings,
+    AppSettingsController notifier,
+  ) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        // key заставляет Flutter пересоздавать поддерево целиком при смене
+        // секции вместо переиспользования Element на совпадающей позиции —
+        // без него, например, PortInput без своего ключа на одной и той же
+        // позиции в дереве (URL пинга в «Пинге», DNS-сервер в «TUN») делил
+        // один и тот же State/TextEditingController между секциями: typing
+        // в одном поле отражался в другом при переключении вкладки.
+        child: KeyedSubtree(
+          key: ValueKey(section),
+          child: _buildSection(section, settings, notifier),
+        ),
+      ),
     );
   }
 
@@ -510,6 +571,20 @@ class _SettingRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // На мобильной раскладке ярлык + `PortSelect` (свой minWidth: 140) в
+    // одном Row не помещаются на узких окнах (см. ROADMAP.md, трек 16) —
+    // вместо переполнения ставим селект под ярлыком.
+    if (isMobileLayout(context)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: PortText.p),
+          const SizedBox(height: 6),
+          child,
+        ],
+      );
+    }
+
     return Row(
       children: [
         Expanded(child: Text(label, style: PortText.p)),

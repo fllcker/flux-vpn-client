@@ -41,13 +41,19 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
     super.dispose();
   }
 
-  Future<void> _refresh(Subscription subscription, {bool resetOrder = false}) async {
+  Future<void> _refresh(
+    Subscription subscription, {
+    bool resetOrder = false,
+  }) async {
     setState(() {
       _refreshing = true;
       _refreshError = null;
     });
 
-    final result = await refreshSubscription(subscription, resetOrder: resetOrder);
+    final result = await refreshSubscription(
+      subscription,
+      resetOrder: resetOrder,
+    );
     if (!mounted) return;
 
     switch (result) {
@@ -89,182 +95,187 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
         .firstOrNull;
 
     if (subscription == null) {
-      return Center(
-        child: Text('Подписка удалена', style: PortText.muted),
-      );
+      return Center(child: Text('Подписка удалена', style: PortText.muted));
     }
 
     final allLeaves = flattenLeaves([subscription.root]);
     final serverCount = allLeaves.length;
     final hiddenLeaves = allLeaves.where((l) => l.hidden).toList();
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 380),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(subscription.name, style: PortText.h4),
-                ),
-                PortIconButton.ghost(
-                  icon: Icon(
-                    LucideIcons.refreshCw,
-                    size: 16,
-                    color: _refreshing
-                        ? PortColors.mutedForeground
-                        : null,
-                  ),
-                  onPressed: _refreshing ? null : () => _refresh(subscription),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            if (_editingUrl)
+    // SingleChildScrollView — без него на узких/невысоких окнах (мобильная
+    // раскладка, см. ROADMAP.md, трек 16) содержимое (заголовок, инфо-строки,
+    // список скрытых серверов, роутинг) легко превышает высоту экрана и
+    // переполняется вертикально; Center внутри скролла по-прежнему
+    // центрирует по горизонтали (высота вдоль оси скролла не ограничена,
+    // Center просто сжимается по контенту).
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 380),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               Row(
                 children: [
-                  Expanded(
-                    child: PortInput(
-                      controller: _urlController,
-                      onSubmitted: (_) => _saveUrl(subscription),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
+                  Expanded(child: Text(subscription.name, style: PortText.h4)),
                   PortIconButton.ghost(
-                    icon: const Icon(LucideIcons.check, size: 16),
-                    onPressed: () => _saveUrl(subscription),
+                    icon: Icon(
+                      LucideIcons.refreshCw,
+                      size: 16,
+                      color: _refreshing ? PortColors.mutedForeground : null,
+                    ),
+                    onPressed: _refreshing
+                        ? null
+                        : () => _refresh(subscription),
                   ),
                 ],
-              )
-            else
-              GestureDetector(
-                onTap: () => _startEditingUrl(subscription),
-                child: Row(
+              ),
+              const SizedBox(height: 4),
+              if (_editingUrl)
+                Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        subscription.url,
-                        style: PortText.muted,
-                        overflow: TextOverflow.ellipsis,
+                      child: PortInput(
+                        controller: _urlController,
+                        onSubmitted: (_) => _saveUrl(subscription),
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const Icon(
-                      LucideIcons.pencil,
-                      size: 12,
-                      color: PortColors.mutedForeground,
+                    PortIconButton.ghost(
+                      icon: const Icon(LucideIcons.check, size: 16),
+                      onPressed: () => _saveUrl(subscription),
                     ),
                   ],
-                ),
-              ),
-            if (_refreshError != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                _refreshError!,
-                style: PortText.muted.copyWith(
-                  color: const Color(0xFFF87171),
-                ),
-              ),
-            ],
-            const SizedBox(height: 20),
-            _InfoRow(label: 'Серверов', value: '$serverCount'),
-            if (subscription.lastRefreshedAt != null)
-              _InfoRow(
-                label: 'Обновлено',
-                value: _formatDateTime(subscription.lastRefreshedAt!),
-              ),
-            if (subscription.expiresAt != null) ...[
-              _InfoRow(
-                label: 'Истекает',
-                value: _formatDateTime(subscription.expiresAt!),
-              ),
-              _InfoRow(
-                label: 'Осталось',
-                value: _formatDaysLeft(subscription.expiresAt!),
-              ),
-            ],
-            if (subscription.traffic case final traffic?)
-              _InfoRow(
-                label: 'Трафик',
-                value:
-                    '${_formatBytes(traffic.usedBytes)} / '
-                    '${_formatBytes(traffic.totalBytes)}',
-              ),
-            for (final entry in subscription.customFields.entries)
-              _InfoRow(label: entry.key, value: entry.value),
-            if (subscription.annotation case final annotation?
-                when annotation.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(annotation, style: PortText.small),
-            ],
-            const SizedBox(height: 20),
-            PortSwitch(
-              value: subscription.autoRefreshOnStartup,
-              label: const Text('Обновлять при запуске приложения'),
-              onChanged: (value) => ref
-                  .read(coreConfigProvider.notifier)
-                  .updateSubscription(
-                    subscription.copyWith(autoRefreshOnStartup: value),
-                  ),
-            ),
-            const SizedBox(height: 12),
-            PortButton.outline(
-              onPressed: _refreshing
-                  ? null
-                  : () => _refresh(subscription, resetOrder: true),
-              leading: const Icon(LucideIcons.rotateCcw, size: 14),
-              child: const Text('Сбросить сортировку'),
-            ),
-            if (hiddenLeaves.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Text(
-                'Скрытые серверы',
-                style: PortText.small.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: PortColors.mutedForeground,
-                ),
-              ),
-              const SizedBox(height: 8),
-              for (final leaf in hiddenLeaves)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
+                )
+              else
+                GestureDetector(
+                  onTap: () => _startEditingUrl(subscription),
                   child: Row(
                     children: [
-                      ServerIcon(icon: leaf.icon, size: 20),
-                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          leaf.name,
-                          style: PortText.small,
+                          subscription.url,
+                          style: PortText.muted,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      PortButton.ghost(
-                        onPressed: () => ref
-                            .read(coreConfigProvider.notifier)
-                            .setHidden(leaf.id, false),
-                        child: const Text('Вернуть'),
+                      const SizedBox(width: 6),
+                      const Icon(
+                        LucideIcons.pencil,
+                        size: 12,
+                        color: PortColors.mutedForeground,
                       ),
                     ],
                   ),
                 ),
-            ],
-            const SizedBox(height: 20),
-            _RoutingSection(subscription: subscription, allLeaves: allLeaves),
-            const SizedBox(height: 24),
-            PortButton.destructive(
-              onPressed: () {
-                ref
+              if (_refreshError != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _refreshError!,
+                  style: PortText.muted.copyWith(
+                    color: const Color(0xFFF87171),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              _InfoRow(label: 'Серверов', value: '$serverCount'),
+              if (subscription.lastRefreshedAt != null)
+                _InfoRow(
+                  label: 'Обновлено',
+                  value: _formatDateTime(subscription.lastRefreshedAt!),
+                ),
+              if (subscription.expiresAt != null) ...[
+                _InfoRow(
+                  label: 'Истекает',
+                  value: _formatDateTime(subscription.expiresAt!),
+                ),
+                _InfoRow(
+                  label: 'Осталось',
+                  value: _formatDaysLeft(subscription.expiresAt!),
+                ),
+              ],
+              if (subscription.traffic case final traffic?)
+                _InfoRow(
+                  label: 'Трафик',
+                  value:
+                      '${_formatBytes(traffic.usedBytes)} / '
+                      '${_formatBytes(traffic.totalBytes)}',
+                ),
+              for (final entry in subscription.customFields.entries)
+                _InfoRow(label: entry.key, value: entry.value),
+              if (subscription.annotation case final annotation?
+                  when annotation.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(annotation, style: PortText.small),
+              ],
+              const SizedBox(height: 20),
+              PortSwitch(
+                value: subscription.autoRefreshOnStartup,
+                label: const Text('Обновлять при запуске приложения'),
+                onChanged: (value) => ref
                     .read(coreConfigProvider.notifier)
-                    .removeSubscription(widget.subscriptionId);
-                ref.read(rightPanelViewProvider.notifier).showConnect();
-              },
-              child: const Text('Удалить подписку'),
-            ),
-          ],
+                    .updateSubscription(
+                      subscription.copyWith(autoRefreshOnStartup: value),
+                    ),
+              ),
+              const SizedBox(height: 12),
+              PortButton.outline(
+                onPressed: _refreshing
+                    ? null
+                    : () => _refresh(subscription, resetOrder: true),
+                leading: const Icon(LucideIcons.rotateCcw, size: 14),
+                child: const Text('Сбросить сортировку'),
+              ),
+              if (hiddenLeaves.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                Text(
+                  'Скрытые серверы',
+                  style: PortText.small.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: PortColors.mutedForeground,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final leaf in hiddenLeaves)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(
+                      children: [
+                        ServerIcon(icon: leaf.icon, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            leaf.name,
+                            style: PortText.small,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        PortButton.ghost(
+                          onPressed: () => ref
+                              .read(coreConfigProvider.notifier)
+                              .setHidden(leaf.id, false),
+                          child: const Text('Вернуть'),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+              const SizedBox(height: 20),
+              _RoutingSection(subscription: subscription, allLeaves: allLeaves),
+              const SizedBox(height: 24),
+              PortButton.destructive(
+                onPressed: () {
+                  ref
+                      .read(coreConfigProvider.notifier)
+                      .removeSubscription(widget.subscriptionId);
+                  ref.read(rightPanelViewProvider.notifier).showConnect();
+                },
+                child: const Text('Удалить подписку'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -331,10 +342,7 @@ class _RoutingSection extends ConsumerWidget {
             style: PortText.muted,
           )
         else ...[
-          Text(
-            'Правила различаются по серверам',
-            style: PortText.muted,
-          ),
+          Text('Правила различаются по серверам', style: PortText.muted),
           const SizedBox(height: 8),
           PortButton.outline(
             onPressed: editCommon,
