@@ -120,6 +120,25 @@ class SettingsDialog extends ConsumerWidget {
                   notifier.update((s) => s.copyWith(pingAllOnStartup: value)),
             ),
             const SizedBox(height: 20),
+            const _SectionLabel('TUN'),
+            const SizedBox(height: 10),
+            _SettingRow(
+              label: 'Ядро TUN-режима',
+              child: ShadSelect<TunCoreType>(
+                initialValue: settings.tunCoreType,
+                onChanged: (value) {
+                  if (value != null) {
+                    notifier.update((s) => s.copyWith(tunCoreType: value));
+                  }
+                },
+                options: const [
+                  ShadOption(value: TunCoreType.singBox, child: Text('sing-box')),
+                ],
+                selectedOptionBuilder: (context, value) =>
+                    Text(_tunCoreTypeLabel(value)),
+              ),
+            ),
+            const SizedBox(height: 20),
             const _SectionLabel('Подписка'),
             const SizedBox(height: 10),
             ShadSwitch(
@@ -163,6 +182,10 @@ class SettingsDialog extends ConsumerWidget {
     PingMode.viaProxy => 'Через прокси',
     PingMode.tcp => 'TCP',
     PingMode.icmp => 'ICMP',
+  };
+
+  String _tunCoreTypeLabel(TunCoreType type) => switch (type) {
+    TunCoreType.singBox => 'sing-box',
   };
 }
 

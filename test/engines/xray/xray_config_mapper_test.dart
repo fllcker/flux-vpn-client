@@ -44,20 +44,4 @@ void main() {
         .toList();
     expect(outboundTags, containsAll(['proxy', 'direct', 'block']));
   });
-
-  test('buildXrayTunConfig maps routing rules the same way', () {
-    final config = buildXrayTunConfig(
-      _server,
-      routingRules: const [
-        DomainRule(values: ['example.com'], outboundTag: 'proxy'),
-      ],
-    );
-
-    final rules = (config['routing'] as Map)['rules'] as List;
-    expect(rules.single, {
-      'type': 'field',
-      'domain': ['example.com'],
-      'outboundTag': 'proxy',
-    });
-  });
 }
