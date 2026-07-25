@@ -37,6 +37,15 @@ class ConnectionController extends Notifier<ConnectionUiState> {
   StreamSubscription<EngineStatus>? _statusSub;
   CoreEngine? _engine;
 
+  // Каждый вызов connectToServer/disconnect бьёт себе номер и после каждого
+  // await сверяется, не обогнал ли его более новый вызов (ROADMAP.md, трек
+  // 15 — быстрый повторный клик/переключение из трея во время уже идущего
+  // перехода). UI-уровень (`connect_panel.dart`'s `busy`) блокирует обычные
+  // клики, но не защищает от программных вызовов — без этой проверки
+  // застрявший старый вызов мог после своего `await` перезаписать состояние,
+  // выставленное уже более новым.
+  int _generation = 0;
+
   @override
   ConnectionUiState build() {
     ref.onDispose(() => _statusSub?.cancel());
@@ -47,6 +56,7 @@ class ConnectionController extends Notifier<ConnectionUiState> {
     ServerLeaf leaf, {
     ConnectionMode mode = ConnectionMode.proxy,
   }) async {
+    final generation = ++_generation;
     state = const ConnectionConnecting();
 
     // Переключение сервера/режима (напр. TUN → Proxy) раньше просто
@@ -59,6 +69,7 @@ class ConnectionController extends Notifier<ConnectionUiState> {
     // стартом нового — как и в disconnect().
     final engineManager = ref.read(engineManagerProvider);
     await engineManager.removeEngine(_engineId);
+    if (generation != _generation) return;
     _engine = null;
 
     final settings = ref.read(appSettingsProvider);
@@ -79,11 +90,13 @@ class ConnectionController extends Notifier<ConnectionUiState> {
         ),
       },
     });
+    if (generation != _generation) return;
     final engine = engineManager.createEngine(coreType, _engineId);
     _engine = engine;
 
     unawaited(_statusSub?.cancel());
     _statusSub = engine.statusStream.listen((status) {
+      if (generation != _generation) return;
       switch (status) {
         case EngineStatus.connected:
           state = ConnectionConnected(
@@ -106,13 +119,15 @@ class ConnectionController extends Notifier<ConnectionUiState> {
     try {
       await engine.start(config);
     } catch (e) {
-      state = ConnectionError('$e');
+      if (generation == _generation) state = ConnectionError('$e');
     }
   }
 
   Future<void> disconnect() async {
+    final generation = ++_generation;
     state = const ConnectionStopping();
     await _engine?.stop();
+    if (generation != _generation) return;
     state = const ConnectionIdle();
   }
 }
