@@ -86,3 +86,89 @@ jobs:
             --generate-notes `
             "build\installer\Flux-$env:VERSION-windows-portable.zip" `
             "build\installer\FluxSetup-$env:VERSION.exe"
+
+  build-android:
+    needs: [check-version, build-windows]
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.check-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      # xray-core has no official prebuilt Android library — this compiles
+      # it via gomobile bind against 2dust/AndroidLibXrayLite, same as
+      # scripts/build_android_xray.ps1 does locally (see
+      # android/app/libs/SOURCE.md). Slow (10+ minutes) and the reason
+      # Android CI didn't exist until now — cache Go's build/module caches
+      # so repeat runs (unchanged go.sum) are much faster.
+      - name: Cache Go build/module caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-android-xray-${{ hashFiles('tool/android-xray-lite/src/go.sum') }}
+          restore-keys: go-android-xray-
+
+      - name: Install gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r27c
+
+      - name: Build libv2ray.aar
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/2dust/AndroidLibXrayLite.git tool/android-xray-lite/src
+          cd tool/android-xray-lite/src
+          go mod tidy -v
+          gomobile bind -v -target=android/arm64 -androidapi 24 -trimpath \
+            -ldflags='-s -w -buildid= -checklinkname=0' -o libv2ray.aar ./
+          mkdir -p ../../../android/app/libs
+          cp libv2ray.aar ../../../android/app/libs/libv2ray.aar
+
+      - name: Restore signing keystore
+        run: |
+          set -euo pipefail
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/upload-keystore.jks
+          cat > android/key.properties <<PROPS
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storeFile=upload-keystore.jks
+          PROPS
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Build Android release APK
+        run: flutter build apk --release
+
+      - name: Upload to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cp build/app/outputs/flutter-apk/app-release.apk "Flux-$VERSION-android.apk"
+          gh release upload "v$VERSION" "Flux-$VERSION-android.apk" --repo "$GITHUB_REPOSITORY"

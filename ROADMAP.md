@@ -1227,3 +1227,59 @@ SOCKS/HTTP, переиспользует существующие `_outbound`/`_
 Всё проверено живьём на Pixel 6a (`flutter analyze`/`flutter test`
 86/86 — тоже чисто, десктопный путь везде за `Platform.isWindows`/
 `Platform.isAndroid` не тронут).
+
+**Апдейт (доводка до продакшн-качества):**
+
+1. Убрали Phase 1 смоук-тест (`Libv2ray.checkVersionX()` в
+   `MainActivity.onCreate`) — своё отслужил.
+2. **Обратная связь об ошибках.** `XrayEngineAndroid` ставил "Connected"
+   сразу после успешного вызова канала и дальше не знал, что происходит
+   на нативной стороне. Добавили `EventChannel "flux/vpn/status"`
+   (`VpnStatusBridge.kt` — синглтон-мост, т.к. `FluxVpnService` — сервис,
+   не привязан ни к какому вызову канала) и подписку на него в
+   `XrayEngineAndroid`. Важная деталь, вскрывшаяся при чтении исходников
+   `AndroidLibXrayLite`: `CallbackHandler.Shutdown()` там **не вызывается
+   никогда** (только `Startup()` и `OnEmitStatus`) — событие "stopped"
+   шлём из своего же `stopTunnel()` в Kotlin, а не из колбэка.
+3. **Runtime-запрос `POST_NOTIFICATIONS`** (Android 13+) в
+   `MainActivity.onCreate` — раньше разрешение просто не запрашивалось,
+   уведомление о работающем VPN могло не показываться.
+4. **IPv6.** `RouteExclusion` умеет только IPv4 (128-битная арифметика не
+   реализована) — `_resolveServerIp` теперь резолвит явно
+   `InternetAddressType.IPv4`, иначе `InternetAddress.lookup` на
+   dual-stack сети мог вернуть IPv6 первым и уронить
+   `RouteExclusion.ipv4RoutesExcluding` на `require(parts.size == 4)`.
+   Полноценный проксинг IPv6-трафика остался нереализован — известное
+   ограничение, не тихий баг.
+5. **Иконка приложения** — была дефолтная Flutter. `flutter_launcher_icons`
+   (новый dev-dependency, `android: true` в конфиге — Windows не
+   затронут) генерирует `android/app/src/main/res/mipmap-*/ic_launcher.png`
+   из уже существующего `assets/icon.png`. Лаунчер Android кеширует
+   иконку — после переустановки поверх старой (`adb install -r`) иконка
+   не обновилась, помогло полное `uninstall`+`install`.
+6. **Release-подпись.** Раньше `release`-сборка Android подписывалась
+   debug-ключом. Сгенерировали постоянный keystore
+   (`android/app/upload-keystore.jks`, alias `flux-upload`, валиден до
+   2053) — сам файл и `android/key.properties` с паролями в git не идут
+   (уже покрыто дефолтным `android/.gitignore`). `build.gradle.kts`
+   подхватывает `key.properties`, если он есть, иначе откатывается на
+   debug-подпись (чтобы сборка не падала на чекауте/CI без файла).
+   Пароли/keystore в base64 переданы пользователю для занесения в GitHub
+   Repository secrets (`ANDROID_KEYSTORE_BASE64`,
+   `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_PASSWORD`,
+   `ANDROID_KEY_ALIAS`) — сам я `gh` CLI на машине не нашёл, добавить
+   не мог.
+7. **Android CI** (`.github/workflows/release.yml`, джоба
+   `build-android`) — по той же схеме, что и `build-windows`: собирает
+   `libv2ray.aar` через `gomobile bind` (кеширует `~/go/pkg/mod`/
+   `~/.cache/go-build` по хэшу `go.sum`, т.к. это самая долгая часть),
+   восстанавливает keystore из секретов, собирает `flutter build apk
+   --release`, заливает APK в тот же GitHub-релиз, что и Windows-сборки.
+   **Не проверено реальным прогоном** — GitHub Actions раннер здесь
+   недоступен для локальной проверки, почти наверняка потребует доводки
+   после первого реального пуша с бампом версии (как было с Windows-CI).
+
+`flutter build apk --release` собирается и подписывается настоящим
+ключом (проверено `apksigner verify --print-certs` — сертификат `CN=Flux`
+совпадает с тем, что выводит `keytool -list` по локальному keystore).
+`flutter analyze`/`flutter test` (86/86) чисто.
