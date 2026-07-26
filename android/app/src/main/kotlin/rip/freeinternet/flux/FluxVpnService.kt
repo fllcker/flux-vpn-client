@@ -67,6 +67,7 @@ class FluxVpnService : VpnService() {
             startTunnel(configJson, serverHost, mtu)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start tunnel", e)
+            VpnStatusBridge.emitError(e.message)
             stopTunnel()
             stopSelf()
         }
@@ -112,13 +113,24 @@ class FluxVpnService : VpnService() {
         tunInterface = pfd
 
         val controller = Libv2ray.newCoreController(object : CoreCallbackHandler {
+            // startup/onEmitStatus are lifecycle markers, not a running
+            // health monitor — libv2ray_main.go only calls Startup() +
+            // OnEmitStatus(0, "Started successfully, running") once xray has
+            // already initialized. Shutdown() is never actually invoked by
+            // this AAR version (checked tool/android-xray-lite/src —
+            // StopLoop() only calls OnEmitStatus, not CallbackHandler.
+            // Shutdown()), so "stopped" is emitted from our own
+            // stopTunnel() below instead. Anything that fails *before*
+            // Startup() comes back as an exception from startLoop() below
+            // (caught in onStartCommand), not through this callback.
             override fun startup(): Long {
                 Log.i(TAG, "xray-core started")
+                VpnStatusBridge.emitStarted()
                 return 0
             }
 
             override fun shutdown(): Long {
-                Log.i(TAG, "xray-core stopped")
+                Log.i(TAG, "xray-core stopped (Shutdown callback)")
                 return 0
             }
 
@@ -132,6 +144,7 @@ class FluxVpnService : VpnService() {
     }
 
     private fun stopTunnel() {
+        val wasRunning = coreController != null
         try {
             coreController?.stopLoop()
         } catch (e: Exception) {
@@ -144,6 +157,7 @@ class FluxVpnService : VpnService() {
             Log.w(TAG, "closing tun fd failed", e)
         }
         tunInterface = null
+        if (wasRunning) VpnStatusBridge.emitStopped()
     }
 
     /** Copies geoip.dat/geosite.dat out of the app's assets (merged in from
