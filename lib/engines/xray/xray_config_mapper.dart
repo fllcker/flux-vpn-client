@@ -54,6 +54,17 @@ Map<String, dynamic> buildXrayTunConfig(
         'port': 0,
         'protocol': 'tun',
         'settings': {'name': 'flux-tun0', 'MTU': mtu},
+        // TUN — чистый L3, до маршрутизации виден только IP пакета, поэтому
+        // доменные routing-правила (DomainRule) без sniffing никогда не
+        // сработают. `routeOnly: true` — используем сниффленный домен только
+        // для выбора outbound'а, реальный дайл всё равно идёт по исходному
+        // IP пакета (тот же приём, что и `action: "sniff"` у sing-box в
+        // tun_bridge_engine.dart на Windows).
+        'sniffing': {
+          'enabled': true,
+          'destOverride': ['http', 'tls', 'quic'],
+          'routeOnly': true,
+        },
       },
     ],
     'outbounds': [_outbound(server), _directOutbound, _blockOutbound],

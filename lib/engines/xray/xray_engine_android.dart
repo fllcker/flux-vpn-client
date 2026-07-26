@@ -8,6 +8,7 @@ import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/core_config.dart';
 import '../../core_abstraction/core_engine.dart';
 import '../../core_abstraction/proxy_node.dart';
+import '../../core_abstraction/server_config.dart';
 import '../../l10n/strings.dart';
 import 'xray_config_mapper.dart';
 
@@ -68,8 +69,19 @@ class XrayEngineAndroid implements CoreEngine {
       throw StateError('Could not resolve ${server.address}');
     }
 
+    // Мало просто исключить IP сервера из маршрутов TUN — если в конфиге
+    // xray-core оставить исходный хостнейм, само ядро при коннекте резолвит
+    // его заново (уже своим DNS-запросом), который снова уйдёт в тот же
+    // ещё не поднятый туннель — тот самый deadlock "нужен тоннель, чтобы
+    // поднять тоннель", от которого на Windows защищаются в
+    // tun_bridge_engine.dart. Подставляем уже резолвленный IP как адрес
+    // подключения, а SNI/serverName фиксируем на исходном хостнейме явно
+    // (иначе xray возьмёт SNI из адреса — станет IP вместо домена, и
+    // TLS/Reality-хендшейк не пройдёт).
+    final pinnedServer = _pinToResolvedIp(server, serverIp);
+
     final xrayConfig = buildXrayTunConfig(
-      server,
+      pinnedServer,
       routingRules: leaf.routingRules,
       logLevel: logLevel,
     );
@@ -96,6 +108,31 @@ class XrayEngineAndroid implements CoreEngine {
     // XrayEngineWindows.
     return const EngineStats(uploadBytes: 0, downloadBytes: 0);
   }
+
+  ServerConfig _pinToResolvedIp(ServerConfig server, String ip) => switch (server) {
+    VlessConfig s => VlessConfig(
+      address: ip,
+      port: s.port,
+      uuid: s.uuid,
+      flow: s.flow,
+      network: s.network,
+      security: s.security,
+      sni: s.sni ?? s.address,
+      publicKey: s.publicKey,
+      shortId: s.shortId,
+      fingerprint: s.fingerprint,
+      xhttpPath: s.xhttpPath,
+      xhttpHost: s.xhttpHost ?? s.address,
+    ),
+    Hysteria2Config s => Hysteria2Config(
+      address: ip,
+      port: s.port,
+      auth: s.auth,
+      sni: s.sni ?? s.address,
+      insecure: s.insecure,
+      obfsPassword: s.obfsPassword,
+    ),
+  };
 
   Future<String?> _resolveServerIp(String host) async {
     try {
