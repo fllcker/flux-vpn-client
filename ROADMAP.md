@@ -1065,3 +1065,51 @@ proxy/TUN самостоятельно):
 окружения). Не проверено вживую (см. `CLAUDE.md`) — переключить
 тему/язык в настройках и глазами сверить обе темы (тёмная должна выглядеть
 пиксель-в-пиксель как раньше) и оба языка на всех экранах.
+
+## 19. Android-порт — в процессе (ветка `android`)
+
+Отдельная ветка `android`, не смёржена в `master`. План (архитектура
+движка) — `C:\Users\local\.claude\plans\resilient-wandering-puddle.md`.
+
+На Windows протокол (VLESS/Hysteria2) всегда обрабатывает xray-core,
+sing-box — только Windows-специфичная TUN-обвязка (см. трек про
+`TunBridgeEngine`/`docs/fix_tun/`). Рассматривали чистый sing-box на
+Android (есть официальная `libbox` AAR с готовой VpnService-интеграцией,
+на ней NekoBox/sing-box-for-android) — отклонили: у стокового sing-box
+нет XHTTP-транспорта (нужен для VLESS XHTTP/Reality), только у неофициальных
+форков с известными багами.
+
+Решение: xray-core остаётся единственным протокольным движком и на
+Android — как и на десктопе. Собирается в `.aar` через `gomobile bind`
+поверх [2dust/AndroidLibXrayLite](https://github.com/2dust/AndroidLibXrayLite)
+(тот же путь, которым v2rayNG собирает xray-core под Android — обычного
+предсобранного AAR от самого XTLS нет). Выяснилось, что у xray-core есть
+собственный `tun`-инбаунд с gVisor netstack (`proxy/tun`, включая
+`tun_android.go`) — он сам читает TUN fd (через env `xray.tun.fd`) и
+маршрутизирует пакеты, отдельный tun2socks-мост (как предполагалось
+исходно) не нужен. Чтобы не зациклить трафик (xray подключается к своему
+же серверу через TUN) — тот же приём, что и в `route_exclude_address` у
+sing-box на Windows, но через явное покрытие 0.0.0.0/0 CIDR-блоками без
+исключённого IP сервера (`RouteExclusion.kt`, т.к. `Builder.excludeRoute()`
+есть только с API 33).
+
+Сделано (Phase 1 + 2 из плана):
+
+1. `flutter create --platforms=android`, `applicationId` = `rip.freeinternet.flux`.
+2. `scripts/build_android_xray.ps1` — собирает `libv2ray.aar`
+   (android/arm64, `-androidapi 24`) в `android/app/libs/` (не в git, см.
+   `android/app/libs/SOURCE.md`, тот же приём, что у `fetch_xray.ps1`/
+   `fetch_sing_box.ps1`, но именно сборка, а не скачивание).
+3. `FluxVpnService.kt` — `VpnService`, поднимает TUN (адрес/DNS/маршруты
+   через `RouteExclusion`), передаёт fd в `CoreController.startLoop`.
+4. `MainActivity.kt` — `MethodChannel "flux/vpn"` (`preparePermission`,
+   `start`, `stop`), permission-flow через `VpnService.prepare()` +
+   `startActivityForResult`.
+
+**Не сделано:** Dart-сторона (`XrayEngineAndroid implements CoreEngine`,
+конфиг с `tun`-инбаундом, подключение к `ConnectionController`/UI) — Phase
+3 плана, ничего из Flutter-кода пока не вызывает `flux/vpn` канал.
+Проверено только `flutter build apk --debug` и `flutter analyze` (чисто) —
+живьём на устройстве/эмуляторе не проверялось и не будет проверяться
+мной (см. `CLAUDE.md`, "не тести proxy/tun режим в приложении сам") —
+нужна проверка руками, когда дойдём до реального подключения.

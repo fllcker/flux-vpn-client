@@ -56,4 +56,5 @@ repositories {
 
 dependencies {
     implementation(":libv2ray@aar")
+    implementation("androidx.core:core-ktx:1.13.1")
 }
