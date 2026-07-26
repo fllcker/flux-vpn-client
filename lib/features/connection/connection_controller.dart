@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,6 +12,7 @@ import '../../core_abstraction/engine_manager_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../engines/singbox/singbox_engine_windows.dart';
 import '../../engines/singbox/tun_bridge_engine.dart';
+import '../../engines/xray/xray_engine_android.dart';
 import '../../engines/xray/xray_engine_windows.dart';
 import '../../l10n/strings.dart';
 import 'connection_state.dart';
@@ -74,22 +76,34 @@ class ConnectionController extends Notifier<ConnectionUiState> {
     _engine = null;
 
     final settings = ref.read(appSettingsProvider);
-    final coreType = mode == ConnectionMode.tun ? CoreType.singbox : CoreType.xray;
-    engineManager.registerFactory(coreType, (id) => switch (mode) {
-      ConnectionMode.proxy => XrayEngineWindows(
-        id: id,
-        xrayExecutablePath: defaultXrayExecutablePath(),
-        logLevel: settings.coreLogLevel,
-      ),
-      ConnectionMode.tun => switch (settings.tunCoreType) {
-        TunCoreType.singBox => TunBridgeEngine(
+    // Android has no Windows-style separate Proxy/TUN mechanism (no system
+    // proxy hook outside VpnService, see xray_engine_android.dart) — both
+    // modes converge onto the same VpnService-backed engine there,
+    // regardless of `mode`. UI still offers the Off/Proxy/TUN selector on
+    // every platform (ROADMAP.md, трек 19 — UI convergence is a later step).
+    final coreType = Platform.isAndroid
+        ? CoreType.xray
+        : (mode == ConnectionMode.tun ? CoreType.singbox : CoreType.xray);
+    engineManager.registerFactory(coreType, (id) {
+      if (Platform.isAndroid) {
+        return XrayEngineAndroid(id: id, logLevel: settings.coreLogLevel);
+      }
+      return switch (mode) {
+        ConnectionMode.proxy => XrayEngineWindows(
           id: id,
           xrayExecutablePath: defaultXrayExecutablePath(),
-          singBoxExecutablePath: defaultSingBoxExecutablePath(),
-          upstreamDns: settings.tunDnsServer,
           logLevel: settings.coreLogLevel,
         ),
-      },
+        ConnectionMode.tun => switch (settings.tunCoreType) {
+          TunCoreType.singBox => TunBridgeEngine(
+            id: id,
+            xrayExecutablePath: defaultXrayExecutablePath(),
+            singBoxExecutablePath: defaultSingBoxExecutablePath(),
+            upstreamDns: settings.tunDnsServer,
+            logLevel: settings.coreLogLevel,
+          ),
+        },
+      };
     });
     if (generation != _generation) return;
     final engine = engineManager.createEngine(coreType, _engineId);

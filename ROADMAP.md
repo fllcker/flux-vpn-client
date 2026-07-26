@@ -1113,3 +1113,17 @@ sing-box на Windows, но через явное покрытие 0.0.0.0/0 CID
 живьём на устройстве/эмуляторе не проверялось и не будет проверяться
 мной (см. `CLAUDE.md`, "не тести proxy/tun режим в приложении сам") —
 нужна проверка руками, когда дойдём до реального подключения.
+
+**Апдейт (Phase 3):** `XrayEngineAndroid implements CoreEngine`
+(`lib/engines/xray/xray_engine_android.dart`) подключён к
+`ConnectionController` — на Android любой режим (Off/Proxy/TUN, селектор
+пока общий для всех платформ, конвергенция UI — Phase 4) идёт через него,
+т.к. отдельного Proxy-механизма на Android нет (см. контекст плана).
+`buildXrayTunConfig` в `xray_config_mapper.dart` — `tun`-инбаунд вместо
+SOCKS/HTTP, переиспользует существующие `_outbound`/`_routing` как есть.
+Адрес сервера резолвится в Dart (`InternetAddress.lookup`, тот же приём,
+что в `tun_bridge_engine.dart`) до передачи в Kotlin — `RouteExclusion`
+там принимает только IPv4-литерал. `flutter analyze`/`flutter test`
+(86/86, десктопный путь ветвится через `Platform.isAndroid` и не
+затронут)/`flutter build apk --debug` — чисто. Не проверено на
+устройстве — то же ограничение, что и у Phase 2.
