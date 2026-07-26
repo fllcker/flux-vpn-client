@@ -68,11 +68,6 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   _SettingsSection _section = _SettingsSection.personalization;
-  // На мобильной раскладке нав и контент не помещаются рядом (см.
-  // ROADMAP.md, трек 16) — вместо бокового меню список секций и содержимое
-  // выбранной секции показываются по очереди на весь экран, null значит
-  // "сейчас список секций, ни одна не открыта".
-  _SettingsSection? _mobileOpenSection;
 
   @override
   Widget build(BuildContext context) {
@@ -134,48 +129,40 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   /// Мобильная раскладка — нав (200px) и контент (`maxWidth: 480`) рядом не
-  /// помещаются на узких окнах (см. ROADMAP.md, трек 16), поэтому вместо
-  /// бокового меню показываем либо список секций на весь экран, либо
-  /// содержимое одной открытой секции со своей мини-шапкой "назад к списку".
+  /// помещаются на узких окнах (см. ROADMAP.md, трек 16). Раньше вместо
+  /// бокового меню показывался список секций на весь экран, потом отдельная
+  /// страница с открытой секцией и своей мини-шапкой "назад к списку" — два
+  /// заголовка друг над другом (внешний "Settings" + внутренний с именем
+  /// секции) и свой самодельный back-стек в state, который не слушал ни
+  /// системную кнопку "назад", ни жест. Заменили на горизонтальный ряд
+  /// вкладок (`PortTabsList`, порт shadcn Tabs — см. docs/internal/shadcn/
+  /// PLAN.md) сверху и контент секции сразу под ним, без второй страницы —
+  /// один экран, одна шапка. Системная кнопка/жест "назад" на Android,
+  /// закрывающие теперь Settings целиком — отдельная поломка на уровне
+  /// выше, см. `PopScope` в `main.dart`, `_FluxAppState.build`.
   Widget _buildMobileBody(
     AppSettings settings,
     AppSettingsController notifier,
   ) {
-    final openSection = _mobileOpenSection;
-    if (openSection == null) {
-      return ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          for (final section in _visibleSettingsSections)
-            _SettingsNavItem(
-              section: section,
-              selected: section == _section,
-              onTap: () => setState(() {
-                _section = section;
-                _mobileOpenSection = section;
-              }),
-            ),
-        ],
-      );
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 8, 12, 8),
-          child: Row(
-            children: [
-              PortIconButton.ghost(
-                icon: const Icon(LucideIcons.arrowLeft, size: 16),
-                onPressed: () => setState(() => _mobileOpenSection = null),
-              ),
-              const SizedBox(width: 4),
-              Text(openSection.label, style: PortText.large),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          child: PortTabsList<_SettingsSection>(
+            value: _section,
+            items: [
+              for (final section in _visibleSettingsSections)
+                PortTabItem(
+                  value: section,
+                  leading: Icon(section.icon, size: 14),
+                  child: Text(section.label),
+                ),
             ],
+            onChanged: (section) => setState(() => _section = section),
           ),
         ),
-        Expanded(child: _buildSectionScroll(openSection, settings, notifier)),
+        Expanded(child: _buildSectionScroll(_section, settings, notifier)),
       ],
     );
   }

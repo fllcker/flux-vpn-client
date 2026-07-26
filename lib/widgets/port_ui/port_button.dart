@@ -148,13 +148,22 @@ class PortIconButton extends StatelessWidget {
   const PortIconButton.destructive({super.key, required this.icon, this.size = 36, this.onPressed})
     : variant = PortButtonVariant.destructive;
 
+  // Android рекомендует минимум 48dp тач-таргета — многие иконки-кнопки
+  // в приложении держат визуал 36px (унаследовано от десктопной
+  // shadcn-разметки под мышь). Раздуваем только хитбокс прозрачным
+  // паддингом вокруг того же визуала, сам квадрат кнопки не растёт — на
+  // десктопе (touchSize == size) это условие ложно, ветка не задействуется.
+  double get _touchSize =>
+      Platform.isAndroid && size < 44 ? 44 : size;
+
   @override
   Widget build(BuildContext context) {
+    final touchSize = _touchSize;
     return _Interactive(
       onTap: onPressed,
       builder: (context, {required hovered, required focused, required pressed}) {
         final v = _resolveButtonVisual(variant, hovered: hovered, focused: focused);
-        return AnimatedContainer(
+        final visual = AnimatedContainer(
           duration: _kDuration,
           curve: _kEase,
           width: size,
@@ -166,6 +175,8 @@ class PortIconButton extends StatelessWidget {
           // IconTheme.of(context).color), не перетирая явные значения.
           child: IconTheme.merge(data: IconThemeData(color: v.fg, size: 16), child: icon),
         );
+        if (touchSize <= size) return visual;
+        return SizedBox(width: touchSize, height: touchSize, child: Center(child: visual));
       },
     );
   }

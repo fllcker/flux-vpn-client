@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../app/layout_breakpoints.dart';
 import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../l10n/strings.dart';
@@ -13,9 +14,9 @@ import 'filter_hidden_nodes.dart';
 import 'flatten_leaves.dart';
 import 'import_subscription_sheet.dart';
 import 'proxy_tree_list.dart';
-import 'right_panel_view.dart';
 import 'routing_rules_dialog.dart';
 import 'selected_server_provider.dart';
+import 'subscription_info_panel.dart';
 
 /// Открывает список серверов выезжающим снизу листом — мобильная раскладка
 /// (см. ROADMAP.md, трек 16), вызывается и плавающей кнопкой в
@@ -67,22 +68,14 @@ class ServerListContent extends ConsumerWidget {
     final selectedId =
         ref.watch(selectedServerIdProvider) ??
         (allLeaves.isNotEmpty ? allLeaves.first.id : null);
-    final rightPanelView = ref.watch(rightPanelViewProvider);
-    final activeSubscriptionId = switch (rightPanelView) {
-      SubscriptionInfoView(:final subscriptionId) => subscriptionId,
-      ConnectView() => null,
-    };
-
     void onSelectLeaf(String id) {
       ref.read(selectedServerIdProvider.notifier).select(id);
-      ref.read(rightPanelViewProvider.notifier).showConnect();
       onAfterSelect?.call();
     }
 
     void onSelectVariant(String leafId, String variantId) {
       ref.read(coreConfigProvider.notifier).selectVariant(leafId, variantId);
       ref.read(selectedServerIdProvider.notifier).select(leafId);
-      ref.read(rightPanelViewProvider.notifier).showConnect();
       onAfterSelect?.call();
     }
 
@@ -100,6 +93,30 @@ class ServerListContent extends ConsumerWidget {
         onSave: (rules) =>
             ref.read(coreConfigProvider.notifier).setRoutingRules(leafId, rules),
       );
+    }
+
+    // Информация о подписке — всегда всплывающая поверх главного экрана, не
+    // встроенная в постоянную колонку/список (раньше подменяла ConnectPanel
+    // через rightPanelViewProvider — на обеих раскладках не было явного
+    // "назад", кроме случайного клика по серверу, см. чат). Мобилка: тот же
+    // bottom sheet, что и список серверов — закрываем текущий (со списком) и
+    // тут же открываем новый (с инфой), а не складываем два друг на друга.
+    // Десктоп: модалка (showSubscriptionInfoDialog), список слева остаётся
+    // как был, ничего не подменяется.
+    void onOpenSubscriptionInfo(String subscriptionId) {
+      if (isMobileLayout(context)) {
+        // pop() не отключает context синхронно (снятие route идёт через
+        // анимацию отдельным кадром) — тот же context ещё валиден для
+        // немедленного показа второго листа сразу следом, без
+        // промежуточного "провала" на голый ConnectPanel между ними.
+        Navigator.of(context).pop();
+        showPortBottomSheet<void>(
+          context: context,
+          builder: (_) => SubscriptionInfoPanel(subscriptionId: subscriptionId),
+        );
+        return;
+      }
+      showSubscriptionInfoDialog(context, subscriptionId: subscriptionId);
     }
 
     final pingCache = ref.watch(pingCacheProvider);
@@ -201,10 +218,7 @@ class ServerListContent extends ConsumerWidget {
                       for (final subscription in config.subscriptions) ...[
                         _SubscriptionHeader(
                           title: subscription.name,
-                          active: subscription.id == activeSubscriptionId,
-                          onTap: () => ref
-                              .read(rightPanelViewProvider.notifier)
-                              .showSubscription(subscription.id),
+                          onTap: () => onOpenSubscriptionInfo(subscription.id),
                         ),
                         ProxyTreeList(
                           nodes: filterHiddenList(switch (subscription.root) {
@@ -235,12 +249,10 @@ class ServerListContent extends ConsumerWidget {
 
 class _SubscriptionHeader extends StatefulWidget {
   final String title;
-  final bool active;
   final VoidCallback onTap;
 
   const _SubscriptionHeader({
     required this.title,
-    required this.active,
     required this.onTap,
   });
 
@@ -253,7 +265,7 @@ class _SubscriptionHeaderState extends State<_SubscriptionHeader> {
 
   @override
   Widget build(BuildContext context) {
-    final highlighted = widget.active || _hovered;
+    final highlighted = _hovered;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -277,7 +289,7 @@ class _SubscriptionHeaderState extends State<_SubscriptionHeader> {
                   style: PortText.muted.copyWith(
                     fontSize: 11,
                     letterSpacing: 0.4,
-                    color: widget.active ? PortColors.foreground : null,
+                    color: highlighted ? PortColors.foreground : null,
                   ),
                 ),
               ),

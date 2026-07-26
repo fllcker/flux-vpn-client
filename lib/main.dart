@@ -219,34 +219,49 @@ class _FluxAppState extends ConsumerState<FluxApp>
       navigatorKey: widget.navigatorKey,
       title: 'Flux',
       home: ClipboardImportHotkey(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Кастомный тайтлбар (drag-area, minimize/maximize/close) имеет
-            // смысл только для окна с рамкой — на Android об это спотыкались
-            // (см. ROADMAP.md, трек 19, Phase 4): вместо системной шторки
-            // сверху висела десктопная полоска с логотипом. SettingsPage
-            // сама себе шапка с кнопкой "назад" (см. settings_page.dart),
-            // так что тайтлбар не нужен и как единственный путь туда —
-            // на мобильной раскладке ConnectionScreen сама даёт плавающую
-            // кнопку настроек (`onOpenSettings`).
-            if (!Platform.isAndroid)
-              AppTitleBar(
-                settingsOpen: _settingsOpen,
-                onToggleSettings: () =>
-                    setState(() => _settingsOpen = !_settingsOpen),
+        // Settings — не отдельный Navigator-route, а просто переключение
+        // `_settingsOpen` в этом же build (см. комментарий у AppTitleBar
+        // ниже) — поэтому системная кнопка/жест "назад" на Android об это
+        // ничего не знали и не закрывали Settings вовсе (обычное поведение
+        // WidgetsApp — попытаться вытолкнуть route, а у единственного route
+        // "home" вытолкнуть нечего). PopScope перехватывает именно этот
+        // случай: пока Settings открыты, не даём поп-у уйти дальше и вместо
+        // этого закрываем Settings сами — на десктопе не нужно (там нет ни
+        // аппаратной кнопки, ни жеста back).
+        child: PopScope(
+          canPop: !(Platform.isAndroid && _settingsOpen),
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop) setState(() => _settingsOpen = false);
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Кастомный тайтлбар (drag-area, minimize/maximize/close) имеет
+              // смысл только для окна с рамкой — на Android об это спотыкались
+              // (см. ROADMAP.md, трек 19, Phase 4): вместо системной шторки
+              // сверху висела десктопная полоска с логотипом. SettingsPage
+              // сама себе шапка с кнопкой "назад" (см. settings_page.dart),
+              // так что тайтлбар не нужен и как единственный путь туда —
+              // на мобильной раскладке ConnectionScreen сама даёт плавающую
+              // кнопку настроек (`onOpenSettings`).
+              if (!Platform.isAndroid)
+                AppTitleBar(
+                  settingsOpen: _settingsOpen,
+                  onToggleSettings: () =>
+                      setState(() => _settingsOpen = !_settingsOpen),
+                ),
+              Expanded(
+                child: _settingsOpen
+                    ? SettingsPage(
+                        onBack: () => setState(() => _settingsOpen = false),
+                      )
+                    : ConnectionScreen(
+                        onOpenSettings: () =>
+                            setState(() => _settingsOpen = true),
+                      ),
               ),
-            Expanded(
-              child: _settingsOpen
-                  ? SettingsPage(
-                      onBack: () => setState(() => _settingsOpen = false),
-                    )
-                  : ConnectionScreen(
-                      onOpenSettings: () =>
-                          setState(() => _settingsOpen = true),
-                    ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

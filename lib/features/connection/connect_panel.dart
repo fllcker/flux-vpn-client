@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
@@ -73,79 +74,93 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
       _ => ConnectSelection.off,
     };
 
+    // Android (тест-эксперимент, см. чат) — оба блока (карточка сервера и
+    // Off/On) fit-content каждый сам по себе, без общего капа ширины и без
+    // принудительного выравнивания под ширину друг друга (на десктопе
+    // карточка растягивается под измеренную ширину селектора,
+    // _selectorWidth — см. коммент у поля, чтобы совпадение было
+    // пиксельным). Сильно скруглённые — почти овалы (999 гарантированно
+    // превышает половину высоты любого из блоков, Flutter сам клэмпит до
+    // "stadium"-формы). На десктопе ничего не меняем.
+    final pillRadius = Platform.isAndroid ? 999.0 : 10.0;
+
+    final card = GestureDetector(
+      // Боковая панель со списком серверов скрыта на мобильной раскладке
+      // (см. ROADMAP.md, трек 16) — тап по карточке открывает тот же bottom
+      // sheet, что и плавающая кнопка сверху, чтобы сменить сервер было
+      // можно и отсюда.
+      onTap: isMobileLayout(context) ? () => openServerListSheet(context) : null,
+      child: Container(
+        // На Android симметричный 12/12 выглядел так, будто слева места
+        // больше, чем справа — сама иконка (см. ServerIcon) уже круглая с
+        // границей, глазу перед ней "читается" больше воздуха, чем после
+        // текста. Компенсируем чуть меньшим левым и чуть большим правым —
+        // десктоп не трогаем.
+        padding: Platform.isAndroid
+            ? const EdgeInsets.fromLTRB(10, 10, 14, 10)
+            : const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: PortColors.muted.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(pillRadius),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ServerIcon(icon: selectedLeaf.icon, size: 32),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    selectedLeaf.name,
+                    style: PortText.large.copyWith(fontSize: 15, height: 1),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 1),
+                  _StatusText(state: connectionState),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final selector = OffProxyTunSelector(
+      key: _selectorKey,
+      value: selection,
+      busy: busy,
+      simplifiedOnOff: Platform.isAndroid,
+      onChanged: (selection) =>
+          _onSelectionChanged(context, ref, selectedLeaf, selection),
+    );
+
+    final content = Platform.isAndroid
+        ? Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [card, const SizedBox(height: 12), selector],
+          )
+        : ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 340),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SizedBox(width: _selectorWidth, child: card),
+                const SizedBox(height: 12),
+                selector,
+              ],
+            ),
+          );
+
     return Align(
       alignment: Alignment.bottomCenter,
       child: Padding(
         padding: const EdgeInsets.only(bottom: 56),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 340),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: _selectorWidth,
-                child: GestureDetector(
-                  // Боковая панель со списком серверов скрыта на мобильной
-                  // раскладке (см. ROADMAP.md, трек 16) — тап по карточке
-                  // открывает тот же bottom sheet, что и плавающая кнопка
-                  // сверху, чтобы сменить сервер было можно и отсюда.
-                  onTap: isMobileLayout(context)
-                      ? () => openServerListSheet(context)
-                      : null,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: PortColors.muted.withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ServerIcon(icon: selectedLeaf.icon, size: 32),
-                        const SizedBox(width: 10),
-                        Flexible(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                selectedLeaf.name,
-                                style: PortText.large.copyWith(
-                                  fontSize: 15,
-                                  height: 1,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 1),
-                              _StatusText(state: connectionState),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              OffProxyTunSelector(
-                key: _selectorKey,
-                value: selection,
-                busy: busy,
-                simplifiedOnOff: Platform.isAndroid,
-                onChanged: (selection) => _onSelectionChanged(
-                  context,
-                  ref,
-                  selectedLeaf,
-                  selection,
-                ),
-              ),
-            ],
-          ),
-        ),
+        child: content,
       ),
     );
   }
@@ -157,6 +172,10 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
     ConnectSelection selection,
   ) async {
     final controller = ref.read(connectionControllerProvider.notifier);
+
+    // Тактильный отклик на главное действие приложения — только Android,
+    // desktop не трогаем (нет аналога вибрации на нажатие кнопки мышью).
+    if (Platform.isAndroid) HapticFeedback.lightImpact();
 
     // Android: селектор уже схлопнут до Off/On (OffProxyTunSelector,
     // simplifiedOnOff), и isRunningElevated()/windows_elevation.dart —

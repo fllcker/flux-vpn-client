@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/widgets.dart';
 
 import '../../widgets/port_ui/port_ui.dart';
@@ -28,11 +30,19 @@ class OffProxyTunSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Android (тест, см. connect_panel.dart) — трек и активный сегмент
+    // почти овалы, тот же приём (999 клэмпится Flutter'ом до половины
+    // высоты). Десктоп не трогаем.
+    final pillRadius = Platform.isAndroid ? 999.0 : 10.0;
+    // Сегменты внутри трека раньше были 8 (чуть меньше трека в 10) —
+    // сохраняем то же соотношение "чуть меньше" на десктопе, на Android оба
+    // 999 всё равно клэмпятся до формы.
+    final segmentRadius = Platform.isAndroid ? 999.0 : 8.0;
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: PortColors.muted.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(pillRadius),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -41,10 +51,13 @@ class OffProxyTunSelector extends StatelessWidget {
             selected: value == ConnectSelection.off,
             enabled: !busy,
             label: 'Off',
-            // Два сегмента вместо трёх той же общей ширины смотрелись
-            // непропорционально узко — компенсируем увеличенным паддингом
-            // только здесь, десктопный трёхсегментный вид не трогаем.
-            horizontalPadding: simplifiedOnOff ? 40 : 18,
+            // Раньше здесь был увеличенный паддинг (40) — компенсировал то,
+            // что 2-сегментный вид растягивался под измеренную ширину
+            // карточки сервера сверху (см. _selectorWidth в
+            // connect_panel.dart). Теперь на Android оба блока fit-content
+            // независимо друг от друга (см. тот же файл), компенсация не
+            // нужна — сегмент снова просто в размер своего текста.
+            radius: segmentRadius,
             onTap: () => onChanged(ConnectSelection.off),
           ),
           if (!simplifiedOnOff)
@@ -53,6 +66,7 @@ class OffProxyTunSelector extends StatelessWidget {
               enabled: !busy,
               label: 'Proxy',
               activeColor: const Color(0xFF4ADE80),
+              radius: segmentRadius,
               onTap: () => onChanged(ConnectSelection.proxy),
             ),
           _Segment(
@@ -65,7 +79,7 @@ class OffProxyTunSelector extends StatelessWidget {
             activeColor: simplifiedOnOff
                 ? const Color(0xFF4ADE80)
                 : const Color(0xFF60A5FA),
-            horizontalPadding: simplifiedOnOff ? 40 : 18,
+            radius: segmentRadius,
             onTap: () => onChanged(ConnectSelection.tun),
           ),
         ],
@@ -79,7 +93,7 @@ class _Segment extends StatelessWidget {
   final bool enabled;
   final String label;
   final Color? activeColor;
-  final double horizontalPadding;
+  final double radius;
   final VoidCallback onTap;
 
   const _Segment({
@@ -88,7 +102,7 @@ class _Segment extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.activeColor,
-    this.horizontalPadding = 18,
+    this.radius = 8,
   });
 
   @override
@@ -106,10 +120,10 @@ class _Segment extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOut,
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
           decoration: BoxDecoration(
             color: selected ? PortColors.background : null,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(radius),
             boxShadow: selected
                 ? [
                     BoxShadow(

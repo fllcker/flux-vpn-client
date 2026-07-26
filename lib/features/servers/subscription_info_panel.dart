@@ -12,7 +12,6 @@ import '../../l10n/app_locale.dart';
 import '../../l10n/strings.dart';
 import '../../widgets/port_ui/port_ui.dart';
 import 'flatten_leaves.dart';
-import 'right_panel_view.dart';
 import 'routing_rules_dialog.dart';
 import 'server_icon.dart';
 import 'subscription_import.dart';
@@ -143,6 +142,17 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
                     onPressed: _refreshing
                         ? null
                         : () => _refresh(subscription),
+                  ),
+                  // Панель теперь всегда открывается поверх главного экрана
+                  // (диалог на десктопе — showSubscriptionInfoDialog ниже,
+                  // bottom sheet на мобилке — см. server_list_panel.dart), а
+                  // не встраивается в постоянную колонку, как раньше — явная
+                  // кнопка закрытия нужна, кликом вне/свайпом одно не всегда
+                  // очевидно.
+                  const SizedBox(width: 4),
+                  PortIconButton.ghost(
+                    icon: const Icon(LucideIcons.x, size: 16),
+                    onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
               ),
@@ -284,7 +294,7 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
                   ref
                       .read(coreConfigProvider.notifier)
                       .removeSubscription(widget.subscriptionId);
-                  ref.read(rightPanelViewProvider.notifier).showConnect();
+                  Navigator.of(context).pop();
                 },
                 child: Text(S.deleteSubscription),
               ),
@@ -294,6 +304,42 @@ class _SubscriptionInfoPanelState extends ConsumerState<SubscriptionInfoPanel> {
       ),
     );
   }
+}
+
+/// Десктопная обёртка — модалка вместо постоянной правой колонки (см.
+/// ROADMAP.md/чат: раньше подписка заменяла ConnectPanel в rightPanelView,
+/// что и на десктопе было неудобно — не было явного "назад", только клик по
+/// серверу). Не переиспользует `PortDialog` целиком — тот сам оборачивает
+/// контент в свой `SingleChildScrollView`/`Column` с заголовком, а
+/// [SubscriptionInfoPanel] уже полностью самодостаточен (свой скролл,
+/// паддинг, maxWidth, теперь и своя кнопка закрытия) — вложение дало бы
+/// двойной скролл и задвоенный паддинг. Берём только карточную "оболочку"
+/// (фон/бордер/тень/скругление) из PortDialog.
+Future<void> showSubscriptionInfoDialog(
+  BuildContext context, {
+  required String subscriptionId,
+}) {
+  return showPortDialog<void>(
+    context: context,
+    builder: (context) => Center(
+      child: Container(
+        constraints: BoxConstraints(
+          maxWidth: 420,
+          maxHeight: MediaQuery.sizeOf(context).height - 64,
+        ),
+        decoration: BoxDecoration(
+          color: PortColors.background,
+          borderRadius: BorderRadius.circular(kRadius),
+          border: Border.all(color: PortColors.border),
+          boxShadow: const [
+            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 24, offset: Offset(0, 12)),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: SubscriptionInfoPanel(subscriptionId: subscriptionId),
+      ),
+    ),
+  );
 }
 
 /// Секция "Роутинг" — правила живут на каждом [ServerLeaf] отдельно (см.
@@ -395,13 +441,23 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Обычно value — короткая строка (число, дата), и spaceBetween без
+    // Expanded давал тот же результат нагляднее. Но customFields (см. цикл
+    // в build() выше) может прилететь с сервера сырой длинной строкой —
+    // без Expanded она просто переполняла Row и переносилась с выравниванием
+    // по левому краю, ломая колонку "ярлык / значение". Expanded + end
+    // сохраняет прежний вид для коротких значений и переносит длинные
+    // вправо-выровненным блоком вместо переполнения.
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label, style: PortText.muted),
-          Text(value, style: PortText.small),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(value, style: PortText.small, textAlign: TextAlign.end),
+          ),
         ],
       ),
     );

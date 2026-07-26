@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/widgets.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -56,31 +58,38 @@ class _ServerRowState extends State<ServerRow> {
         ? PortColors.accent.withValues(alpha: 0.5)
         : const Color(0x00000000);
 
-    final row = _buildRow(background);
     final onHide = widget.onHide;
     final onEditRouting = widget.onEditRouting;
-    if (onHide == null && onEditRouting == null) return row;
+    if (onHide == null && onEditRouting == null) return _buildRow(background);
 
-    return PortContextMenuRegion(
-      items: [
-        if (onEditRouting != null)
-          PortContextMenuItem(
-            leading: const Icon(LucideIcons.route, size: 14),
-            onPressed: onEditRouting,
-            child: Text(S.routing),
-          ),
-        if (onHide != null)
-          PortContextMenuItem(
-            leading: const Icon(LucideIcons.eyeOff, size: 14),
-            onPressed: onHide,
-            child: Text(S.hide),
-          ),
-      ],
-      child: row,
-    );
+    final items = [
+      if (onEditRouting != null)
+        PortContextMenuItem(
+          leading: const Icon(LucideIcons.route, size: 14),
+          onPressed: onEditRouting,
+          child: Text(S.routing),
+        ),
+      if (onHide != null)
+        PortContextMenuItem(
+          leading: const Icon(LucideIcons.eyeOff, size: 14),
+          onPressed: onHide,
+          child: Text(S.hide),
+        ),
+    ];
+
+    // На Android/iOS правого клика нет, а вешать открытие меню на long
+    // press нельзя — строка уже перетаскивается по long press (см. doc
+    // PortContextMenuButton). Троеточие — часть самой строки (не оверлей),
+    // иначе перекрывало бы индикатор пинга/шеврон, которые уже занимают
+    // правый край.
+    if (Platform.isAndroid || Platform.isIOS) {
+      return _buildRow(background, trailing: PortContextMenuButton(items: items));
+    }
+
+    return PortContextMenuRegion(items: items, child: _buildRow(background));
   }
 
-  Widget _buildRow(Color background) {
+  Widget _buildRow(Color background, {Widget? trailing}) {
     final hasVariantChoice = widget.leaf.variants.length > 1;
 
     return MouseRegion(
@@ -154,6 +163,7 @@ class _ServerRowState extends State<ServerRow> {
                   size: 14,
                   color: PortColors.mutedForeground,
                 ),
+              ?trailing,
             ],
           ),
         ),

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -14,12 +16,10 @@ import '../../widgets/port_ui/port_ui.dart';
 import '../ping/ping_all.dart';
 import '../servers/flag_emoji.dart';
 import '../servers/flatten_leaves.dart';
-import '../servers/right_panel_view.dart';
 import '../servers/selected_server_provider.dart';
 import '../servers/server_icon.dart';
 import '../servers/server_list_panel.dart';
 import '../servers/subscription_import.dart';
-import '../servers/subscription_info_panel.dart';
 import 'connect_panel.dart';
 
 /// Главный экран: список серверов слева, справа — карточка подключения
@@ -82,10 +82,8 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final rightPanelView = ref.watch(rightPanelViewProvider);
     final homeBackground = ref.watch(appSettingsProvider).homeBackground;
-    final showBackground =
-        rightPanelView is ConnectView && homeBackground != HomeBackground.none;
+    final showBackground = homeBackground != HomeBackground.none;
 
     final mainContent = Stack(
       children: [
@@ -127,12 +125,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
               child: ShaderBackground(assetPath: 'shaders/galaxy.frag'),
             ),
           },
-        switch (rightPanelView) {
-          ConnectView() => const ConnectPanel(),
-          SubscriptionInfoView(:final subscriptionId) => SubscriptionInfoPanel(
-            subscriptionId: subscriptionId,
-          ),
-        },
+        const ConnectPanel(),
       ],
     );
 
@@ -153,6 +146,12 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
             // должен оставаться на весь экран, поэтому SafeArea оборачивает
             // только сами кнопки, а не весь Stack.
             final topInset = MediaQuery.of(context).padding.top + 12;
+            // На Android эти две плавающие кнопки — единственный путь к
+            // списку серверов/настройкам (нет бокового меню и AppTitleBar),
+            // а дефолтный размер 36px под мышь на телефоне выглядит мелко —
+            // увеличиваем и сам квадрат, и иконку внутри, только здесь.
+            final buttonSize = Platform.isAndroid ? 44.0 : 36.0;
+            final iconSize = Platform.isAndroid ? 20.0 : 16.0;
             return Stack(
               children: [
                 mainContent,
@@ -160,7 +159,8 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                   top: topInset,
                   left: 12,
                   child: PortIconButton.secondary(
-                    icon: const Icon(LucideIcons.list),
+                    icon: Icon(LucideIcons.list, size: iconSize),
+                    size: buttonSize,
                     onPressed: () => openServerListSheet(context),
                   ),
                 ),
@@ -169,7 +169,8 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                     top: topInset,
                     right: 12,
                     child: PortIconButton.secondary(
-                      icon: const Icon(LucideIcons.settings),
+                      icon: Icon(LucideIcons.settings, size: iconSize),
+                      size: buttonSize,
                       onPressed: onOpenSettings,
                     ),
                   ),
