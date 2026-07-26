@@ -1065,3 +1065,165 @@ proxy/TUN самостоятельно):
 окружения). Не проверено вживую (см. `CLAUDE.md`) — переключить
 тему/язык в настройках и глазами сверить обе темы (тёмная должна выглядеть
 пиксель-в-пиксель как раньше) и оба языка на всех экранах.
+
+## 19. Android-порт — в процессе (ветка `android`)
+
+Отдельная ветка `android`, не смёржена в `master`. План (архитектура
+движка) — `C:\Users\local\.claude\plans\resilient-wandering-puddle.md`.
+
+На Windows протокол (VLESS/Hysteria2) всегда обрабатывает xray-core,
+sing-box — только Windows-специфичная TUN-обвязка (см. трек про
+`TunBridgeEngine`/`docs/fix_tun/`). Рассматривали чистый sing-box на
+Android (есть официальная `libbox` AAR с готовой VpnService-интеграцией,
+на ней NekoBox/sing-box-for-android) — отклонили: у стокового sing-box
+нет XHTTP-транспорта (нужен для VLESS XHTTP/Reality), только у неофициальных
+форков с известными багами.
+
+Решение: xray-core остаётся единственным протокольным движком и на
+Android — как и на десктопе. Собирается в `.aar` через `gomobile bind`
+поверх [2dust/AndroidLibXrayLite](https://github.com/2dust/AndroidLibXrayLite)
+(тот же путь, которым v2rayNG собирает xray-core под Android — обычного
+предсобранного AAR от самого XTLS нет). Выяснилось, что у xray-core есть
+собственный `tun`-инбаунд с gVisor netstack (`proxy/tun`, включая
+`tun_android.go`) — он сам читает TUN fd (через env `xray.tun.fd`) и
+маршрутизирует пакеты, отдельный tun2socks-мост (как предполагалось
+исходно) не нужен. Чтобы не зациклить трафик (xray подключается к своему
+же серверу через TUN) — тот же приём, что и в `route_exclude_address` у
+sing-box на Windows, но через явное покрытие 0.0.0.0/0 CIDR-блоками без
+исключённого IP сервера (`RouteExclusion.kt`, т.к. `Builder.excludeRoute()`
+есть только с API 33).
+
+Сделано (Phase 1 + 2 из плана):
+
+1. `flutter create --platforms=android`, `applicationId` = `rip.freeinternet.flux`.
+2. `scripts/build_android_xray.ps1` — собирает `libv2ray.aar`
+   (android/arm64, `-androidapi 24`) в `android/app/libs/` (не в git, см.
+   `android/app/libs/SOURCE.md`, тот же приём, что у `fetch_xray.ps1`/
+   `fetch_sing_box.ps1`, но именно сборка, а не скачивание).
+3. `FluxVpnService.kt` — `VpnService`, поднимает TUN (адрес/DNS/маршруты
+   через `RouteExclusion`), передаёт fd в `CoreController.startLoop`.
+4. `MainActivity.kt` — `MethodChannel "flux/vpn"` (`preparePermission`,
+   `start`, `stop`), permission-flow через `VpnService.prepare()` +
+   `startActivityForResult`.
+
+**Не сделано:** Dart-сторона (`XrayEngineAndroid implements CoreEngine`,
+конфиг с `tun`-инбаундом, подключение к `ConnectionController`/UI) — Phase
+3 плана, ничего из Flutter-кода пока не вызывает `flux/vpn` канал.
+Проверено только `flutter build apk --debug` и `flutter analyze` (чисто) —
+живьём на устройстве/эмуляторе не проверялось и не будет проверяться
+мной (см. `CLAUDE.md`, "не тести proxy/tun режим в приложении сам") —
+нужна проверка руками, когда дойдём до реального подключения.
+
+**Апдейт (Phase 3):** `XrayEngineAndroid implements CoreEngine`
+(`lib/engines/xray/xray_engine_android.dart`) подключён к
+`ConnectionController` — на Android любой режим (Off/Proxy/TUN, селектор
+пока общий для всех платформ, конвергенция UI — Phase 4) идёт через него,
+т.к. отдельного Proxy-механизма на Android нет (см. контекст плана).
+`buildXrayTunConfig` в `xray_config_mapper.dart` — `tun`-инбаунд вместо
+SOCKS/HTTP, переиспользует существующие `_outbound`/`_routing` как есть.
+Адрес сервера резолвится в Dart (`InternetAddress.lookup`, тот же приём,
+что в `tun_bridge_engine.dart`) до передачи в Kotlin — `RouteExclusion`
+там принимает только IPv4-литерал. `flutter analyze`/`flutter test`
+(86/86, десктопный путь ветвится через `Platform.isAndroid` и не
+затронут)/`flutter build apk --debug` — чисто. Не проверено на
+устройстве — то же ограничение, что и у Phase 2.
+
+**Апдейт (живое тестирование на Pixel 6a, через `adb`):** нашли и
+исправили четыре независимых бага, ни один не ловится
+`flutter analyze`/`flutter test`/сборкой — только реальным подключением:
+
+1. **Чёрный экран при запуске.** `main.dart` дергал `windowManager.
+   ensureInitialized()` без проверки платформы (`window_manager` —
+   desktop-only пакет) — необработанное исключение до `runApp()`, весь
+   `main()` обрывался, `runApp` не вызывался. Обернули все вызовы
+   `window_manager` в `main.dart`/`_FluxAppState` в `Platform.isWindows`
+   (`tray.dart`/`deep_link.dart` уже были самодостаточны в этом смысле).
+2. **`geosite.dat`/`geoip.dat` не находятся.** xray-core резолвит путь к
+   ним через `os.Stat` **до** вызова `NewFileReader`-хука
+   (`common/platform/filesystem.getAssetFileLocation`) — значит,
+   `InitCoreEnv`/`Seq.setContext` (JNI-мост в `golang.org/x/mobile/asset`)
+   тут в принципе не помогают, т.к. `mobasset.Open` до них просто не
+   доходит. Единственный рабочий вариант — распаковать оба файла из
+   Android-ассетов (они реально попадают в APK из `libv2ray.aar`, но
+   только через `AssetManager`, не как обычный путь) в `filesDir` при
+   старте сервиса (`FluxVpnService.ensureGeoAssetsExtracted()`) и указать
+   `xray.location.asset` туда явно.
+3. **DNS-петля / зависшие коннекты к серверу.** `XrayEngineAndroid`
+   резолвил адрес сервера в Dart только чтобы построить маршруты
+   исключения — сам конфиг xray по-прежнему получал исходный хостнейм, и
+   xray-core резолвил его заново уже своим DNS-запросом, который уходил в
+   тот же ещё не поднятый тоннель (тот самый deadlock "нужен тоннель,
+   чтобы поднять тоннель" из `tun_bridge_engine.dart`, но не
+   предотвращённый на Android). В логах это выглядело как бесконечные
+   `dialing TCP to <хост>:<порт>` без единого завершения. Фикс —
+   `XrayEngineAndroid._pinToResolvedIp`: подставляет уже резолвленный IP
+   как адрес подключения в конфиге, `sni`/`xhttpHost` фиксирует на
+   исходном хостнейме явно (иначе TLS/Reality SNI станет IP и хендшейк не
+   пройдёт).
+4. **Доменные routing-правила не применялись, `direct`-маршрут для них
+   тоже приводил к зависанию.** TUN — чистый L3, без sniffing
+   `DomainRule` в принципе не может сработать (виден только IP пакета) —
+   добавили `sniffing: {enabled: true, destOverride: [...], routeOnly:
+   true}` на `tun`-инбаунд в `buildXrayTunConfig` (тот же приём, что
+   `action: "sniff"` у sing-box на Windows). После этого всплыл второй
+   слой той же проблемы, что и в п.3: `direct`-outbound сам коннектится к
+   произвольному IP сайта, который в маршруты-исключения не попадает —
+   тоже уходил в тот же тоннель и зависал. Настоящий фикс —
+   `Builder.addDisallowedApplication(packageName)` в
+   `FluxVpnService.startTunnel` — исключает вообще всё, что коннектит сам
+   xray-core (не только к VLESS-серверу, а вообще), из собственного
+   VPN-тоннеля приложения; `RouteExclusion` после этого уже не
+   единственная защита от петли, а подстраховка.
+
+После всех четырёх фиксов: подключение поднимается, прокси-трафик реально
+идёт через VLESS-сервер, `direct`-правила по доменам срабатывают
+(проверено на `2ip.ru`) — живой тест пользователем подтвердил рабочее
+состояние.
+
+**Апдейт (Phase 4 — UI-адаптация под мобильную раскладку):**
+
+1. `windows_elevation.dart` (`DynamicLibrary.open('shell32.dll')`) падал
+   бы при первом же тапе на "TUN" на Android — `connect_panel.dart`
+   теперь ветвится по `Platform.isAndroid` до вызова `isRunningElevated()`
+   вообще. Селектор `OffProxyTunSelector` схлопнут в Off/On
+   (`simplifiedOnOff`) — сегмент "Proxy" скрыт, TUN-сегмент подписан "On"
+   и покрашен в зелёный (не в синий — так приятнее), оба сегмента шире,
+   чтобы не выглядеть неряшливо вдвоём вместо троих.
+2. `AppTitleBar` (drag-area, minimize/maximize/close — `window_manager`,
+   desktop-only) не рендерится на Android вообще (`main.dart`) — доступ к
+   настройкам вместо этого дают плавающей кнопкой-шестерёнкой сверху
+   справа в `ConnectionScreen` (мобильная раскладка), симметрично уже
+   существовавшей кнопке списка серверов слева. `SettingsPage` (у неё
+   своя шапка с "назад") и обе плавающие кнопки на `ConnectionScreen`
+   получили `SafeArea`/отступ на `MediaQuery.padding.top` — без
+   `AppTitleBar` они иначе рисуются прямо под статус-баром/чёлкой.
+3. `settings_page.dart`: секции "TUN" (там всегда список из одного
+   sing-box, а Android использует свой `tun`-инбаунд xray-core, не
+   sing-box вовсе) и "Система" (автозапуск — тихий no-op на Android, см.
+   `windows_autostart.dart`) скрыты через `_visibleSettingsSections`.
+4. `port_bottom_sheet.dart` (список серверов на мобильной раскладке) был
+   обычным `showGeneralDialog` без единого жеста — палец интуитивно тянет
+   такой лист вниз, а ничего не происходило. Добавили drag-to-dismiss, но
+   не на весь лист целиком: список внутри (`ServerListContent`, тот же
+   виджет, что и в десктопной `ServerListPanel`, трогать нельзя) сам
+   скроллящийся, и общий `GestureDetector` проигрывает гонку жестов
+   вложенному `Scrollable`. Пробовали ловить "докрутили до верха, тянут
+   дальше" через `NotificationListener<ScrollNotification>` +
+   `BouncingScrollPhysics` (чтобы получить `OverscrollNotification`) — не
+   сработало: списки в приложении почти всегда длиннее видимой области
+   листа, палец успевает просто проскроллить контент, не долетая до
+   overscroll за один свайп (подтверждено логами — ни разу не пришёл
+   `OverscrollNotification`, только `ScrollUpdateNotification`).
+   Остановились на отдельной полоске-ручке сверху (32px, с ручкой видимой
+   4px-полоской) — работает надёжно, устроило при живой проверке.
+5. `proxy_tree_list.dart`: drag-and-drop сервера/группы между узлами дерева
+   был на обычном `Draggable` — стартовал перетаскивание с первого же
+   движения пальца, на тачскрине это означало случайные сдвиги при
+   попытке просто скроллить/тапнуть. На `Platform.isAndroid ||
+   Platform.isIOS` заменили на `LongPressDraggable` (тот же виджет с
+   задержкой перед стартом) — десктопная мышь по-прежнему тащит сразу,
+   без изменений.
+
+Всё проверено живьём на Pixel 6a (`flutter analyze`/`flutter test`
+86/86 — тоже чисто, десктопный путь везде за `Platform.isWindows`/
+`Platform.isAndroid` не тронут).

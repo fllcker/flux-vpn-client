@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -201,23 +203,39 @@ class ProxyTreeList extends ConsumerWidget {
       onAcceptWithDetails: (details) => onAccept(details.data),
       builder: (context, candidateData, rejectedData) {
         final hovering = candidateData.isNotEmpty;
+        final draggedChild = hovering
+            ? DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: PortColors.primary,
+                      width: 2,
+                    ),
+                  ),
+                ),
+                child: child,
+              )
+            : child;
+
+        // Обычный Draggable стартует перетаскивание с первого же движения
+        // пальца — на мышке это нормально (клик и сразу тащим), но на
+        // тачскрине так легко случайно сдвинуть элемент вместо тапа/скролла
+        // списка. LongPressDraggable — тот же виджет, но с задержкой перед
+        // стартом (используем платформенный дефолт `kLongPressTimeout`).
+        if (Platform.isAndroid || Platform.isIOS) {
+          return LongPressDraggable<String>(
+            data: nodeId,
+            feedback: _DragFeedback(label: feedbackLabel, icon: feedbackIcon),
+            childWhenDragging: Opacity(opacity: 0.4, child: child),
+            child: draggedChild,
+          );
+        }
+
         return Draggable<String>(
           data: nodeId,
           feedback: _DragFeedback(label: feedbackLabel, icon: feedbackIcon),
           childWhenDragging: Opacity(opacity: 0.4, child: child),
-          child: hovering
-              ? DecoratedBox(
-                  decoration: BoxDecoration(
-                    border: Border(
-                      top: BorderSide(
-                        color: PortColors.primary,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  child: child,
-                )
-              : child,
+          child: draggedChild,
         );
       },
     );

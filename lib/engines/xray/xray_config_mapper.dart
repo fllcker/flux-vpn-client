@@ -33,6 +33,45 @@ Map<String, dynamic> buildXrayConfig(
   };
 }
 
+/// Android TUN-конфиг — `tun`-инбаунд вместо SOCKS/HTTP, см.
+/// `lib/engines/xray/xray_engine_android.dart`. В отличие от Windows,
+/// xray-core сам умеет настраивать/читать TUN на Android (gVisor-стек,
+/// `proxy/tun/tun_android.go`) через fd, переданный из `FluxVpnService`
+/// (`xray.tun.fd`, см. `CoreController.startLoop`) — конфиг сам по себе
+/// маршруты/адрес/DNS не описывает, это уже сделано на стороне
+/// `VpnService.Builder` в Kotlin.
+Map<String, dynamic> buildXrayTunConfig(
+  ServerConfig server, {
+  List<RoutingRule> routingRules = const [],
+  CoreLogLevel logLevel = CoreLogLevel.warn,
+  int mtu = 1500,
+}) {
+  return {
+    'log': {'loglevel': logLevel.xrayName},
+    'inbounds': [
+      {
+        'tag': 'tun-in',
+        'port': 0,
+        'protocol': 'tun',
+        'settings': {'name': 'flux-tun0', 'MTU': mtu},
+        // TUN — чистый L3, до маршрутизации виден только IP пакета, поэтому
+        // доменные routing-правила (DomainRule) без sniffing никогда не
+        // сработают. `routeOnly: true` — используем сниффленный домен только
+        // для выбора outbound'а, реальный дайл всё равно идёт по исходному
+        // IP пакета (тот же приём, что и `action: "sniff"` у sing-box в
+        // tun_bridge_engine.dart на Windows).
+        'sniffing': {
+          'enabled': true,
+          'destOverride': ['http', 'tls', 'quic'],
+          'routeOnly': true,
+        },
+      },
+    ],
+    'outbounds': [_outbound(server), _directOutbound, _blockOutbound],
+    if (routingRules.isNotEmpty) 'routing': _routing(routingRules),
+  };
+}
+
 const _directOutbound = {'protocol': 'freedom', 'tag': 'direct'};
 const _blockOutbound = {'protocol': 'blackhole', 'tag': 'block'};
 
