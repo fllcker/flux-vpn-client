@@ -24,6 +24,10 @@ class XrayEngineAndroid implements CoreEngine {
   XrayEngineAndroid({required this.id, this.logLevel = CoreLogLevel.warn});
 
   static const _channel = MethodChannel('flux/vpn');
+  // FluxVpnService (a Service, not a MethodChannel call) pushes async
+  // status/error events here — e.g. xray-core failing to actually start
+  // *after* `start` above already returned success. See VpnStatusBridge.kt.
+  static const _statusChannel = EventChannel('flux/vpn/status');
 
   @override
   final String id;
@@ -35,6 +39,7 @@ class XrayEngineAndroid implements CoreEngine {
 
   final _statusController = StreamController<EngineStatus>.broadcast();
   final _statsController = StreamController<EngineStats>.broadcast();
+  StreamSubscription<dynamic>? _nativeStatusSub;
 
   @override
   Stream<EngineStatus> get statusStream => _statusController.stream;
@@ -45,6 +50,7 @@ class XrayEngineAndroid implements CoreEngine {
   @override
   Future<void> start(CoreConfig config) async {
     _statusController.add(EngineStatus.starting);
+    _listenToNativeStatus();
 
     final leaf = _firstLeafWithConfig(config);
     final server = leaf?.activeVariant?.config;
@@ -99,7 +105,36 @@ class XrayEngineAndroid implements CoreEngine {
   Future<void> stop() async {
     _statusController.add(EngineStatus.stopping);
     await _channel.invokeMethod('stop');
+    unawaited(_nativeStatusSub?.cancel());
+    _nativeStatusSub = null;
     _statusController.add(EngineStatus.stopped);
+  }
+
+  /// `start()` sets `EngineStatus.connected` optimistically right after the
+  /// `start` MethodChannel call returns (matches XrayEngineWindows — start()
+  /// only proves the request was accepted, not that the tunnel actually came
+  /// up). This stream is how a later native-side failure (e.g. xray-core
+  /// rejecting the config after the TUN fd was already handed over) still
+  /// reaches the UI instead of leaving it stuck on "Connected".
+  void _listenToNativeStatus() {
+    unawaited(_nativeStatusSub?.cancel());
+    _nativeStatusSub = _statusChannel.receiveBroadcastStream().listen((event) {
+      final map = event as Map<dynamic, dynamic>;
+      switch (map['event']) {
+        case 'started':
+          // Already covered by the optimistic add() in start() — nothing
+          // new to report.
+          break;
+        case 'stopped':
+          // The *service* reporting its own teardown (e.g. onRevoke — user
+          // pulled the system VPN toggle outside the app), not something
+          // this class's own stop() needs to duplicate (it adds `stopped`
+          // itself after cancelling this subscription).
+          _statusController.add(EngineStatus.stopped);
+        case 'error':
+          _statusController.add(EngineStatus.error);
+      }
+    });
   }
 
   @override
@@ -134,9 +169,19 @@ class XrayEngineAndroid implements CoreEngine {
     ),
   };
 
+  /// Только IPv4 — `RouteExclusion.kt` умеет считать исключающие маршруты
+  /// только для него (128-битная арифметика для IPv6 не реализована, см.
+  /// ROADMAP.md, трек 19). `InternetAddress.lookup` на dual-stack сети может
+  /// вернуть IPv6 первым — без фильтра `RouteExclusion` получил бы строку не
+  /// того формата и упал на `require(parts.size == 4)`. Из-за этого сервер,
+  /// доступный только по IPv6, на Android пока не заработает — известное
+  /// ограничение, не тихий баг.
   Future<String?> _resolveServerIp(String host) async {
     try {
-      final addresses = await InternetAddress.lookup(host);
+      final addresses = await InternetAddress.lookup(
+        host,
+        type: InternetAddressType.IPv4,
+      );
       return addresses.isEmpty ? null : addresses.first.address;
     } on SocketException {
       return null;

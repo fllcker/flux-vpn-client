@@ -1,30 +1,41 @@
 package rip.freeinternet.flux
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.VpnService
-import android.util.Log
+import android.os.Build
+import androidx.core.app.ActivityCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
-import libv2ray.Libv2ray
 
 /**
- * Phase 2 skeleton (see the Android engine architecture plan) — exposes the
- * VpnService permission flow and start/stop of FluxVpnService over a
- * MethodChannel. Not wired into the Dart-side CoreEngine/ConnectionController
- * yet (Phase 3); nothing in the Flutter UI calls this channel today.
+ * Exposes the VpnService permission flow, start/stop of FluxVpnService, and
+ * its status/error stream to Dart — see xray_engine_android.dart, which is
+ * the only consumer of both channels.
  */
 class MainActivity : FlutterActivity() {
     private val channelName = "flux/vpn"
+    private val statusChannelName = "flux/vpn/status"
     private val requestVpnPermissionCode = 4242
     private var pendingPermissionResult: MethodChannel.Result? = null
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
-        // Phase 1 smoke check (see tool/android-xray-lite) — proves libv2ray.aar
-        // actually links and its Go-bound code runs.
-        Log.i("Flux", "libv2ray xray-core version: " + Libv2ray.checkVersionX())
+        // Without this, POST_NOTIFICATIONS stays unrequested on API 33+ and
+        // FluxVpnService's startForeground() notification just silently
+        // doesn't show (the VPN itself keeps working either way — this is
+        // only about the notification being visible).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
+            }
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -50,6 +61,21 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        // FluxVpnService runs detached from any Activity/MethodChannel call —
+        // VpnStatusBridge is the only way for it to push async status/error
+        // events (e.g. xray-core failing after startLoop already returned
+        // successfully) back to XrayEngineAndroid's statusStream.
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, statusChannelName).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+                    VpnStatusBridge.sink = events
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    VpnStatusBridge.sink = null
+                }
+            },
+        )
     }
 
     /** Returns true (via [result]) if permission is already granted; otherwise
