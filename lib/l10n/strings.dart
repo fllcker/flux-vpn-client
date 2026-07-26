@@ -212,6 +212,11 @@ abstract final class S {
       ? 'TUN mode requires administrator rights — the app is running without them'
       : 'TUN-режим требует прав администратора — приложение запущено без них';
 
+  // xray_engine_android.dart
+  static String get vpnPermissionDenied => _en
+      ? 'VPN permission was not granted'
+      : 'Разрешение на VPN не выдано';
+
   // apply_mj_payload.dart
   static String subscriptionsAdded(int count) =>
       _en ? 'Subscriptions added: $count' : 'Добавлено подписок: $count';

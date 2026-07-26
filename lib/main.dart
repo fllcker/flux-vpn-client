@@ -37,8 +37,16 @@ void main(List<String> args) async {
   final startMinimized = args.contains('--minimized');
 
   WidgetsFlutterBinding.ensureInitialized();
-  await windowManager.ensureInitialized();
-  registerFluxUriProtocolIfNeeded();
+
+  // window_manager/tray_manager have no Android implementation — calling
+  // them there throws MissingPluginException. Was unguarded here (unlike
+  // tray.dart/deep_link.dart, which already self-guard), so on Android the
+  // unhandled exception from ensureInitialized() aborted main() before
+  // runApp() ever ran — black screen, nothing else wrong.
+  if (Platform.isWindows) {
+    await windowManager.ensureInitialized();
+    registerFluxUriProtocolIfNeeded();
+  }
 
   // Стартовый size — дефолт для десктопа, не трогаем. minimumSize снижен
   // против прежних 760×480, чтобы окно можно было вручную ужать до
@@ -68,6 +76,8 @@ void main(List<String> args) async {
     ),
   );
 
+  if (!Platform.isWindows) return;
+
   // Закрытие окна (крестик/Alt+F4) сворачивает в трей вместо выхода — сам
   // перехват в `_FluxAppState.onWindowClose` (main.dart, WindowListener).
   await windowManager.setPreventClose(true);
@@ -91,7 +101,10 @@ Future<void> _warmUpOverlays() async {
   final context = _navigatorKey.currentContext;
   if (context == null || !context.mounted) return;
 
-  showPortDialog(context: context, builder: (_) => const ImportSubscriptionSheet());
+  showPortDialog(
+    context: context,
+    builder: (_) => const ImportSubscriptionSheet(),
+  );
   await WidgetsBinding.instance.endOfFrame;
   final navigator = _navigatorKey.currentState;
   if (navigator != null && navigator.canPop()) {
@@ -123,7 +136,7 @@ class _FluxAppState extends ConsumerState<FluxApp>
   @override
   void initState() {
     super.initState();
-    windowManager.addListener(this);
+    if (Platform.isWindows) windowManager.addListener(this);
     WidgetsBinding.instance.addObserver(this);
     _deepLinkSub = widget.incomingDeepLinks.listen(_handleIncomingDeepLink);
     if (widget.initialDeepLink case final link?) {
@@ -135,7 +148,7 @@ class _FluxAppState extends ConsumerState<FluxApp>
 
   @override
   void dispose() {
-    windowManager.removeListener(this);
+    if (Platform.isWindows) windowManager.removeListener(this);
     WidgetsBinding.instance.removeObserver(this);
     _deepLinkSub?.cancel();
     super.dispose();
@@ -159,8 +172,10 @@ class _FluxAppState extends ConsumerState<FluxApp>
   void onWindowClose() => windowManager.hide();
 
   Future<void> _handleIncomingDeepLink(String link) async {
-    await windowManager.show();
-    await windowManager.focus();
+    if (Platform.isWindows) {
+      await windowManager.show();
+      await windowManager.focus();
+    }
     if (link.isEmpty) return;
     _openAddDialogForDeepLink(link);
   }
@@ -207,14 +222,29 @@ class _FluxAppState extends ConsumerState<FluxApp>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AppTitleBar(
-              settingsOpen: _settingsOpen,
-              onToggleSettings: () => setState(() => _settingsOpen = !_settingsOpen),
-            ),
+            // Кастомный тайтлбар (drag-area, minimize/maximize/close) имеет
+            // смысл только для окна с рамкой — на Android об это спотыкались
+            // (см. ROADMAP.md, трек 19, Phase 4): вместо системной шторки
+            // сверху висела десктопная полоска с логотипом. SettingsPage
+            // сама себе шапка с кнопкой "назад" (см. settings_page.dart),
+            // так что тайтлбар не нужен и как единственный путь туда —
+            // на мобильной раскладке ConnectionScreen сама даёт плавающую
+            // кнопку настроек (`onOpenSettings`).
+            if (!Platform.isAndroid)
+              AppTitleBar(
+                settingsOpen: _settingsOpen,
+                onToggleSettings: () =>
+                    setState(() => _settingsOpen = !_settingsOpen),
+              ),
             Expanded(
               child: _settingsOpen
-                  ? SettingsPage(onBack: () => setState(() => _settingsOpen = false))
-                  : const ConnectionScreen(),
+                  ? SettingsPage(
+                      onBack: () => setState(() => _settingsOpen = false),
+                    )
+                  : ConnectionScreen(
+                      onOpenSettings: () =>
+                          setState(() => _settingsOpen = true),
+                    ),
             ),
           ],
         ),
