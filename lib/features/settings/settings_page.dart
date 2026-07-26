@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -34,6 +36,19 @@ enum _SettingsSection {
   };
 }
 
+/// На Android нет ни автозапуска через реестр (`_SettingsSection.system`
+/// — `setAutoStartOnBoot` там тихо no-op), ни выбора TUN-ядра
+/// (`_SettingsSection.tun` — там всегда sing-box-специфичный список, а
+/// Android использует собственный `tun`-инбаунд xray-core, не sing-box
+/// вовсе, см. `xray_engine_android.dart`) — обе секции только путали бы.
+List<_SettingsSection> get _visibleSettingsSections => Platform.isAndroid
+    ? _SettingsSection.values
+          .where(
+            (s) => s != _SettingsSection.tun && s != _SettingsSection.system,
+          )
+          .toList()
+    : _SettingsSection.values;
+
 /// Настройки приложения — отдельная страница (заменяет `home` вместо
 /// `ConnectionScreen`, см. `FluxApp`), а не диалог: список секций разросся
 /// настолько, что диалог по центру окна уже не помещался по высоте.
@@ -65,40 +80,56 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final notifier = ref.read(appSettingsProvider.notifier);
     final mobile = isMobileLayout(context);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: PortColors.border)),
-          ),
-          child: Row(
-            children: [
-              PortIconButton.ghost(icon: const Icon(LucideIcons.arrowLeft), onPressed: widget.onBack),
-              const SizedBox(width: 8),
-              Text(S.settingsTitle, style: PortText.large),
-            ],
-          ),
-        ),
-        Expanded(
-          child: mobile
-              ? _buildMobileBody(settings, notifier)
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _SettingsNav(
-                      selected: _section,
-                      onSelect: (section) => setState(() => _section = section),
-                    ),
-                    Expanded(
-                      child: _buildSectionScroll(_section, settings, notifier),
-                    ),
-                  ],
+    // Без AppTitleBar (см. main.dart — его нет на Android) эта шапка сама
+    // становится первым, что рисуется сверху — SafeArea защищает её от
+    // статус-бара/чёлки, снаружи (не нужен на Windows: там всегда padding.top
+    // == 0, SafeArea там no-op).
+    return SafeArea(
+      bottom: false,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: PortColors.border)),
+            ),
+            child: Row(
+              children: [
+                PortIconButton.ghost(
+                  icon: const Icon(LucideIcons.arrowLeft),
+                  onPressed: widget.onBack,
                 ),
-        ),
-      ],
+                const SizedBox(width: 8),
+                Text(S.settingsTitle, style: PortText.large),
+              ],
+            ),
+          ),
+          Expanded(
+            child: mobile
+                ? _buildMobileBody(settings, notifier)
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _SettingsNav(
+                        sections: _visibleSettingsSections,
+                        selected: _section,
+                        onSelect: (section) =>
+                            setState(() => _section = section),
+                      ),
+                      Expanded(
+                        child: _buildSectionScroll(
+                          _section,
+                          settings,
+                          notifier,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -106,13 +137,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   /// помещаются на узких окнах (см. ROADMAP.md, трек 16), поэтому вместо
   /// бокового меню показываем либо список секций на весь экран, либо
   /// содержимое одной открытой секции со своей мини-шапкой "назад к списку".
-  Widget _buildMobileBody(AppSettings settings, AppSettingsController notifier) {
+  Widget _buildMobileBody(
+    AppSettings settings,
+    AppSettingsController notifier,
+  ) {
     final openSection = _mobileOpenSection;
     if (openSection == null) {
       return ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          for (final section in _SettingsSection.values)
+          for (final section in _visibleSettingsSections)
             _SettingsNavItem(
               section: section,
               selected: section == _section,
@@ -196,9 +230,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 }
               },
               options: [
-                PortSelectOption(value: AppThemeMode.dark, child: Text(S.themeDark)),
+                PortSelectOption(
+                  value: AppThemeMode.dark,
+                  child: Text(S.themeDark),
+                ),
               ],
-              selectedOptionBuilder: (context, value) => Text(_themeModeLabel(value)),
+              selectedOptionBuilder: (context, value) =>
+                  Text(_themeModeLabel(value)),
             ),
           ),
           const SizedBox(height: 12),
@@ -215,11 +253,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               // так принято в language-переключателях, не зависит от того,
               // на каком языке сейчас сам интерфейс.
               options: [
-                PortSelectOption(value: AppLanguage.system, child: Text(S.languageSystem)),
-                const PortSelectOption(value: AppLanguage.ru, child: Text('Русский')),
-                const PortSelectOption(value: AppLanguage.en, child: Text('English')),
+                PortSelectOption(
+                  value: AppLanguage.system,
+                  child: Text(S.languageSystem),
+                ),
+                const PortSelectOption(
+                  value: AppLanguage.ru,
+                  child: Text('Русский'),
+                ),
+                const PortSelectOption(
+                  value: AppLanguage.en,
+                  child: Text('English'),
+                ),
               ],
-              selectedOptionBuilder: (context, value) => Text(_languageLabel(value)),
+              selectedOptionBuilder: (context, value) =>
+                  Text(_languageLabel(value)),
             ),
           ),
           const SizedBox(height: 12),
@@ -233,8 +281,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 }
               },
               options: [
-                PortSelectOption(value: HomeBackground.none, child: Text(S.backgroundNone)),
-                PortSelectOption(value: HomeBackground.globe, child: Text(S.backgroundGlobe)),
+                PortSelectOption(
+                  value: HomeBackground.none,
+                  child: Text(S.backgroundNone),
+                ),
+                PortSelectOption(
+                  value: HomeBackground.globe,
+                  child: Text(S.backgroundGlobe),
+                ),
                 const PortSelectOption(
                   value: HomeBackground.simpleGradient,
                   child: Text('Simple Gradient'),
@@ -243,9 +297,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   value: HomeBackground.colorBends,
                   child: Text('Color Bends'),
                 ),
-                const PortSelectOption(value: HomeBackground.galaxy, child: Text('Galaxy')),
+                const PortSelectOption(
+                  value: HomeBackground.galaxy,
+                  child: Text('Galaxy'),
+                ),
               ],
-              selectedOptionBuilder: (context, value) => Text(_homeBackgroundLabel(value)),
+              selectedOptionBuilder: (context, value) =>
+                  Text(_homeBackgroundLabel(value)),
             ),
           ),
         ],
@@ -263,11 +321,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 }
               },
               options: [
-                PortSelectOption(value: PingMode.viaProxy, child: Text(S.throughProxy)),
+                PortSelectOption(
+                  value: PingMode.viaProxy,
+                  child: Text(S.throughProxy),
+                ),
                 const PortSelectOption(value: PingMode.tcp, child: Text('TCP')),
-                const PortSelectOption(value: PingMode.icmp, child: Text('ICMP')),
+                const PortSelectOption(
+                  value: PingMode.icmp,
+                  child: Text('ICMP'),
+                ),
               ],
-              selectedOptionBuilder: (context, value) => Text(_pingModeLabel(value)),
+              selectedOptionBuilder: (context, value) =>
+                  Text(_pingModeLabel(value)),
             ),
           ),
           const SizedBox(height: 12),
@@ -309,9 +374,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 }
               },
               options: const [
-                PortSelectOption(value: TunCoreType.singBox, child: Text('sing-box')),
+                PortSelectOption(
+                  value: TunCoreType.singBox,
+                  child: Text('sing-box'),
+                ),
               ],
-              selectedOptionBuilder: (context, value) => Text(_tunCoreTypeLabel(value)),
+              selectedOptionBuilder: (context, value) =>
+                  Text(_tunCoreTypeLabel(value)),
             ),
           ),
           const SizedBox(height: 12),
@@ -366,12 +435,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 }
               },
               options: [
-                PortSelectOption(value: CoreLogLevel.error, child: Text(S.logErrorsOnly)),
-                PortSelectOption(value: CoreLogLevel.warn, child: Text(S.logWarnings)),
-                PortSelectOption(value: CoreLogLevel.info, child: Text(S.logDetailed)),
-                PortSelectOption(value: CoreLogLevel.debug, child: Text(S.logDebug)),
+                PortSelectOption(
+                  value: CoreLogLevel.error,
+                  child: Text(S.logErrorsOnly),
+                ),
+                PortSelectOption(
+                  value: CoreLogLevel.warn,
+                  child: Text(S.logWarnings),
+                ),
+                PortSelectOption(
+                  value: CoreLogLevel.info,
+                  child: Text(S.logDetailed),
+                ),
+                PortSelectOption(
+                  value: CoreLogLevel.debug,
+                  child: Text(S.logDebug),
+                ),
               ],
-              selectedOptionBuilder: (context, value) => Text(_logLevelLabel(value)),
+              selectedOptionBuilder: (context, value) =>
+                  Text(_logLevelLabel(value)),
             ),
           ),
           const SizedBox(height: 6),
@@ -432,10 +514,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 }
 
 class _SettingsNav extends StatelessWidget {
+  final List<_SettingsSection> sections;
   final _SettingsSection selected;
   final ValueChanged<_SettingsSection> onSelect;
 
-  const _SettingsNav({required this.selected, required this.onSelect});
+  const _SettingsNav({
+    required this.sections,
+    required this.selected,
+    required this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -448,7 +535,7 @@ class _SettingsNav extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final section in _SettingsSection.values)
+          for (final section in sections)
             _SettingsNavItem(
               section: section,
               selected: section == selected,
@@ -554,8 +641,7 @@ class _AboutSection extends ConsumerWidget {
     };
   }
 
-  String _appVersionText(AboutInfo info) =>
-      info.buildNumber.isEmpty
+  String _appVersionText(AboutInfo info) => info.buildNumber.isEmpty
       ? info.appVersion
       : '${info.appVersion} (${S.buildNumberSuffix(info.buildNumber)})';
 

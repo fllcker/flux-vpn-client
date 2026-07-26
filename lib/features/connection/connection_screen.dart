@@ -25,7 +25,12 @@ import 'connect_panel.dart';
 /// Главный экран: список серверов слева, справа — карточка подключения
 /// либо (если выбрана подписка в списке) информация о ней.
 class ConnectionScreen extends ConsumerStatefulWidget {
-  const ConnectionScreen({super.key});
+  /// Плавающая кнопка настроек в мобильной раскладке (см. `build`) — на
+  /// Android нет `AppTitleBar` (десктопный тайтлбар, см. `main.dart`), это
+  /// единственный путь туда. `null` на десктопе, там открывает `AppTitleBar`.
+  final VoidCallback? onOpenSettings;
+
+  const ConnectionScreen({super.key, this.onOpenSettings});
 
   @override
   ConsumerState<ConnectionScreen> createState() => _ConnectionScreenState();
@@ -59,7 +64,10 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
         .where((s) => s.autoRefreshOnStartup);
     final autoGroup = ref.read(appSettingsProvider).autoGroupSubscriptions;
     for (final subscription in subscriptions) {
-      final result = await refreshSubscription(subscription, autoGroup: autoGroup);
+      final result = await refreshSubscription(
+        subscription,
+        autoGroup: autoGroup,
+      );
       if (!mounted) return;
       if (result case SubscriptionImportResultOk(:final subscription)) {
         ref.read(coreConfigProvider.notifier).updateSubscription(subscription);
@@ -98,9 +106,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                       width: 620,
                       height: 620,
                       child: SphereGlobe(
-                        color: PortColors.primary.withValues(
-                          alpha: 0.45,
-                        ),
+                        color: PortColors.primary.withValues(alpha: 0.45),
                         markers: _selectedServerMarker(context, ref),
                         rotationController: _rotation,
                       ),
@@ -115,9 +121,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
               ),
             ),
             HomeBackground.colorBends => const Positioned.fill(
-              child: ShaderBackground(
-                assetPath: 'shaders/color_bends.frag',
-              ),
+              child: ShaderBackground(assetPath: 'shaders/color_bends.frag'),
             ),
             HomeBackground.galaxy => const Positioned.fill(
               child: ShaderBackground(assetPath: 'shaders/galaxy.frag'),
@@ -125,8 +129,9 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
           },
         switch (rightPanelView) {
           ConnectView() => const ConnectPanel(),
-          SubscriptionInfoView(:final subscriptionId) =>
-            SubscriptionInfoPanel(subscriptionId: subscriptionId),
+          SubscriptionInfoView(:final subscriptionId) => SubscriptionInfoPanel(
+            subscriptionId: subscriptionId,
+          ),
         },
       ],
     );
@@ -141,17 +146,33 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
           // прячется за кнопкой и открывается снизу листом
           // (`showPortBottomSheet`).
           if (constraints.maxWidth < kMobileBreakpoint) {
+            final onOpenSettings = widget.onOpenSettings;
+            // Без AppTitleBar (см. main.dart — его нет на Android) кнопки
+            // висят прямо под системным статус-баром/чёлкой, если не
+            // добавить его высоту явно — `mainContent` (фон/глобус) при этом
+            // должен оставаться на весь экран, поэтому SafeArea оборачивает
+            // только сами кнопки, а не весь Stack.
+            final topInset = MediaQuery.of(context).padding.top + 12;
             return Stack(
               children: [
                 mainContent,
                 Positioned(
-                  top: 12,
+                  top: topInset,
                   left: 12,
                   child: PortIconButton.secondary(
                     icon: const Icon(LucideIcons.list),
                     onPressed: () => openServerListSheet(context),
                   ),
                 ),
+                if (onOpenSettings != null)
+                  Positioned(
+                    top: topInset,
+                    right: 12,
+                    child: PortIconButton.secondary(
+                      icon: const Icon(LucideIcons.settings),
+                      onPressed: onOpenSettings,
+                    ),
+                  ),
               ],
             );
           }

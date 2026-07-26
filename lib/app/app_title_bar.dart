@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/widgets.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:window_manager/window_manager.dart';
@@ -27,6 +29,7 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
   @override
   void initState() {
     super.initState();
+    if (!Platform.isWindows) return;
     windowManager.addListener(this);
     windowManager.isMaximized().then((value) {
       if (mounted) setState(() => _maximized = value);
@@ -35,7 +38,7 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
 
   @override
   void dispose() {
-    windowManager.removeListener(this);
+    if (Platform.isWindows) windowManager.removeListener(this);
     super.dispose();
   }
 
@@ -47,6 +50,23 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
 
   @override
   Widget build(BuildContext context) {
+    final titleRow = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          Image.asset(
+            'assets/icon.png',
+            width: 20,
+            height: 20,
+            color: PortColors.foreground,
+            colorBlendMode: BlendMode.srcIn,
+          ),
+          const SizedBox(width: 8),
+          Text('Flux', style: PortText.small),
+        ],
+      ),
+    );
+
     return Container(
       height: 40,
       decoration: BoxDecoration(
@@ -55,25 +75,15 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
       ),
       child: Row(
         children: [
+          // DragToMoveArea/minimize/maximize/close — окно с рамкой и
+          // системными кнопками есть только на десктопе (см. main.dart,
+          // `TitleBarStyle.hidden` — кастомный тайтлбар вместо системного).
+          // На Android своя навигация (жест "назад"/системная панель),
+          // window_manager там не зарегистрирован вообще.
           Expanded(
-            child: DragToMoveArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  children: [
-                    Image.asset(
-                      'assets/icon.png',
-                      width: 20,
-                      height: 20,
-                      color: PortColors.foreground,
-                      colorBlendMode: BlendMode.srcIn,
-                    ),
-                    const SizedBox(width: 8),
-                    Text('Flux', style: PortText.small),
-                  ],
-                ),
-              ),
-            ),
+            child: Platform.isWindows
+                ? DragToMoveArea(child: titleRow)
+                : titleRow,
           ),
           _TitleBarButton(
             icon: widget.settingsOpen ? LucideIcons.x : LucideIcons.settings,
@@ -81,26 +91,28 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
             active: widget.settingsOpen,
             onPressed: widget.onToggleSettings,
           ),
-          _TitleBarButton(
-            icon: LucideIcons.minus,
-            onPressed: () => windowManager.minimize(),
-          ),
-          _TitleBarButton(
-            icon: _maximized ? LucideIcons.copy : LucideIcons.square,
-            iconSize: _maximized ? 13 : 12,
-            onPressed: () => windowManager.isMaximized().then((maximized) {
-              if (maximized) {
-                windowManager.unmaximize();
-              } else {
-                windowManager.maximize();
-              }
-            }),
-          ),
-          _TitleBarButton(
-            icon: LucideIcons.x,
-            hoverColor: const Color(0xFFEF4444),
-            onPressed: () => windowManager.close(),
-          ),
+          if (Platform.isWindows) ...[
+            _TitleBarButton(
+              icon: LucideIcons.minus,
+              onPressed: () => windowManager.minimize(),
+            ),
+            _TitleBarButton(
+              icon: _maximized ? LucideIcons.copy : LucideIcons.square,
+              iconSize: _maximized ? 13 : 12,
+              onPressed: () => windowManager.isMaximized().then((maximized) {
+                if (maximized) {
+                  windowManager.unmaximize();
+                } else {
+                  windowManager.maximize();
+                }
+              }),
+            ),
+            _TitleBarButton(
+              icon: LucideIcons.x,
+              hoverColor: const Color(0xFFEF4444),
+              onPressed: () => windowManager.close(),
+            ),
+          ],
         ],
       ),
     );
