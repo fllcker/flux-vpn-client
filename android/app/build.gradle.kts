@@ -18,7 +18,9 @@ android {
         applicationId = "rip.freeinternet.flux"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // libv2ray.aar (tool/android-xray-lite) was built with -androidapi 24 —
+        // must not go below that.
+        minSdk = maxOf(flutter.minSdkVersion, 24)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -41,4 +43,17 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+// libv2ray.aar — xray-core built for Android via gomobile bind, see
+// tool/android-xray-lite/README.md for how to (re)produce it. Not fetched
+// automatically like the Windows binaries (scripts/fetch_xray.ps1) yet —
+// gomobile builds take too long to do on every CI run, revisit once Android
+// CI exists.
+repositories {
+    flatDir { dirs("libs") }
+}
+
+dependencies {
+    implementation(":libv2ray@aar")
 }

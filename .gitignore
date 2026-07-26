@@ -53,3 +53,12 @@ app.*.map.json
 # git (see assets/sing-box/SOURCE.md).
 /assets/sing-box/*
 !/assets/sing-box/SOURCE.md
+
+# libv2ray.aar (xray-core for Android) — built by scripts/build_android_xray.ps1,
+# not checked into git (see android/app/libs/SOURCE.md).
+/android/app/libs/*
+!/android/app/libs/SOURCE.md
+
+# Clone of 2dust/AndroidLibXrayLite that scripts/build_android_xray.ps1 builds
+# against — not our code, not checked into git.
+/tool/android-xray-lite/src/
