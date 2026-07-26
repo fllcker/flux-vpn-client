@@ -605,7 +605,7 @@ class _AboutSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final info = ref.watch(aboutInfoProvider);
 
-    return switch (info) {
+    final infoRows = switch (info) {
       AsyncData(:final value) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -626,6 +626,25 @@ class _AboutSection extends ConsumerWidget {
         ],
       ),
     };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        infoRows,
+        const SizedBox(height: 16),
+        // Сбрасывает только сам флаг (`onboardingCompleted: false`) — сам
+        // визард ничего не знает про "запущено из настроек" vs "первый
+        // запуск", main.dart реактивно подменит эту же SettingsPage на
+        // OnboardingFlow при следующей перестройке (см. main.dart).
+        PortButton.outline(
+          onPressed: () => ref
+              .read(appSettingsProvider.notifier)
+              .update((s) => s.copyWith(onboardingCompleted: false)),
+          leading: const Icon(LucideIcons.compass, size: 14),
+          child: Text(S.redoOnboardingLabel),
+        ),
+      ],
+    );
   }
 
   String _appVersionText(AboutInfo info) => info.buildNumber.isEmpty

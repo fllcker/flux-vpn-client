@@ -39,6 +39,17 @@ class ProxyTreeList extends ConsumerWidget {
   // `nodes` этого же уровня, но сама группа-владелец недоступна отсюда без
   // явной передачи id.
   final String? parentGroupId;
+  // Id всех групп-предков узлов этого уровня (от корня дерева до
+  // [parentGroupId] включительно) — нужен только для drag-n-drop: без него
+  // можно перетащить группу внутрь её же собственного потомка (в том числе
+  // в её же собственный список детей или на его trailing-зону). Само
+  // сохранение (`moveNodeInTree`, core_config_provider.dart) от такой
+  // перестановки уже защищено порядком операций (извлекает узел из дерева
+  // раньше, чем ищет целевую группу, так что self/потомок там просто не
+  // найдётся) — но `DragTarget` без этой проверки всё равно ПОКАЗЫВАЕТ
+  // приём дропа (подсветку), хотя по факту ничего не изменится, что
+  // выглядит как баг с точки зрения жеста, а не только данных.
+  final List<String> ancestorGroupIds;
   final void Function(String groupId, List<ServerLeaf> leavesInGroup)?
   onSelectAuto;
   // Драг-н-дрой сортировки (см. ROADMAP.md, трек 6): dragged node id, id
@@ -65,6 +76,7 @@ class ProxyTreeList extends ConsumerWidget {
     this.latencyForLeaf,
     this.pingingLeafIds = const {},
     this.parentGroupId,
+    this.ancestorGroupIds = const [],
     this.onSelectAuto,
     this.onReorder,
   });
@@ -115,6 +127,7 @@ class ProxyTreeList extends ConsumerWidget {
                     latencyForLeaf: latencyForLeaf,
                     pingingLeafIds: pingingLeafIds,
                     parentGroupId: group.id,
+                    ancestorGroupIds: [...ancestorGroupIds, group.id],
                     onSelectAuto: onSelectAuto,
                     onReorder: onReorder,
                   ),
@@ -180,6 +193,7 @@ class ProxyTreeList extends ConsumerWidget {
           },
         if (onReorder != null)
           _TrailingDropZone(
+            onWillAccept: (draggedId) => !ancestorGroupIds.contains(draggedId),
             onAccept: (draggedId) =>
                 onReorder!(draggedId, ownParentId, nodes.length),
           ),
@@ -199,7 +213,13 @@ class ProxyTreeList extends ConsumerWidget {
     if (onReorder == null) return child;
 
     return DragTarget<String>(
-      onWillAcceptWithDetails: (details) => details.data != nodeId,
+      // details.data != nodeId — не дропать узел сам на себя (не меняет
+      // порядок, no-op). !ancestorGroupIds.contains — не дать перетащить
+      // группу-предка внутрь одного из её же потомков (сюда попадает и
+      // сама группа этого узла, если nodeId — id группы: см.
+      // ancestorGroupIds в конструкторе ProxyTreeList).
+      onWillAcceptWithDetails: (details) =>
+          details.data != nodeId && !ancestorGroupIds.contains(details.data),
       onAcceptWithDetails: (details) => onAccept(details.data),
       builder: (context, candidateData, rejectedData) {
         final hovering = candidateData.isNotEmpty;
@@ -245,12 +265,16 @@ class ProxyTreeList extends ConsumerWidget {
 /// Полоса-приёмник в конце списка узлов одного уровня — дроп на неё
 /// добавляет перетаскиваемый узел последним элементом этого уровня.
 class _TrailingDropZone extends StatelessWidget {
+  final bool Function(String draggedId)? onWillAccept;
   final void Function(String draggedId) onAccept;
-  const _TrailingDropZone({required this.onAccept});
+  const _TrailingDropZone({this.onWillAccept, required this.onAccept});
 
   @override
   Widget build(BuildContext context) {
     return DragTarget<String>(
+      onWillAcceptWithDetails: onWillAccept == null
+          ? null
+          : (details) => onWillAccept!(details.data),
       onAcceptWithDetails: (details) => onAccept(details.data),
       builder: (context, candidateData, rejectedData) {
         final hovering = candidateData.isNotEmpty;

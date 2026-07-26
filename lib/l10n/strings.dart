@@ -227,4 +227,34 @@ abstract final class S {
       : 'Добавлено: $added, обновлено: $updated';
   static String serversFromMagicJson(int count) =>
       _en ? 'Servers from Magic JSON: $count' : 'Серверов из Magic JSON: $count';
+
+  // onboarding_flow.dart / onboarding_steps.dart
+  static String get onboardingWelcomeTitle =>
+      _en ? 'Welcome to Flux' : 'Добро пожаловать в Flux';
+  static String get onboardingWelcomeSubtitle => _en
+      ? "Want to set a few things up, or just get started with the recommended defaults?"
+      : 'Хочешь кое-что настроить, или сразу начать с рекомендованными параметрами?';
+  static String get onboardingCustomize => _en ? 'Customize' : 'Настроить';
+  static String get onboardingSkip => _en ? 'Skip' : 'Пропустить';
+  static String get onboardingBackgroundTitle =>
+      _en ? 'Pick a background' : 'Выбери фон';
+  static String get onboardingLanguageTitle =>
+      _en ? 'Pick a language' : 'Выбери язык';
+  static String get onboardingAutostartTitle =>
+      _en ? 'Launch on Windows startup?' : 'Запускать при старте Windows?';
+  static String get onboardingAutostartCaption => _en
+      ? 'Flux will start minimized to the tray when Windows boots — you can change this later in Settings.'
+      : 'Flux будет запускаться свёрнутым в трей при загрузке Windows — это всегда можно поменять в настройках.';
+  static String get onboardingGuideTitle =>
+      _en ? 'Grouping and reordering' : 'Группировка и сортировка';
+  static String get onboardingGuideCaption => _en
+      ? 'Servers can be grouped into folders — tap the group below to expand it. You can also drag any row to reorder the list. Try it out!'
+      : 'Серверы можно группировать в папки — тапни по группе ниже, чтобы развернуть. А ещё любую строку можно перетащить, чтобы поменять порядок. Попробуй!';
+  static String get onboardingBack => _en ? 'Back' : 'Назад';
+  static String get onboardingNext => _en ? 'Next' : 'Далее';
+  static String get onboardingDone => _en ? 'Get started' : 'Готово';
+
+  // settings_page.dart — кнопка в разделе "О программе"
+  static String get redoOnboardingLabel =>
+      _en ? 'Redo initial setup' : 'Пройти настройку заново';
 }

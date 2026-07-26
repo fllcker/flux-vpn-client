@@ -80,10 +80,36 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # --generate-notes даёт только "What's Changed"/"New Contributors" и не
+          # позволяет ничего добавить перед ними — вместо этого зовём тот же
+          # generate-notes API вручную, приклеиваем свой гайд впереди и передаём
+          # готовый файл через --notes-file.
+          $generated = gh api "repos/$env:GITHUB_REPOSITORY/releases/generate-notes" -f "tag_name=v$env:VERSION" --jq .body
+
+          # Однокавычный here-string (литеральный) — не хотим, чтобы PowerShell
+          # трогал бэктики в markdown-инлайн-коде как escape-последовательности;
+          # версию подставляем потом через -replace.
+          $guideTemplate = @'
+          ## 📥 Гайд по установке
+
+          ### Windows
+          - `FluxSetup-__VERSION__.exe` — обычный установщик, самый простой вариант для большинства пользователей.
+          - `Flux-__VERSION__-windows-portable.zip` — портативная версия: распакуйте архив и запускайте `flux.exe` напрямую, ничего не устанавливая в систему.
+
+          ### Android
+          - `Flux-__VERSION__-android.apk` — скачайте и установите APK-файл (может понадобиться разрешить установку из неизвестных источников в настройках телефона).
+
+          ---
+
+          '@
+          $guide = $guideTemplate -replace '__VERSION__', $env:VERSION
+
+          ($guide + $generated) | Out-File -FilePath release_notes.md -Encoding utf8
+
           gh release create "v$env:VERSION" `
             --repo $env:GITHUB_REPOSITORY `
             --title "v$env:VERSION" `
-            --generate-notes `
+            --notes-file release_notes.md `
             "build\installer\Flux-$env:VERSION-windows-portable.zip" `
             "build\installer\FluxSetup-$env:VERSION.exe"
 

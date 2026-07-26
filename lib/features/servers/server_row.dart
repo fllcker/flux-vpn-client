@@ -106,64 +106,83 @@ class _ServerRowState extends State<ServerRow> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           curve: Curves.easeOut,
+          // Тот же отступ, что и у _GroupRow/_AutoRow (без него) — бар
+          // выбора раньше был Row-соседом иконки и сам занимал 3+10=13px,
+          // сдвигая иконку сервера правее иконок группы/"Авто" на одном
+          // уровне вложенности (и заодно от заголовка подписки, который
+          // ориентируется на ту же базовую отметку). Теперь бар — оверлей
+          // в Stack ниже, из потока Row выведен, иконка больше не сдвинута.
           padding: EdgeInsets.fromLTRB(10 + 14.0 * widget.depth, 8, 10, 8),
           decoration: BoxDecoration(
             color: background,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Row(
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                width: 3,
-                height: hasVariantChoice ? 28 : 20,
-                decoration: BoxDecoration(
-                  color: widget.selected
-                      ? PortColors.primary
-                      : const Color(0x00000000),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 10),
-              ServerIcon(icon: widget.leaf.icon, size: 26),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      widget.leaf.name,
-                      style: PortText.small,
-                      overflow: TextOverflow.ellipsis,
+              Positioned(
+                // Заезжает в отступ контейнера слева от иконки — не в
+                // Row-поток, поэтому не сдвигает остальной контент.
+                left: -13,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: 3,
+                    height: hasVariantChoice ? 28 : 20,
+                    decoration: BoxDecoration(
+                      color: widget.selected
+                          ? PortColors.primary
+                          : const Color(0x00000000),
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    if (hasVariantChoice)
-                      Text(
-                        widget.leaf.activeVariant?.label ?? '',
-                        style: PortText.muted.copyWith(
-                          fontSize: 11,
-                          height: 1,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                  ],
+                  ),
                 ),
               ),
-              if (widget.onPing != null)
-                _PingIndicator(
-                  latencyMs: widget.latencyMs,
-                  pinging: widget.pinging,
-                  onPing: widget.onPing!,
-                ),
-              if (hasVariantChoice)
-                Icon(
-                  widget.expanded
-                      ? LucideIcons.chevronUp
-                      : LucideIcons.chevronDown,
-                  size: 14,
-                  color: PortColors.mutedForeground,
-                ),
-              ?trailing,
+              Row(
+                children: [
+                  ServerIcon(icon: widget.leaf.icon, size: 26),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          widget.leaf.name,
+                          style: PortText.small,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (hasVariantChoice)
+                          Text(
+                            widget.leaf.activeVariant?.label ?? '',
+                            style: PortText.muted.copyWith(
+                              fontSize: 11,
+                              height: 1,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (widget.onPing != null)
+                    _PingIndicator(
+                      latencyMs: widget.latencyMs,
+                      pinging: widget.pinging,
+                      onPing: widget.onPing!,
+                    ),
+                  if (hasVariantChoice)
+                    Icon(
+                      widget.expanded
+                          ? LucideIcons.chevronUp
+                          : LucideIcons.chevronDown,
+                      size: 14,
+                      color: PortColors.mutedForeground,
+                    ),
+                  ?trailing,
+                ],
+              ),
             ],
           ),
         ),

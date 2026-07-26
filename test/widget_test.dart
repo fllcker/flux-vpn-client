@@ -127,5 +127,8 @@ class _PresetAppSettingsController extends AppSettingsController {
   AppSettings build() => const AppSettings(
     homeBackground: HomeBackground.globe,
     language: AppLanguage.ru,
+    // Иначе виджет-тесты вместо ConnectionScreen увидели бы OnboardingFlow
+    // (дефолт конструктора — false, см. app_settings.dart) и падали.
+    onboardingCompleted: true,
   );
 }

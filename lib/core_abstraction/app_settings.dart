@@ -75,6 +75,16 @@ class AppSettings {
   /// запусками.
   final String? lastSelectedServerId;
 
+  /// Первый запуск показывает онбординг (`lib/features/onboarding/`) вместо
+  /// `ConnectionScreen` — см. `main.dart`. Дефолт этого поля НАРОЧНО разный
+  /// между конструктором (`false`) и `fromJson` (`true`, см. ниже): если
+  /// одинаково завести `false` и там, и там, все уже существующие установки
+  /// (settings.json уже на диске у пользователей версии 1.1.0) увидят
+  /// онбординг из ниоткуда при обновлении — конструктор используется только
+  /// когда файла ещё вовсе не было (реально первый запуск), а `fromJson` —
+  /// когда файл есть, но поля в нём нет (апгрейд с версии до онбординга).
+  final bool onboardingCompleted;
+
   const AppSettings({
     this.themeMode = AppThemeMode.dark,
     this.language = AppLanguage.system,
@@ -88,6 +98,7 @@ class AppSettings {
     this.tunDnsServer = defaultTunDnsServer,
     this.coreLogLevel = CoreLogLevel.warn,
     this.lastSelectedServerId,
+    this.onboardingCompleted = false,
   });
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -127,6 +138,10 @@ class AppSettings {
       CoreLogLevel.warn,
     ),
     lastSelectedServerId: json['lastSelectedServerId'] as String?,
+    // ?? true, не ?? false — см. комментарий у поля: отсутствие ключа тут
+    // значит "апгрейд с версии, где онбординга не было", а не "первый
+    // запуск" (тот идёт через конструктор напрямую, когда файла нет вовсе).
+    onboardingCompleted: json['onboardingCompleted'] as bool? ?? true,
   );
 
   Map<String, dynamic> toJson() => {
@@ -142,6 +157,7 @@ class AppSettings {
     'tunDnsServer': tunDnsServer,
     'coreLogLevel': coreLogLevel.name,
     if (lastSelectedServerId != null) 'lastSelectedServerId': lastSelectedServerId,
+    'onboardingCompleted': onboardingCompleted,
   };
 
   AppSettings copyWith({
@@ -157,6 +173,7 @@ class AppSettings {
     String? tunDnsServer,
     CoreLogLevel? coreLogLevel,
     String? lastSelectedServerId,
+    bool? onboardingCompleted,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -172,6 +189,7 @@ class AppSettings {
       tunDnsServer: tunDnsServer ?? this.tunDnsServer,
       coreLogLevel: coreLogLevel ?? this.coreLogLevel,
       lastSelectedServerId: lastSelectedServerId ?? this.lastSelectedServerId,
+      onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
     );
   }
 }

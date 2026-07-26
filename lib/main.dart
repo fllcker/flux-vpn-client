@@ -12,6 +12,7 @@ import 'app/tray.dart';
 import 'core_abstraction/app_settings.dart';
 import 'core_abstraction/app_settings_provider.dart';
 import 'features/connection/connection_screen.dart';
+import 'features/onboarding/onboarding_flow.dart';
 import 'features/servers/clipboard_import_hotkey.dart';
 import 'features/servers/import_subscription_sheet.dart';
 import 'features/settings/settings_page.dart';
@@ -251,7 +252,16 @@ class _FluxAppState extends ConsumerState<FluxApp>
                       setState(() => _settingsOpen = !_settingsOpen),
                 ),
               Expanded(
-                child: _settingsOpen
+                // Онбординг (первый запуск, `lib/features/onboarding/`)
+                // всегда приоритетнее Settings/ConnectionScreen — и на самом
+                // первом запуске, и когда юзер жмёт "Пройти настройку
+                // заново" в Settings (просто сбрасывает этот флаг, никакого
+                // отдельного роутинга для этого не нужно — реактивно
+                // подхватится тут же). Своя внутренняя PopScope-логика шага
+                // назад живёт в самом OnboardingFlow, не здесь.
+                child: !settings.onboardingCompleted
+                    ? const OnboardingFlow()
+                    : _settingsOpen
                     ? SettingsPage(
                         onBack: () => setState(() => _settingsOpen = false),
                       )
