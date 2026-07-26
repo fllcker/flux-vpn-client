@@ -1179,3 +1179,51 @@ SOCKS/HTTP, переиспользует существующие `_outbound`/`_
 идёт через VLESS-сервер, `direct`-правила по доменам срабатывают
 (проверено на `2ip.ru`) — живой тест пользователем подтвердил рабочее
 состояние.
+
+**Апдейт (Phase 4 — UI-адаптация под мобильную раскладку):**
+
+1. `windows_elevation.dart` (`DynamicLibrary.open('shell32.dll')`) падал
+   бы при первом же тапе на "TUN" на Android — `connect_panel.dart`
+   теперь ветвится по `Platform.isAndroid` до вызова `isRunningElevated()`
+   вообще. Селектор `OffProxyTunSelector` схлопнут в Off/On
+   (`simplifiedOnOff`) — сегмент "Proxy" скрыт, TUN-сегмент подписан "On"
+   и покрашен в зелёный (не в синий — так приятнее), оба сегмента шире,
+   чтобы не выглядеть неряшливо вдвоём вместо троих.
+2. `AppTitleBar` (drag-area, minimize/maximize/close — `window_manager`,
+   desktop-only) не рендерится на Android вообще (`main.dart`) — доступ к
+   настройкам вместо этого дают плавающей кнопкой-шестерёнкой сверху
+   справа в `ConnectionScreen` (мобильная раскладка), симметрично уже
+   существовавшей кнопке списка серверов слева. `SettingsPage` (у неё
+   своя шапка с "назад") и обе плавающие кнопки на `ConnectionScreen`
+   получили `SafeArea`/отступ на `MediaQuery.padding.top` — без
+   `AppTitleBar` они иначе рисуются прямо под статус-баром/чёлкой.
+3. `settings_page.dart`: секции "TUN" (там всегда список из одного
+   sing-box, а Android использует свой `tun`-инбаунд xray-core, не
+   sing-box вовсе) и "Система" (автозапуск — тихий no-op на Android, см.
+   `windows_autostart.dart`) скрыты через `_visibleSettingsSections`.
+4. `port_bottom_sheet.dart` (список серверов на мобильной раскладке) был
+   обычным `showGeneralDialog` без единого жеста — палец интуитивно тянет
+   такой лист вниз, а ничего не происходило. Добавили drag-to-dismiss, но
+   не на весь лист целиком: список внутри (`ServerListContent`, тот же
+   виджет, что и в десктопной `ServerListPanel`, трогать нельзя) сам
+   скроллящийся, и общий `GestureDetector` проигрывает гонку жестов
+   вложенному `Scrollable`. Пробовали ловить "докрутили до верха, тянут
+   дальше" через `NotificationListener<ScrollNotification>` +
+   `BouncingScrollPhysics` (чтобы получить `OverscrollNotification`) — не
+   сработало: списки в приложении почти всегда длиннее видимой области
+   листа, палец успевает просто проскроллить контент, не долетая до
+   overscroll за один свайп (подтверждено логами — ни разу не пришёл
+   `OverscrollNotification`, только `ScrollUpdateNotification`).
+   Остановились на отдельной полоске-ручке сверху (32px, с ручкой видимой
+   4px-полоской) — работает надёжно, устроило при живой проверке.
+5. `proxy_tree_list.dart`: drag-and-drop сервера/группы между узлами дерева
+   был на обычном `Draggable` — стартовал перетаскивание с первого же
+   движения пальца, на тачскрине это означало случайные сдвиги при
+   попытке просто скроллить/тапнуть. На `Platform.isAndroid ||
+   Platform.isIOS` заменили на `LongPressDraggable` (тот же виджет с
+   задержкой перед стартом) — десктопная мышь по-прежнему тащит сразу,
+   без изменений.
+
+Всё проверено живьём на Pixel 6a (`flutter analyze`/`flutter test`
+86/86 — тоже чисто, десктопный путь везде за `Platform.isWindows`/
+`Platform.isAndroid` не тронут).

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
@@ -133,6 +135,7 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
                 key: _selectorKey,
                 value: selection,
                 busy: busy,
+                simplifiedOnOff: Platform.isAndroid,
                 onChanged: (selection) => _onSelectionChanged(
                   context,
                   ref,
@@ -154,6 +157,25 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
     ConnectSelection selection,
   ) async {
     final controller = ref.read(connectionControllerProvider.notifier);
+
+    // Android: селектор уже схлопнут до Off/On (OffProxyTunSelector,
+    // simplifiedOnOff), и isRunningElevated()/windows_elevation.dart —
+    // Windows-only FFI (DynamicLibrary.open('shell32.dll')), падает на
+    // Android при первом вызове. Единственный реальный механизм там — TUN
+    // через VpnService (см. xray_engine_android.dart), поэтому режим всегда
+    // ConnectionMode.tun — это ещё и то, что реально отражает архитектуру
+    // (запрет пинга во время TUN и т.п. читают именно .mode).
+    if (Platform.isAndroid) {
+      switch (selection) {
+        case ConnectSelection.off:
+          await controller.disconnect();
+        case ConnectSelection.proxy:
+        case ConnectSelection.tun:
+          await controller.connectToServer(leaf, mode: ConnectionMode.tun);
+      }
+      return;
+    }
+
     switch (selection) {
       case ConnectSelection.off:
         await controller.disconnect();

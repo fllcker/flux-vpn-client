@@ -101,7 +101,10 @@ Future<void> _warmUpOverlays() async {
   final context = _navigatorKey.currentContext;
   if (context == null || !context.mounted) return;
 
-  showPortDialog(context: context, builder: (_) => const ImportSubscriptionSheet());
+  showPortDialog(
+    context: context,
+    builder: (_) => const ImportSubscriptionSheet(),
+  );
   await WidgetsBinding.instance.endOfFrame;
   final navigator = _navigatorKey.currentState;
   if (navigator != null && navigator.canPop()) {
@@ -219,14 +222,29 @@ class _FluxAppState extends ConsumerState<FluxApp>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AppTitleBar(
-              settingsOpen: _settingsOpen,
-              onToggleSettings: () => setState(() => _settingsOpen = !_settingsOpen),
-            ),
+            // Кастомный тайтлбар (drag-area, minimize/maximize/close) имеет
+            // смысл только для окна с рамкой — на Android об это спотыкались
+            // (см. ROADMAP.md, трек 19, Phase 4): вместо системной шторки
+            // сверху висела десктопная полоска с логотипом. SettingsPage
+            // сама себе шапка с кнопкой "назад" (см. settings_page.dart),
+            // так что тайтлбар не нужен и как единственный путь туда —
+            // на мобильной раскладке ConnectionScreen сама даёт плавающую
+            // кнопку настроек (`onOpenSettings`).
+            if (!Platform.isAndroid)
+              AppTitleBar(
+                settingsOpen: _settingsOpen,
+                onToggleSettings: () =>
+                    setState(() => _settingsOpen = !_settingsOpen),
+              ),
             Expanded(
               child: _settingsOpen
-                  ? SettingsPage(onBack: () => setState(() => _settingsOpen = false))
-                  : const ConnectionScreen(),
+                  ? SettingsPage(
+                      onBack: () => setState(() => _settingsOpen = false),
+                    )
+                  : ConnectionScreen(
+                      onOpenSettings: () =>
+                          setState(() => _settingsOpen = true),
+                    ),
             ),
           ],
         ),

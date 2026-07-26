@@ -7,9 +7,15 @@ enum ConnectSelection { off, proxy, tun }
 /// Трёхпозиционный переключатель режима подключения (см. PLAN.md, "Режимы
 /// подключения"). TUN требует прав администратора — запрос повышения прав
 /// обрабатывается на уровне ConnectPanel, не здесь.
+///
+/// На Android отдельного Proxy-механизма нет — Off/Proxy/TUN схлопывается в
+/// Off/On (см. ROADMAP.md, трек 19, Phase 4): [simplifiedOnOff] прячет
+/// сегмент "Proxy" и подписывает TUN-сегмент как "On". `onChanged` тогда
+/// вызывается только с [ConnectSelection.off]/[ConnectSelection.tun].
 class OffProxyTunSelector extends StatelessWidget {
   final ConnectSelection value;
   final bool busy;
+  final bool simplifiedOnOff;
   final ValueChanged<ConnectSelection> onChanged;
 
   const OffProxyTunSelector({
@@ -17,6 +23,7 @@ class OffProxyTunSelector extends StatelessWidget {
     required this.value,
     required this.busy,
     required this.onChanged,
+    this.simplifiedOnOff = false,
   });
 
   @override
@@ -34,20 +41,31 @@ class OffProxyTunSelector extends StatelessWidget {
             selected: value == ConnectSelection.off,
             enabled: !busy,
             label: 'Off',
+            // Два сегмента вместо трёх той же общей ширины смотрелись
+            // непропорционально узко — компенсируем увеличенным паддингом
+            // только здесь, десктопный трёхсегментный вид не трогаем.
+            horizontalPadding: simplifiedOnOff ? 40 : 18,
             onTap: () => onChanged(ConnectSelection.off),
           ),
-          _Segment(
-            selected: value == ConnectSelection.proxy,
-            enabled: !busy,
-            label: 'Proxy',
-            activeColor: const Color(0xFF4ADE80),
-            onTap: () => onChanged(ConnectSelection.proxy),
-          ),
+          if (!simplifiedOnOff)
+            _Segment(
+              selected: value == ConnectSelection.proxy,
+              enabled: !busy,
+              label: 'Proxy',
+              activeColor: const Color(0xFF4ADE80),
+              onTap: () => onChanged(ConnectSelection.proxy),
+            ),
           _Segment(
             selected: value == ConnectSelection.tun,
             enabled: !busy,
-            label: 'TUN',
-            activeColor: const Color(0xFF60A5FA),
+            label: simplifiedOnOff ? 'On' : 'TUN',
+            // "On" (Android) красится в зелёный — тот же акцент, что у
+            // Proxy на десктопе, смотрится приятнее синего для простого
+            // Off/On. TUN на десктопе остаётся синим, не трогаем.
+            activeColor: simplifiedOnOff
+                ? const Color(0xFF4ADE80)
+                : const Color(0xFF60A5FA),
+            horizontalPadding: simplifiedOnOff ? 40 : 18,
             onTap: () => onChanged(ConnectSelection.tun),
           ),
         ],
@@ -61,6 +79,7 @@ class _Segment extends StatelessWidget {
   final bool enabled;
   final String label;
   final Color? activeColor;
+  final double horizontalPadding;
   final VoidCallback onTap;
 
   const _Segment({
@@ -69,6 +88,7 @@ class _Segment extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.activeColor,
+    this.horizontalPadding = 18,
   });
 
   @override
@@ -86,7 +106,7 @@ class _Segment extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 10),
           decoration: BoxDecoration(
             color: selected ? PortColors.background : null,
             borderRadius: BorderRadius.circular(8),
