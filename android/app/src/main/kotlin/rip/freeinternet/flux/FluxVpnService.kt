@@ -71,6 +71,10 @@ class FluxVpnService : VpnService() {
             private set
 
         private fun requestTileUpdate(context: Context) {
+            // Обновляет уже забинженный (видимый в открытой шторке) инстанс
+            // напрямую — requestListeningState ниже его не трогает, см.
+            // doc-комментарий у FluxQuickTile.refreshIfListening.
+            FluxQuickTile.refreshIfListening()
             TileService.requestListeningState(
                 context,
                 ComponentName(context, FluxQuickTile::class.java),

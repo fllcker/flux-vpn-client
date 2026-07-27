@@ -21,9 +21,36 @@ import androidx.core.content.ContextCompat
  * показать этот диалог из TileService нельзя).
  */
 class FluxQuickTile : TileService() {
+    companion object {
+        // `TileService.requestListeningState()` (вызывается из
+        // `FluxVpnService` при смене `isRunning`) надёжно триггерит
+        // `onStartListening()` только на переход "не слушает → слушает" —
+        // если шторка уже открыта (плитка уже забинжена и слушает), система
+        // не считает это сменой состояния и не перевызывает
+        // `onStartListening`, поэтому плитка визуально не обновлялась, пока
+        // её не закрыть и открыть заново. Держим ссылку на реально живой
+        // (забинженный) инстанс и обновляем его напрямую в дополнение к
+        // `requestListeningState` — тот остаётся нужен для случая, когда
+        // шторка сейчас закрыта совсем (нет живого инстанса, но при
+        // следующем открытии `onStartListening` должен сразу показать
+        // актуальное состояние).
+        @Volatile
+        private var activeInstance: FluxQuickTile? = null
+
+        fun refreshIfListening() {
+            activeInstance?.updateTile()
+        }
+    }
+
     override fun onStartListening() {
         super.onStartListening()
+        activeInstance = this
         updateTile()
+    }
+
+    override fun onStopListening() {
+        if (activeInstance === this) activeInstance = null
+        super.onStopListening()
     }
 
     override fun onClick() {
