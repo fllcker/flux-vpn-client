@@ -7,9 +7,12 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../app/layout_breakpoints.dart';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
+import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config_provider.dart';
+import '../../core_abstraction/proxy_node.dart';
 import '../../engines/geo_assets.dart';
 import '../../engines/singbox/geo_ruleset_cache.dart';
+import '../../engines/xray/windows_elevation.dart';
 import '../../widgets/globe/country_centroids.dart';
 import '../../widgets/globe/shader_background.dart';
 import '../../widgets/globe/sphere_globe.dart';
@@ -23,6 +26,7 @@ import '../servers/server_icon.dart';
 import '../servers/server_list_panel.dart';
 import '../servers/subscription_import.dart';
 import 'connect_panel.dart';
+import 'connection_controller.dart';
 
 /// Главный экран: список серверов слева, справа — карточка подключения
 /// либо (если выбрана подписка в списке) информация о ней.
@@ -47,11 +51,25 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _autoRefreshSubscriptions();
-      _pingAllOnStartup();
-      _ensureGeoAssets();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _runStartupSequence());
+  }
+
+  /// Автоподключение (см. `_autoConnectOnStartup`) должно строго идти
+  /// последним — раньше эти вызовы не дожидались друг друга, что для
+  /// автоподключения небезопасно: пока `_autoRefreshSubscriptions()` ещё
+  /// пересобирает дерево, `lastSelectedServerId` может как раз исчезнуть/
+  /// замениться (см. трек 9), и автоконнект либо промахнётся мимо сервера,
+  /// либо подключится к тому, что через мгновение пропадёт. Прогрев
+  /// geoip/geosite (включая rule-set'ы, трек 21) — тоже до автоконнекта,
+  /// иначе первое TUN-подключение всё равно тормозит на ленивой конвертации.
+  /// `_pingAllOnStartup()` не трогает дерево/выбор — безопасно не ждать.
+  Future<void> _runStartupSequence() async {
+    _pingAllOnStartup();
+    await _autoRefreshSubscriptions();
+    if (!mounted) return;
+    await _ensureGeoAssets();
+    if (!mounted) return;
+    await _autoConnectOnStartup();
   }
 
   @override
@@ -101,6 +119,46 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
         ...leaf.routingRules,
     ];
     await pregenerateGeoRuleSets(allRoutingRules);
+  }
+
+  /// Windows-only (ROADMAP.md, трек 24) — Android и так всегда TUN через
+  /// VpnService, отдельного понятия автоподключения там нет. Вызывается
+  /// последним в `_runStartupSequence()`, когда дерево серверов и
+  /// `lastSelectedServerId` уже точно актуальны.
+  Future<void> _autoConnectOnStartup() async {
+    if (!Platform.isWindows) return;
+    final settings = ref.read(appSettingsProvider);
+    if (!settings.autoConnectOnStartup) return;
+
+    final serverId = ref.read(selectedServerIdProvider);
+    if (serverId == null) return;
+    ServerLeaf? leaf;
+    for (final candidate in flattenAllLeaves(ref.read(coreConfigProvider))) {
+      if (candidate.id == serverId) {
+        leaf = candidate;
+        break;
+      }
+    }
+    if (leaf == null) return;
+
+    // Откат на Proxy, если elevated-автозапуск почему-то не сработал
+    // (задачу удалили руками, UAC был отклонён и т.п.) — тихо, без ошибки:
+    // `TunBridgeEngine.start()` и так бросил бы `StateError` без прав
+    // администратора, но лучше подключиться в Proxy, чем не подключиться
+    // вовсе.
+    final mode = settings.autoConnectMode == ConnectionMode.tun && isRunningElevated()
+        ? ConnectionMode.tun
+        : ConnectionMode.proxy;
+
+    try {
+      await ref
+          .read(connectionControllerProvider.notifier)
+          .connectToServer(leaf, mode: mode);
+    } catch (_) {
+      // Реальный UI-фидбэк об ошибке автоподключения при скрытом окне —
+      // ROADMAP.md, трек 25 (уведомления). Тут — best-effort, не роняем
+      // экран из-за фонового автодействия при старте.
+    }
   }
 
   @override

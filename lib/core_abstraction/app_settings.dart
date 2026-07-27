@@ -1,3 +1,5 @@
+import 'connection_session.dart';
+
 /// Тема оформления — `system` следует настройке ОС, см. [AppSettings].
 enum AppThemeMode { system, light, dark }
 
@@ -21,6 +23,15 @@ enum PingMode { viaProxy, tcp, icmp }
 /// а не хардкод, чтобы второй вариант добавлялся без переписывания
 /// контроллера подключения.
 enum TunCoreType { singBox }
+
+/// Уровень привилегий автозапуска при входе в Windows — см. ROADMAP.md,
+/// трек 24. `standard` — обычный реестровый `HKCU\...\Run` (не требует
+/// прав администратора). `elevated` — Windows не даёт элевейтить процесс,
+/// запущенный из `Run`, без интерактивного UAC на каждый вход, поэтому это
+/// отдельный механизм — Scheduled Task с "Run with highest privileges" (см.
+/// `windows_autostart.dart`), нужен для автозапуска в TUN-режиме
+/// (`AppSettings.autoConnectMode`), раз TUN сам требует прав администратора.
+enum AppAutoStartPrivilege { none, standard, elevated }
 
 /// Подробность логов ядер. Значения общие для xray и sing-box, хотя называют
 /// они их по-разному — маппинг в [CoreLogLevel.singBoxName]/[xrayName].
@@ -67,7 +78,27 @@ class AppSettings {
   final String pingTestUrl;
   final bool pingAllOnStartup;
   final bool autoGroupSubscriptions;
-  final bool autoStartOnBoot;
+  final AppAutoStartPrivilege autoStartPrivilege;
+
+  /// Показывать окно при автозапуске — `false` (дефолт) означает окно
+  /// остаётся скрытым, приложение доступно только через трей (см.
+  /// ROADMAP.md, трек 24). Актуально только при `autoStartPrivilege !=
+  /// none` — сам по себе флаг ни на что не влияет.
+  final bool autoStartShowWindow;
+
+  /// Автоматически подключаться к последнему выбранному серверу
+  /// (`lastSelectedServerId`, трек 9) после запуска — не привязано к
+  /// автозапуску: работает и при обычном ручном запуске приложения.
+  final bool autoConnectOnStartup;
+
+  /// Режим для автоподключения — `tun` реально используется, только если
+  /// `autoStartPrivilege == elevated` (TUN требует прав администратора);
+  /// UI (`settings_page.dart`) ограничивает выбор соответственно, а
+  /// `connection_screen.dart` дополнительно подстраховывается на рантайме
+  /// (`isRunningElevated()`), откатываясь на `proxy`, если элевейтед-задача
+  /// автозапуска почему-то не сработала.
+  final ConnectionMode autoConnectMode;
+
   final TunCoreType tunCoreType;
 
   /// Апстрим-резолвер TUN-режима. В Proxy-режиме не используется намеренно:
@@ -108,7 +139,10 @@ class AppSettings {
     this.pingTestUrl = _defaultPingTestUrl,
     this.pingAllOnStartup = false,
     this.autoGroupSubscriptions = true,
-    this.autoStartOnBoot = false,
+    this.autoStartPrivilege = AppAutoStartPrivilege.none,
+    this.autoStartShowWindow = false,
+    this.autoConnectOnStartup = false,
+    this.autoConnectMode = ConnectionMode.proxy,
     this.tunCoreType = TunCoreType.singBox,
     this.tunDnsServer = defaultTunDnsServer,
     this.coreLogLevel = CoreLogLevel.warn,
@@ -142,7 +176,25 @@ class AppSettings {
     pingTestUrl: json['pingTestUrl'] as String? ?? _defaultPingTestUrl,
     pingAllOnStartup: json['pingAllOnStartup'] as bool? ?? false,
     autoGroupSubscriptions: json['autoGroupSubscriptions'] as bool? ?? true,
-    autoStartOnBoot: json['autoStartOnBoot'] as bool? ?? false,
+    autoStartPrivilege: json['autoStartPrivilege'] != null
+        ? _enumFromJson(
+            AppAutoStartPrivilege.values,
+            json['autoStartPrivilege'],
+            AppAutoStartPrivilege.none,
+          )
+        // Апгрейд с версии до этого трека — старое булево поле означало
+        // именно обычный (non-elevated) автозапуск, elevated тогда не
+        // существовал вовсе.
+        : ((json['autoStartOnBoot'] as bool?) == true
+              ? AppAutoStartPrivilege.standard
+              : AppAutoStartPrivilege.none),
+    autoStartShowWindow: json['autoStartShowWindow'] as bool? ?? false,
+    autoConnectOnStartup: json['autoConnectOnStartup'] as bool? ?? false,
+    autoConnectMode: _enumFromJson(
+      ConnectionMode.values,
+      json['autoConnectMode'],
+      ConnectionMode.proxy,
+    ),
     tunCoreType: _enumFromJson(
       TunCoreType.values,
       json['tunCoreType'],
@@ -171,7 +223,10 @@ class AppSettings {
     'pingTestUrl': pingTestUrl,
     'pingAllOnStartup': pingAllOnStartup,
     'autoGroupSubscriptions': autoGroupSubscriptions,
-    'autoStartOnBoot': autoStartOnBoot,
+    'autoStartPrivilege': autoStartPrivilege.name,
+    'autoStartShowWindow': autoStartShowWindow,
+    'autoConnectOnStartup': autoConnectOnStartup,
+    'autoConnectMode': autoConnectMode.name,
     'tunCoreType': tunCoreType.name,
     'tunDnsServer': tunDnsServer,
     'coreLogLevel': coreLogLevel.name,
@@ -189,7 +244,10 @@ class AppSettings {
     String? pingTestUrl,
     bool? pingAllOnStartup,
     bool? autoGroupSubscriptions,
-    bool? autoStartOnBoot,
+    AppAutoStartPrivilege? autoStartPrivilege,
+    bool? autoStartShowWindow,
+    bool? autoConnectOnStartup,
+    ConnectionMode? autoConnectMode,
     TunCoreType? tunCoreType,
     String? tunDnsServer,
     CoreLogLevel? coreLogLevel,
@@ -207,7 +265,10 @@ class AppSettings {
       pingAllOnStartup: pingAllOnStartup ?? this.pingAllOnStartup,
       autoGroupSubscriptions:
           autoGroupSubscriptions ?? this.autoGroupSubscriptions,
-      autoStartOnBoot: autoStartOnBoot ?? this.autoStartOnBoot,
+      autoStartPrivilege: autoStartPrivilege ?? this.autoStartPrivilege,
+      autoStartShowWindow: autoStartShowWindow ?? this.autoStartShowWindow,
+      autoConnectOnStartup: autoConnectOnStartup ?? this.autoConnectOnStartup,
+      autoConnectMode: autoConnectMode ?? this.autoConnectMode,
       tunCoreType: tunCoreType ?? this.tunCoreType,
       tunDnsServer: tunDnsServer ?? this.tunDnsServer,
       coreLogLevel: coreLogLevel ?? this.coreLogLevel,

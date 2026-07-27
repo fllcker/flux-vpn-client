@@ -1732,7 +1732,45 @@ URL подписки на рабочий домен (чтобы следующи
 
 ---
 
-## 24. Развитие автозапуска на Windows — не начато
+## 24. Развитие автозапуска на Windows — сделано
+
+**Реализовано** ровно по плану ниже: `AppSettings` → новый
+`AppAutoStartPrivilege { none, standard, elevated }` (мигрирует старое
+булево `autoStartOnBoot` при апгрейде: `true` → `standard`), плюс
+`autoStartShowWindow`/`autoConnectOnStartup`/`autoConnectMode`.
+`windows_autostart.dart` → `setAutoStartOnBoot({privilege, showWindow})`:
+`standard` — как раньше, реестровый `Run` (опционально без `--minimized`,
+если `showWindow: true`); `elevated` — `ShellExecute` verb `"runas"` на
+`schtasks.exe /create ... /rl highest /f` (Scheduled Task с "Run with
+highest privileges" — реестровый `Run` физически не может элевейтить без
+UAC на каждый вход); при любом переключении сначала чистятся оба
+механизма. `isElevatedAutoStartActuallyRegistered()` — `schtasks /query`
+(не требует elevation) для проверки постфактум, раз `ShellExecute` не
+сообщает результат синхронно (пользователь мог отклонить UAC) —
+`settings_page.dart` ждёт ~1.5с и показывает тост.
+
+`settings_page.dart`, секция "Система" — `PortSelect` "Автозапускать как"
+(Выключено/Обычный/С правами администратора), тумблер "Показывать окно при
+автозапуске" (виден только если автозапуск включён), тумблер
+"Автоматически подключаться при запуске" + `PortSelect` "Режим при
+автоподключении" (Proxy/TUN — вариант TUN в списке только при
+`elevated`-автозапуске).
+
+`connection_screen.dart` — `initState` переписан на последовательный
+`_runStartupSequence()`: пинг (не блокирует) → `await
+_autoRefreshSubscriptions()` → `await _ensureGeoAssets()` (прогрев
+rule-set'ов, трек 21) → только потом `_autoConnectOnStartup()` — раньше
+все три вызова не дожидались друг друга, для автоподключения это была бы
+гонка с ещё пересобираемым деревом серверов (трек 9). Автоподключение
+берёт `lastSelectedServerId`, откатывается на Proxy, если запрошен TUN, но
+`isRunningElevated()` возвращает `false` (elevated-автозапуск не сработал/
+задачу удалили руками) — тихо, без ошибки.
+
+Тесты — `test/core_abstraction/app_settings_test.dart` (миграция
+legacy-поля, round-trip новых полей, `copyWith`). `windows_autostart.dart`
+(реестр/schtasks/UAC) не юнит-тестируется — реальные системные
+side-effects; проверка автозапуска при реальном входе в Windows —
+пользователем вручную.
 
 **Текущее состояние:** `windows_autostart.dart` → `setAutoStartOnBoot(bool)`
 (трек 7) при включении безусловно пишет в реестр `"<exePath>" --minimized` —

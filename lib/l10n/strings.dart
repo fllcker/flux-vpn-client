@@ -144,6 +144,27 @@ abstract final class S {
   static String get autoStartLabel =>
       _en ? 'Start with Windows' : 'Запускать при старте Windows';
 
+  // settings_page.dart — автозапуск/автоподключение (трек 24)
+  static String get autoStartPrivilegeLabel =>
+      _en ? 'Start automatically as' : 'Автозапускать как';
+  static String get autoStartPrivilegeNone => _en ? 'Off' : 'Выключено';
+  static String get autoStartPrivilegeStandard => _en ? 'Regular' : 'Обычный';
+  static String get autoStartPrivilegeElevated =>
+      _en ? 'With administrator rights' : 'С правами администратора';
+  static String get autoStartShowWindowLabel =>
+      _en ? 'Show window on autostart' : 'Показывать окно при автозапуске';
+  static String get autoConnectOnStartupLabel =>
+      _en ? 'Connect automatically on startup' : 'Автоматически подключаться при запуске';
+  static String get autoConnectModeLabel =>
+      _en ? 'Autoconnect method' : 'Режим при автоподключении';
+  static String get elevatedAutoStartConfirmed =>
+      _en
+          ? 'Administrator autostart registered'
+          : 'Автозапуск с правами администратора зарегистрирован';
+  static String get elevatedAutoStartDeclined => _en
+      ? "Administrator autostart wasn't confirmed — UAC request may have been declined"
+      : 'Автозапуск с правами администратора не подтверждён — возможно, запрос UAC был отклонён';
+
   // settings_page.dart — логи
   static String get verbosityLabel => _en ? 'Verbosity' : 'Подробность';
   static String get logErrorsOnly => _en ? 'Errors only' : 'Только ошибки';

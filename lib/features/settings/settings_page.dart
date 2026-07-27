@@ -9,6 +9,7 @@ import '../../app/layout_breakpoints.dart';
 import '../../app/windows_autostart.dart';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
+import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config_provider.dart';
 import '../../engines/geo_assets.dart';
 import '../../engines/singbox/geo_ruleset_cache.dart';
@@ -447,13 +448,90 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         ],
       ),
-      _SettingsSection.system => PortSwitch(
-        value: settings.autoStartOnBoot,
-        label: Text(S.autoStartLabel),
-        onChanged: (value) {
-          setAutoStartOnBoot(value);
-          notifier.update((s) => s.copyWith(autoStartOnBoot: value));
-        },
+      _SettingsSection.system => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SettingRow(
+            label: S.autoStartPrivilegeLabel,
+            child: PortSelect<AppAutoStartPrivilege>(
+              initialValue: settings.autoStartPrivilege,
+              onChanged: (value) {
+                if (value == null) return;
+                _applyAutoStart(
+                  privilege: value,
+                  showWindow: settings.autoStartShowWindow,
+                  notifier: notifier,
+                );
+              },
+              options: [
+                PortSelectOption(
+                  value: AppAutoStartPrivilege.none,
+                  child: Text(S.autoStartPrivilegeNone),
+                ),
+                PortSelectOption(
+                  value: AppAutoStartPrivilege.standard,
+                  child: Text(S.autoStartPrivilegeStandard),
+                ),
+                PortSelectOption(
+                  value: AppAutoStartPrivilege.elevated,
+                  child: Text(S.autoStartPrivilegeElevated),
+                ),
+              ],
+              selectedOptionBuilder: (context, value) =>
+                  Text(_autoStartPrivilegeLabel(value)),
+            ),
+          ),
+          if (settings.autoStartPrivilege != AppAutoStartPrivilege.none) ...[
+            const SizedBox(height: 12),
+            PortSwitch(
+              value: settings.autoStartShowWindow,
+              label: Text(S.autoStartShowWindowLabel),
+              onChanged: (value) => _applyAutoStart(
+                privilege: settings.autoStartPrivilege,
+                showWindow: value,
+                notifier: notifier,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          PortSwitch(
+            value: settings.autoConnectOnStartup,
+            label: Text(S.autoConnectOnStartupLabel),
+            onChanged: (value) =>
+                notifier.update((s) => s.copyWith(autoConnectOnStartup: value)),
+          ),
+          if (settings.autoConnectOnStartup) ...[
+            const SizedBox(height: 12),
+            _SettingRow(
+              label: S.autoConnectModeLabel,
+              child: PortSelect<ConnectionMode>(
+                initialValue: settings.autoConnectMode,
+                onChanged: (value) {
+                  if (value != null) {
+                    notifier.update((s) => s.copyWith(autoConnectMode: value));
+                  }
+                },
+                options: [
+                  PortSelectOption(
+                    value: ConnectionMode.proxy,
+                    child: Text(S.throughProxy),
+                  ),
+                  // TUN требует прав администратора — доступен в выборе,
+                  // только если автозапуск настроен как elevated (иначе на
+                  // старте автоподключение всё равно откатится на Proxy,
+                  // см. connection_screen.dart).
+                  if (settings.autoStartPrivilege == AppAutoStartPrivilege.elevated)
+                    const PortSelectOption(
+                      value: ConnectionMode.tun,
+                      child: Text('TUN'),
+                    ),
+                ],
+                selectedOptionBuilder: (context, value) =>
+                    Text(value == ConnectionMode.tun ? 'TUN' : S.throughProxy),
+              ),
+            ),
+          ],
+        ],
       ),
       _SettingsSection.logs => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -505,6 +583,45 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       _SettingsSection.about => const _AboutSection(),
     };
   }
+
+  /// Применяет выбор автозапуска и сразу сохраняет его в `AppSettings` —
+  /// `setAutoStartOnBoot` синхронно чистит предыдущий механизм
+  /// (реестр/scheduled task) и настраивает новый. При `elevated`
+  /// `ShellExecute` не сообщает результат синхронно (пользователь мог
+  /// отклонить UAC) — через паузу проверяем реальное состояние задачи и
+  /// показываем тост.
+  void _applyAutoStart({
+    required AppAutoStartPrivilege privilege,
+    required bool showWindow,
+    required AppSettingsController notifier,
+  }) {
+    setAutoStartOnBoot(privilege: privilege, showWindow: showWindow);
+    notifier.update(
+      (s) => s.copyWith(autoStartPrivilege: privilege, autoStartShowWindow: showWindow),
+    );
+    if (privilege == AppAutoStartPrivilege.elevated) {
+      _confirmElevatedAutoStart();
+    }
+  }
+
+  Future<void> _confirmElevatedAutoStart() async {
+    await Future.delayed(const Duration(milliseconds: 1500));
+    final registered = await isElevatedAutoStartActuallyRegistered();
+    if (!mounted) return;
+    PortToaster.of(context).show(
+      PortToast(
+        title: Text(
+          registered ? S.elevatedAutoStartConfirmed : S.elevatedAutoStartDeclined,
+        ),
+      ),
+    );
+  }
+
+  String _autoStartPrivilegeLabel(AppAutoStartPrivilege privilege) => switch (privilege) {
+    AppAutoStartPrivilege.none => S.autoStartPrivilegeNone,
+    AppAutoStartPrivilege.standard => S.autoStartPrivilegeStandard,
+    AppAutoStartPrivilege.elevated => S.autoStartPrivilegeElevated,
+  };
 
   Future<void> _updateGeoAssets(BuildContext context, AppSettings settings) async {
     setState(() => _updatingGeoAssets = true);

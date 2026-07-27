@@ -238,11 +238,17 @@ class AutostartStep extends ConsumerWidget {
         const SizedBox(height: 20),
         Center(
           child: PortSwitch(
-            value: settings.autoStartOnBoot,
+            value: settings.autoStartPrivilege != AppAutoStartPrivilege.none,
             label: Text(S.autoStartLabel),
             onChanged: (value) {
-              setAutoStartOnBoot(value);
-              notifier.update((s) => s.copyWith(autoStartOnBoot: value));
+              final privilege = value
+                  ? AppAutoStartPrivilege.standard
+                  : AppAutoStartPrivilege.none;
+              setAutoStartOnBoot(
+                privilege: privilege,
+                showWindow: settings.autoStartShowWindow,
+              );
+              notifier.update((s) => s.copyWith(autoStartPrivilege: privilege));
             },
           ),
         ),
