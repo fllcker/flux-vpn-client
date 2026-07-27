@@ -32,3 +32,28 @@ Future<void> openFluxLogDirectory() async {
   final path = ensureFluxLogDirectory();
   await Process.start('explorer.exe', [path]);
 }
+
+/// Каталог geoip/geosite баз и сгенерированных из них sing-box rule-set'ов
+/// (ROADMAP.md, треки 20/21) — раньше эти файлы были вшиты в сборку рядом с
+/// `xray.exe`, теперь качаются в рантайме и живут вместе с остальными
+/// пользовательскими данными.
+Directory fluxGeoDirectory() => Directory('${fluxDataDirectoryPath()}\\geo');
+
+/// Создаёт каталог geoip/geosite, если его ещё нет, и возвращает путь — тот
+/// же паттерн, что и [ensureFluxLogDirectory].
+String ensureFluxGeoDirectory() {
+  final dir = fluxGeoDirectory();
+  dir.createSync(recursive: true);
+  return dir.path;
+}
+
+/// Каталог сгенерированных из geoip.dat/geosite.dat sing-box rule-set'ов
+/// (ROADMAP.md, трек 21, `lib/engines/singbox/geo_ruleset_cache.dart`) —
+/// подкаталог geoip/geosite, а не рядом с ним: это производные файлы,
+/// которые можно целиком удалить и перегенерировать, в отличие от самих
+/// `.dat`.
+String ensureFluxGeoRuleSetDirectory() {
+  final dir = Directory('${ensureFluxGeoDirectory()}\\rulesets');
+  dir.createSync(recursive: true);
+  return dir.path;
+}

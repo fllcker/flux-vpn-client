@@ -4,6 +4,7 @@ import 'dart:io';
 
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/server_config.dart';
+import '../../app/app_paths.dart';
 import '../../engines/xray/child_process_job.dart';
 import '../../engines/xray/xray_config_mapper.dart';
 import '../../engines/xray/xray_engine_windows.dart' show defaultXrayExecutablePath;
@@ -101,11 +102,11 @@ class PingService {
 
     Process? process;
     try {
-      process = await Process.start(defaultXrayExecutablePath(), [
-        'run',
-        '-c',
-        configFile.path,
-      ]);
+      process = await Process.start(
+        defaultXrayExecutablePath(),
+        ['run', '-c', configFile.path],
+        environment: {'XRAY_LOCATION_ASSET': ensureFluxGeoDirectory()},
+      );
       tieChildProcessLifetimeToApp(process);
       // Даём xray время поднять локальные инбаунды перед первым запросом.
       await Future.delayed(const Duration(milliseconds: 300));

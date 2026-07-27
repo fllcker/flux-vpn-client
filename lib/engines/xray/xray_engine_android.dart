@@ -21,7 +21,12 @@ import 'xray_config_mapper.dart';
 /// Вся связь с нативной стороной — один `MethodChannel`, объявленный в
 /// `MainActivity.kt`.
 class XrayEngineAndroid implements CoreEngine {
-  XrayEngineAndroid({required this.id, this.logLevel = CoreLogLevel.warn});
+  XrayEngineAndroid({
+    required this.id,
+    this.logLevel = CoreLogLevel.warn,
+    this.geoipUrl = defaultGeoipUrl,
+    this.geositeUrl = defaultGeositeUrl,
+  });
 
   static const _channel = MethodChannel('flux/vpn');
   // FluxVpnService (a Service, not a MethodChannel call) pushes async
@@ -36,6 +41,8 @@ class XrayEngineAndroid implements CoreEngine {
   CoreType get type => CoreType.xray;
 
   final CoreLogLevel logLevel;
+  final String geoipUrl;
+  final String geositeUrl;
 
   final _statusController = StreamController<EngineStatus>.broadcast();
   final _statsController = StreamController<EngineStats>.broadcast();
@@ -96,6 +103,8 @@ class XrayEngineAndroid implements CoreEngine {
       'configJson': jsonEncode(xrayConfig),
       'serverHost': serverIp,
       'mtu': 1500,
+      'geoipUrl': geoipUrl,
+      'geositeUrl': geositeUrl,
     });
 
     _statusController.add(EngineStatus.connected);

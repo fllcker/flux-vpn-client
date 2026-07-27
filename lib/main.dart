@@ -22,22 +22,39 @@ import 'widgets/port_ui/port_ui.dart';
 final _navigatorKey = GlobalKey<NavigatorState>();
 
 void main(List<String> args) async {
-  // Windows передаёт зарегистрированный `flux://...` URL как аргумент
-  // командной строки — как при первом запуске, так и при повторном клике по
-  // ссылке, пока приложение уже открыто (тогда ОС просто стартует второй
-  // процесс, который должен переслать ссылку первому и сразу выйти).
-  final initialDeepLink = extractFluxDeepLinkFromArgs(args);
-  final instance = await acquireSingleInstance(deepLink: initialDeepLink);
-  if (instance is SecondaryInstance) {
-    exit(0);
+  // Android-ветка ниже дёргает platform channel (см. deep_link.dart) —
+  // должно случиться после ensureInitialized(), поэтому он теперь первым
+  // делом, а не после разбора Windows-аргументов, как было раньше (там это
+  // было не важно — extractFluxDeepLinkFromArgs/acquireSingleInstance это
+  // голый dart:io, без Flutter-биндингов).
+  WidgetsFlutterBinding.ensureInitialized();
+
+  String? initialDeepLink;
+  Stream<String> incomingDeepLinks = const Stream.empty();
+
+  if (Platform.isAndroid) {
+    // Одна Activity с launchMode="singleTop" (AndroidManifest.xml) — ни
+    // второго процесса, ни loopback-IPC тут нет и не нужно, ОС сама
+    // переиспользует ту же Activity для повторных ссылок и присылает их
+    // через onNewIntent (MainActivity.kt).
+    initialDeepLink = await androidInitialDeepLink();
+    incomingDeepLinks = androidDeepLinkStream;
+  } else {
+    // Windows передаёт зарегистрированный `flux://...` URL как аргумент
+    // командной строки — как при первом запуске, так и при повторном клике по
+    // ссылке, пока приложение уже открыто (тогда ОС просто стартует второй
+    // процесс, который должен переслать ссылку первому и сразу выйти).
+    initialDeepLink = extractFluxDeepLinkFromArgs(args);
+    final instance = await acquireSingleInstance(deepLink: initialDeepLink);
+    if (instance is SecondaryInstance) {
+      exit(0);
+    }
+    incomingDeepLinks = (instance as PrimaryInstance).incomingDeepLinks;
   }
-  final incomingDeepLinks = (instance as PrimaryInstance).incomingDeepLinks;
   // Автозапуск при старте Windows передаёт этот флаг (см.
   // `windows_autostart.dart`), чтобы не мозолить окном при входе в систему —
   // окно остаётся скрытым, доступно через иконку в трее.
   final startMinimized = args.contains('--minimized');
-
-  WidgetsFlutterBinding.ensureInitialized();
 
   // window_manager/tray_manager have no Android implementation — calling
   // them there throws MissingPluginException. Was unguarded here (unlike

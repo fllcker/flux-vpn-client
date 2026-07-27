@@ -47,6 +47,15 @@ const _defaultPingTestUrl = 'https://www.gstatic.com/generate_204';
 /// `singbox_config_mapper.dart`.
 const defaultTunDnsServer = '8.8.8.8';
 
+/// URL по умолчанию для geoip/geosite — см. `lib/engines/geo_assets.dart` и
+/// ROADMAP.md, трек 20. Продублировано тут (а не импортировано оттуда) —
+/// `app_settings.dart` часть `core_abstraction/`, не должна тянуть зависимость
+/// на `lib/engines/`.
+const defaultGeoipUrl =
+    'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat';
+const defaultGeositeUrl =
+    'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat';
+
 /// Настройки приложения — отдельно от [CoreConfig] (серверы/подписки):
 /// это предпочтения интерфейса и поведения, не часть профиля, которым можно
 /// было бы поделиться. Хранятся в своём файле, см. `app_settings_storage.dart`.
@@ -67,6 +76,12 @@ class AppSettings {
   /// которая ни на что не влияет.
   final String tunDnsServer;
   final CoreLogLevel coreLogLevel;
+
+  /// Кастомные ссылки на `geoip.dat`/`geosite.dat` — см. ROADMAP.md, трек 20.
+  /// По умолчанию — тот же апстрим, что раньше неявно ехал внутри
+  /// `Xray-windows-64.zip`.
+  final String geoipUrl;
+  final String geositeUrl;
 
   /// Id последнего выбранного сервера (`ServerLeaf.id`) — предпочтение этой
   /// машины, не часть Magic JSON-профиля, которым можно поделиться (см.
@@ -97,6 +112,8 @@ class AppSettings {
     this.tunCoreType = TunCoreType.singBox,
     this.tunDnsServer = defaultTunDnsServer,
     this.coreLogLevel = CoreLogLevel.warn,
+    this.geoipUrl = defaultGeoipUrl,
+    this.geositeUrl = defaultGeositeUrl,
     this.lastSelectedServerId,
     this.onboardingCompleted = false,
   });
@@ -137,6 +154,8 @@ class AppSettings {
       json['coreLogLevel'],
       CoreLogLevel.warn,
     ),
+    geoipUrl: json['geoipUrl'] as String? ?? defaultGeoipUrl,
+    geositeUrl: json['geositeUrl'] as String? ?? defaultGeositeUrl,
     lastSelectedServerId: json['lastSelectedServerId'] as String?,
     // ?? true, не ?? false — см. комментарий у поля: отсутствие ключа тут
     // значит "апгрейд с версии, где онбординга не было", а не "первый
@@ -156,6 +175,8 @@ class AppSettings {
     'tunCoreType': tunCoreType.name,
     'tunDnsServer': tunDnsServer,
     'coreLogLevel': coreLogLevel.name,
+    'geoipUrl': geoipUrl,
+    'geositeUrl': geositeUrl,
     if (lastSelectedServerId != null) 'lastSelectedServerId': lastSelectedServerId,
     'onboardingCompleted': onboardingCompleted,
   };
@@ -172,6 +193,8 @@ class AppSettings {
     TunCoreType? tunCoreType,
     String? tunDnsServer,
     CoreLogLevel? coreLogLevel,
+    String? geoipUrl,
+    String? geositeUrl,
     String? lastSelectedServerId,
     bool? onboardingCompleted,
   }) {
@@ -188,6 +211,8 @@ class AppSettings {
       tunCoreType: tunCoreType ?? this.tunCoreType,
       tunDnsServer: tunDnsServer ?? this.tunDnsServer,
       coreLogLevel: coreLogLevel ?? this.coreLogLevel,
+      geoipUrl: geoipUrl ?? this.geoipUrl,
+      geositeUrl: geositeUrl ?? this.geositeUrl,
       lastSelectedServerId: lastSelectedServerId ?? this.lastSelectedServerId,
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
     );

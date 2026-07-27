@@ -96,6 +96,7 @@ abstract final class S {
   static String get sectionPersonalization => _en ? 'Personalization' : 'Персонализация';
   static String get sectionPing => _en ? 'Ping' : 'Пинг';
   static String get sectionSubscription => _en ? 'Subscription' : 'Подписка';
+  static String get sectionRouting => _en ? 'Routing databases' : 'Базы роутинга';
   static String get sectionSystem => _en ? 'System' : 'Система';
   static String get sectionLogs => _en ? 'Logs' : 'Логи';
   static String get sectionAbout => _en ? 'About' : 'О программе';
@@ -125,6 +126,17 @@ abstract final class S {
   static String get proxyDnsNote => _en
       ? "An address, not a name — resolving the resolver itself would be circular. In Proxy mode the server resolves names, so this setting doesn't affect it."
       : 'Адресом, а не именем — резолвить сам резолвер было бы замкнутым кругом. В Proxy-режиме имена резолвит сервер, поэтому настройка на него не влияет.';
+
+  // settings_page.dart — базы роутинга (geoip/geosite)
+  static String get geoipUrlLabel => _en ? 'geoip.dat URL' : 'Ссылка на geoip.dat';
+  static String get geositeUrlLabel => _en ? 'geosite.dat URL' : 'Ссылка на geosite.dat';
+  static String get updateGeoAssetsLabel =>
+      _en ? 'Update routing databases' : 'Обновить базы роутинга';
+  static String get geoAssetsUpdateSuccess =>
+      _en ? 'Routing databases updated' : 'Базы роутинга обновлены';
+  static String geoAssetsUpdateFailure(Object error) => _en
+      ? 'Failed to update routing databases: $error'
+      : 'Не удалось обновить базы роутинга: $error';
 
   // settings_page.dart — подписка/система
   static String get autoGroupLabel =>

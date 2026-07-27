@@ -9,8 +9,12 @@ import '../../app/layout_breakpoints.dart';
 import '../../app/windows_autostart.dart';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
+import '../../core_abstraction/core_config_provider.dart';
+import '../../engines/geo_assets.dart';
+import '../../engines/singbox/geo_ruleset_cache.dart';
 import '../../l10n/strings.dart';
 import '../../widgets/port_ui/port_ui.dart';
+import '../servers/flatten_leaves.dart';
 import 'about_info.dart';
 
 enum _SettingsSection {
@@ -18,6 +22,7 @@ enum _SettingsSection {
   ping(LucideIcons.activity),
   tun(LucideIcons.network),
   subscription(LucideIcons.rss),
+  routing(LucideIcons.map),
   system(LucideIcons.settings),
   logs(LucideIcons.fileText),
   about(LucideIcons.info);
@@ -30,6 +35,7 @@ enum _SettingsSection {
     _SettingsSection.ping => S.sectionPing,
     _SettingsSection.tun => 'TUN',
     _SettingsSection.subscription => S.sectionSubscription,
+    _SettingsSection.routing => S.sectionRouting,
     _SettingsSection.system => S.sectionSystem,
     _SettingsSection.logs => S.sectionLogs,
     _SettingsSection.about => S.sectionAbout,
@@ -68,6 +74,7 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   _SettingsSection _section = _SettingsSection.personalization;
+  bool _updatingGeoAssets = false;
 
   @override
   Widget build(BuildContext context) {
@@ -401,6 +408,45 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         onChanged: (value) =>
             notifier.update((s) => s.copyWith(autoGroupSubscriptions: value)),
       ),
+      _SettingsSection.routing => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(S.geoipUrlLabel, style: PortText.small),
+          const SizedBox(height: 6),
+          PortInput(
+            initialValue: settings.geoipUrl,
+            placeholder: defaultGeoipUrl,
+            onSubmitted: (value) {
+              final url = value.trim();
+              notifier.update(
+                (s) => s.copyWith(geoipUrl: url.isEmpty ? defaultGeoipUrl : url),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          Text(S.geositeUrlLabel, style: PortText.small),
+          const SizedBox(height: 6),
+          PortInput(
+            initialValue: settings.geositeUrl,
+            placeholder: defaultGeositeUrl,
+            onSubmitted: (value) {
+              final url = value.trim();
+              notifier.update(
+                (s) =>
+                    s.copyWith(geositeUrl: url.isEmpty ? defaultGeositeUrl : url),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          PortButton.outline(
+            leading: const Icon(LucideIcons.refreshCw, size: 16),
+            onPressed: _updatingGeoAssets
+                ? null
+                : () => _updateGeoAssets(context, settings),
+            child: Text(_updatingGeoAssets ? '…' : S.updateGeoAssetsLabel),
+          ),
+        ],
+      ),
       _SettingsSection.system => PortSwitch(
         value: settings.autoStartOnBoot,
         label: Text(S.autoStartLabel),
@@ -458,6 +504,32 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ),
       _SettingsSection.about => const _AboutSection(),
     };
+  }
+
+  Future<void> _updateGeoAssets(BuildContext context, AppSettings settings) async {
+    setState(() => _updatingGeoAssets = true);
+    try {
+      await forceUpdateGeoAssets(
+        geoipUrl: settings.geoipUrl,
+        geositeUrl: settings.geositeUrl,
+      );
+      // Прогрев кэша rule-set'ов сразу после обновления баз (трек 21) — иначе
+      // первое подключение к TUN само делает конвертацию и заметно тормозит.
+      final allRoutingRules = [
+        for (final leaf in flattenAllLeaves(ref.read(coreConfigProvider)))
+          ...leaf.routingRules,
+      ];
+      await pregenerateGeoRuleSets(allRoutingRules);
+      if (!context.mounted) return;
+      PortToaster.of(context).show(PortToast(title: Text(S.geoAssetsUpdateSuccess)));
+    } catch (e) {
+      if (!context.mounted) return;
+      PortToaster.of(
+        context,
+      ).show(PortToast(title: Text(S.geoAssetsUpdateFailure(e))));
+    } finally {
+      if (mounted) setState(() => _updatingGeoAssets = false);
+    }
   }
 
   String _themeModeLabel(AppThemeMode mode) => switch (mode) {

@@ -11,6 +11,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import go.Seq
 import java.io.File
+import java.net.URL
 import libv2ray.CoreCallbackHandler
 import libv2ray.CoreController
 import libv2ray.Libv2ray
@@ -28,6 +29,16 @@ class FluxVpnService : VpnService() {
         const val EXTRA_CONFIG_JSON = "configJson"
         const val EXTRA_SERVER_HOST = "serverHost"
         const val EXTRA_MTU = "mtu"
+        const val EXTRA_GEOIP_URL = "geoipUrl"
+        const val EXTRA_GEOSITE_URL = "geositeUrl"
+        // Тот же апстрим, что и дефолт в lib/core_abstraction/app_settings.dart
+        // (`defaultGeoipUrl`/`defaultGeositeUrl`) — держать в синхроне вручную,
+        // общего конфига ради двух строк заводить не стали (см. ROADMAP.md,
+        // трек 20).
+        private const val DEFAULT_GEOIP_URL =
+            "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat"
+        private const val DEFAULT_GEOSITE_URL =
+            "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat"
         private const val NOTIFICATION_CHANNEL_ID = "flux_vpn"
         private const val NOTIFICATION_ID = 1
         private const val TAG = "FluxVpnService"
@@ -38,11 +49,11 @@ class FluxVpnService : VpnService() {
 
     override fun onCreate() {
         super.onCreate()
-        // golang.org/x/mobile/asset (used by xray-core's NewFileReader fallback
-        // to reach geoip.dat/geosite.dat bundled inside libv2ray.aar's assets/)
-        // needs the JavaVM + Context registered explicitly — without this call
-        // it silently has no AssetManager and every asset lookup fails as if
-        // the file didn't exist.
+        // golang.org/x/mobile/asset needs the JavaVM + Context registered
+        // explicitly for gomobile's Android bindings in general — required by
+        // libv2ray regardless of where geoip.dat/geosite.dat come from (those
+        // are fetched over the network now, see ensureGeoAssetsExtracted, not
+        // read through this asset bridge anymore).
         Seq.setContext(applicationContext)
     }
 
@@ -56,6 +67,8 @@ class FluxVpnService : VpnService() {
         val configJson = intent?.getStringExtra(EXTRA_CONFIG_JSON)
         val serverHost = intent?.getStringExtra(EXTRA_SERVER_HOST)
         val mtu = intent?.getIntExtra(EXTRA_MTU, 1500) ?: 1500
+        val geoipUrl = intent?.getStringExtra(EXTRA_GEOIP_URL) ?: DEFAULT_GEOIP_URL
+        val geositeUrl = intent?.getStringExtra(EXTRA_GEOSITE_URL) ?: DEFAULT_GEOSITE_URL
         if (configJson == null || serverHost == null) {
             Log.e(TAG, "Missing configJson/serverHost extras, stopping")
             stopSelf()
@@ -64,18 +77,30 @@ class FluxVpnService : VpnService() {
 
         startForeground(NOTIFICATION_ID, buildNotification())
         Log.d(TAG, "configJson: $configJson")
-        try {
-            startTunnel(configJson, serverHost, mtu)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to start tunnel", e)
-            VpnStatusBridge.emitError(e.message)
-            stopTunnel()
-            stopSelf()
-        }
+        // ensureGeoAssetsExtracted now does a network fetch (see below) —
+        // startTunnel can no longer run synchronously on whatever thread
+        // onStartCommand is called on (that's the main thread, and blocking
+        // network I/O there trips StrictMode's NetworkOnMainThreadException).
+        Thread {
+            try {
+                startTunnel(configJson, serverHost, mtu, geoipUrl, geositeUrl)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start tunnel", e)
+                VpnStatusBridge.emitError(e.message)
+                stopTunnel()
+                stopSelf()
+            }
+        }.start()
         return START_STICKY
     }
 
-    private fun startTunnel(configJson: String, serverHost: String, mtu: Int) {
+    private fun startTunnel(
+        configJson: String,
+        serverHost: String,
+        mtu: Int,
+        geoipUrl: String,
+        geositeUrl: String,
+    ) {
         // xray-core resolves geoip.dat/geosite.dat with a plain os.Stat/os.Open
         // against a real filesystem path *before* NewFileReader/mobile-asset
         // hooks ever get a chance to run (common/platform/filesystem.
@@ -84,7 +109,7 @@ class FluxVpnService : VpnService() {
         // inside libv2ray.aar's assets/ (those are only reachable via
         // Android's AssetManager, which isn't a real path). Extract them to
         // a real file once and point xray.location.asset there instead.
-        Libv2ray.initCoreEnv(ensureGeoAssetsExtracted().absolutePath, "")
+        Libv2ray.initCoreEnv(ensureGeoAssetsExtracted(geoipUrl, geositeUrl).absolutePath, "")
 
         val builder = Builder()
             .setSession("Flux")
@@ -161,18 +186,23 @@ class FluxVpnService : VpnService() {
         if (wasRunning) VpnStatusBridge.emitStopped()
     }
 
-    /** Copies geoip.dat/geosite.dat out of the app's assets (merged in from
-     * libv2ray.aar) into a real file the first time, and reuses it after —
-     * both files together are ~27MB, not something to redo on every connect. */
-    private fun ensureGeoAssetsExtracted(): File {
+    /** Downloads geoip.dat/geosite.dat into a real file the first time, and
+     * reuses it after — both files together are several MB, not something to
+     * redo on every connect. Used to extract from the app's assets (merged in
+     * from libv2ray.aar); now fetched at runtime instead, same as the Windows
+     * side (`lib/engines/geo_assets.dart`, ROADMAP.md трек 20) — independent
+     * of libv2ray.aar's own bundled copies and updatable without a rebuild. */
+    private fun ensureGeoAssetsExtracted(geoipUrl: String, geositeUrl: String): File {
         val dir = File(filesDir, "xray-assets")
         dir.mkdirs()
-        for (name in arrayOf("geoip.dat", "geosite.dat")) {
+        for ((name, url) in arrayOf("geoip.dat" to geoipUrl, "geosite.dat" to geositeUrl)) {
             val dest = File(dir, name)
             if (dest.exists()) continue
-            assets.open(name).use { input ->
-                dest.outputStream().use { output -> input.copyTo(output) }
+            val tmp = File(dir, "$name.tmp")
+            URL(url).openStream().use { input ->
+                tmp.outputStream().use { output -> input.copyTo(output) }
             }
+            tmp.renameTo(dest)
         }
         return dir
     }

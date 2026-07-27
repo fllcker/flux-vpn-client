@@ -101,6 +101,7 @@ class TunBridgeEngine implements CoreEngine {
       serverIps: await _resolveServerIps(serverHost),
       upstreamDns: upstreamDns,
       logLevel: logLevel,
+      routingRules: _xray.activeRoutingRules,
     );
 
     _statusController.add(EngineStatus.connected);

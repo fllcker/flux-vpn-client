@@ -5,7 +5,9 @@ import 'dart:io';
 import '../../app/app_paths.dart';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/core_engine.dart';
+import '../../core_abstraction/proxy_node.dart';
 import '../xray/child_process_job.dart';
+import 'geo_ruleset_cache.dart';
 import 'singbox_config_mapper.dart';
 
 /// Обёртка над процессом `sing-box.exe`, используемая только изнутри
@@ -32,8 +34,11 @@ class SingBoxEngineWindows {
     List<String> serverIps = const [],
     String upstreamDns = defaultTunDnsServer,
     CoreLogLevel logLevel = CoreLogLevel.warn,
+    List<RoutingRule> routingRules = const [],
   }) async {
     _statusController.add(EngineStatus.starting);
+
+    final ruleSetPaths = await _resolveRuleSetPaths(routingRules);
 
     final config = buildSingBoxTunBridgeConfig(
       socksInPort: socksInPort,
@@ -41,6 +46,8 @@ class SingBoxEngineWindows {
       serverIps: serverIps,
       upstreamDns: upstreamDns,
       logLevel: logLevel,
+      routingRules: routingRules,
+      ruleSetPaths: ruleSetPaths,
     );
     final configFile = await File(
       '${ensureFluxLogDirectory()}/flux_singbox_$id.json',
@@ -63,6 +70,24 @@ class SingBoxEngineWindows {
     );
 
     _statusController.add(EngineStatus.connected);
+  }
+
+  /// Резолвит geosite/geoip-теги, на которые ссылаются [routingRules]
+  /// (`geoRuleSetReferences`), в пути уже сконвертированных JSON rule-set'ов
+  /// (`geo_ruleset_cache.dart`, ROADMAP.md трек 21) — заранее, до вызова
+  /// [buildSingBoxTunBridgeConfig], т.к. сама конвертация асинхронная
+  /// (читает `.dat` с диска), а мапер остаётся чистой синхронной функцией.
+  Future<Map<String, String>> _resolveRuleSetPaths(
+    List<RoutingRule> routingRules,
+  ) async {
+    final paths = <String, String>{};
+    for (final tag in geoRuleSetReferences(routingRules)) {
+      final category = tag.substring(tag.indexOf('-') + 1);
+      paths[tag] = tag.startsWith('geosite-')
+          ? await geositeRuleSetPath(category)
+          : await geoipRuleSetPath(category);
+    }
+    return paths;
   }
 
   Future<void> stop() async {

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart' show EventChannel, MethodChannel;
 import 'package:win32_registry/win32_registry.dart';
 
 /// Диплинк-схема приложения — как `vless://`, `sing-box://` и подобные в
@@ -61,4 +62,34 @@ String? extractFluxDeepLinkFromArgs(List<String> args) {
     if (arg.toLowerCase().startsWith('$fluxUriScheme://')) return arg;
   }
   return null;
+}
+
+// --- Android ---------------------------------------------------------------
+//
+// Регистрация схемы — не в Dart, а в `android/app/src/main/AndroidManifest.
+// xml` (intent-filter с `android:scheme="flux"` на MainActivity). У Android
+// нет второго процесса/loopback-IPC, как на Windows (см.
+// `single_instance.dart`) — одна Activity с `launchMode="singleTop"`, ОС
+// сама переиспользует её для повторных ссылок и присылает их через
+// `onNewIntent` (`MainActivity.kt`), а не через новый запуск процесса.
+// Поэтому обвязка тут принципиально другая: холодный старт — один вызов
+// метода за уже случившимся `intent.data`, повторные ссылки, пока
+// приложение уже открыто, — `EventChannel`.
+const _androidDeepLinkChannel = MethodChannel('flux/deeplink');
+const _androidDeepLinkEventChannel = EventChannel('flux/deeplink/stream');
+
+Future<String?> androidInitialDeepLink() async {
+  if (!Platform.isAndroid) return null;
+  try {
+    return await _androidDeepLinkChannel.invokeMethod<String>('getInitialLink');
+  } catch (_) {
+    return null;
+  }
+}
+
+Stream<String> get androidDeepLinkStream {
+  if (!Platform.isAndroid) return const Stream.empty();
+  return _androidDeepLinkEventChannel.receiveBroadcastStream().map(
+    (event) => event as String,
+  );
 }

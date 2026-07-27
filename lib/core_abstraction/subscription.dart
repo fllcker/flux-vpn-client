@@ -1,5 +1,7 @@
 import 'proxy_node.dart';
 
+const _defaultDomainTimeoutMs = 2500;
+
 class TrafficInfo {
   final int usedBytes;
   final int totalBytes;
@@ -38,6 +40,25 @@ class Subscription {
   /// [traffic]/[expiresAt].
   final Map<String, String> customFields;
 
+  /// Фоллбек-домены на случай, если основной [url] стал недоступен (DNS,
+  /// блокировка, домен сгорел) — см. ROADMAP.md, трек 23. Работает только
+  /// на повторных `refreshSubscription`, не на первичном импорте: секция
+  /// приходит внутри самой подписки, значит на самый первый фетч, если он
+  /// падает, взять её ещё неоткуда.
+  ///
+  /// [fallbackDomains] — статический список альтернативных доменов,
+  /// перебирается по порядку. [fallbackDomainsUrl] — опциональная ссылка на
+  /// JSON вида `{"domains": [...]}`, фетчится, когда статический список
+  /// исчерпан; результат **заменяет** [fallbackDomains] целиком при
+  /// следующем сохранении (отдельного кэша для этого не заводили — сама
+  /// подписка и есть постоянное хранилище). [domainTimeoutMs] — таймаут
+  /// одной попытки достучаться до конкретного домена (текущего или
+  /// очередного фоллбека); лимита количества попыток сверху нет — перебор
+  /// естественно ограничен длиной списка.
+  final List<String> fallbackDomains;
+  final String? fallbackDomainsUrl;
+  final int domainTimeoutMs;
+
   const Subscription({
     required this.id,
     required this.name,
@@ -49,6 +70,9 @@ class Subscription {
     this.lastRefreshedAt,
     this.autoRefreshOnStartup = false,
     this.customFields = const {},
+    this.fallbackDomains = const [],
+    this.fallbackDomainsUrl,
+    this.domainTimeoutMs = _defaultDomainTimeoutMs,
     required this.root,
   });
 
@@ -73,6 +97,12 @@ class Subscription {
             (k, v) => MapEntry(k, v as String),
           ) ??
           const {},
+      fallbackDomains: (json['fallbackDomains'] as List<dynamic>?)
+              ?.map((v) => v as String)
+              .toList() ??
+          const [],
+      fallbackDomainsUrl: json['fallbackDomainsUrl'] as String?,
+      domainTimeoutMs: json['domainTimeoutMs'] as int? ?? _defaultDomainTimeoutMs,
       root: ProxyNode.fromJson(json['root'] as Map<String, dynamic>),
     );
   }
@@ -89,6 +119,9 @@ class Subscription {
       'lastRefreshedAt': lastRefreshedAt!.toIso8601String(),
     if (autoRefreshOnStartup) 'autoRefreshOnStartup': autoRefreshOnStartup,
     if (customFields.isNotEmpty) 'customFields': customFields,
+    if (fallbackDomains.isNotEmpty) 'fallbackDomains': fallbackDomains,
+    if (fallbackDomainsUrl != null) 'fallbackDomainsUrl': fallbackDomainsUrl,
+    if (domainTimeoutMs != _defaultDomainTimeoutMs) 'domainTimeoutMs': domainTimeoutMs,
     'root': root.toJson(),
   };
 
@@ -102,6 +135,9 @@ class Subscription {
     DateTime? lastRefreshedAt,
     bool? autoRefreshOnStartup,
     Map<String, String>? customFields,
+    List<String>? fallbackDomains,
+    String? fallbackDomainsUrl,
+    int? domainTimeoutMs,
     ProxyNode? root,
   }) {
     return Subscription(
@@ -115,6 +151,9 @@ class Subscription {
       lastRefreshedAt: lastRefreshedAt ?? this.lastRefreshedAt,
       autoRefreshOnStartup: autoRefreshOnStartup ?? this.autoRefreshOnStartup,
       customFields: customFields ?? this.customFields,
+      fallbackDomains: fallbackDomains ?? this.fallbackDomains,
+      fallbackDomainsUrl: fallbackDomainsUrl ?? this.fallbackDomainsUrl,
+      domainTimeoutMs: domainTimeoutMs ?? this.domainTimeoutMs,
       root: root ?? this.root,
     );
   }

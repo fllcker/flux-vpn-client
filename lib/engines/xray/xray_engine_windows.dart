@@ -58,6 +58,13 @@ class XrayEngineWindows implements CoreEngine {
   /// себя — значит однажды разойтись с ней и молча обходить не тот адрес.
   ServerConfig? get activeServer => _activeServer;
 
+  List<RoutingRule> _activeRoutingRules = const [];
+
+  /// Правила роутинга активного листа — нужны [TunBridgeEngine], чтобы
+  /// сгенерировать те же правила ещё и в конфиге sing-box (см.
+  /// `singbox_config_mapper.dart`, ROADMAP.md трек 21).
+  List<RoutingRule> get activeRoutingRules => _activeRoutingRules;
+
   final _statusController = StreamController<EngineStatus>.broadcast();
   final _statsController = StreamController<EngineStats>.broadcast();
 
@@ -80,6 +87,7 @@ class XrayEngineWindows implements CoreEngine {
     }
 
     _activeServer = server;
+    _activeRoutingRules = leaf.routingRules;
 
     final xrayConfig = buildXrayConfig(
       server,
@@ -94,11 +102,11 @@ class XrayEngineWindows implements CoreEngine {
     ).writeAsString(jsonEncode(xrayConfig));
     _configFile = configFile;
 
-    final process = await Process.start(xrayExecutablePath, [
-      'run',
-      '-c',
-      configFile.path,
-    ]);
+    final process = await Process.start(
+      xrayExecutablePath,
+      ['run', '-c', configFile.path],
+      environment: {'XRAY_LOCATION_ASSET': ensureFluxGeoDirectory()},
+    );
     _process = process;
     tieChildProcessLifetimeToApp(process);
     unawaited(_pipeLogs(process));

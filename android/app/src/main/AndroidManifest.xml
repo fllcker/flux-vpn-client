@@ -32,6 +32,16 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- flux://... — тот же диплинк, что регистрирует Windows в
+                 реестре (см. lib/app/deep_link.dart, registerFluxUriProtocolIfNeeded).
+                 Без host/path — совпадает с любым URI этой схемы, как и на
+                 Windows. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="flux"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

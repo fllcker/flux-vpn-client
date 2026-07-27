@@ -86,7 +86,12 @@ class ConnectionController extends Notifier<ConnectionUiState> {
         : (mode == ConnectionMode.tun ? CoreType.singbox : CoreType.xray);
     engineManager.registerFactory(coreType, (id) {
       if (Platform.isAndroid) {
-        return XrayEngineAndroid(id: id, logLevel: settings.coreLogLevel);
+        return XrayEngineAndroid(
+          id: id,
+          logLevel: settings.coreLogLevel,
+          geoipUrl: settings.geoipUrl,
+          geositeUrl: settings.geositeUrl,
+        );
       }
       return switch (mode) {
         ConnectionMode.proxy => XrayEngineWindows(

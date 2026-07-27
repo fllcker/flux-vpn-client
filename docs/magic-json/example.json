@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "type": "subscriptions",
+  "content": [
+    {
+      "id": "8f14e45f-ceea-4d5e-8b17-9d6b1a9d1a1a",
+      "name": "My VPN",
+      "url": "https://example.com/sub/8f14e45f",
+      "pictureUrl": "https://example.com/logo.png",
+      "annotation": "Активен до 2026-12-31",
+      "traffic": { "usedBytes": 6442450944, "totalBytes": 107374182400 },
+      "expiresAt": "2026-12-31T00:00:00.000Z",
+      "lastRefreshedAt": "2026-07-27T10:00:00.000Z",
+      "autoRefreshOnStartup": true,
+      "customFields": { "Тариф": "Premium", "Статус": "Актив" },
+      "fallbackDomains": ["example2.com", "example3.com"],
+      "fallbackDomainsUrl": "https://raw.githubusercontent.com/example/vpn-domains/main/domains.json",
+      "domainTimeoutMs": 2500,
+      "root": {
+        "type": "group",
+        "id": "root-basic",
+        "name": "Basic",
+        "icon": null,
+        "hidden": false,
+        "strategy": "select",
+        "children": [
+          {
+            "type": "leaf",
+            "id": "leaf-de1",
+            "name": "Germany 1",
+            "icon": "🇩🇪",
+            "hidden": false,
+            "variants": [
+              {
+                "id": "variant-de1-reality",
+                "label": "TCP Reality",
+                "config": {
+                  "protocol": "vless",
+                  "address": "de1.example.com",
+                  "port": 443,
+                  "uuid": "1f9a2b3c-4d5e-6f70-8192-a3b4c5d6e7f8",
+                  "flow": "xtls-rprx-vision",
+                  "network": "tcp",
+                  "security": "reality",
+                  "sni": "www.microsoft.com",
+                  "publicKey": "abcDEF1234567890abcDEF1234567890abcDEF1234",
+                  "shortId": "0a1b2c",
+                  "fingerprint": "chrome"
+                }
+              },
+              {
+                "id": "variant-de1-xhttp",
+                "label": "XHTTP Reality",
+                "config": {
+                  "protocol": "vless",
+                  "address": "de1.example.com",
+                  "port": 8443,
+                  "uuid": "1f9a2b3c-4d5e-6f70-8192-a3b4c5d6e7f8",
+                  "network": "xhttp",
+                  "security": "reality",
+                  "sni": "www.microsoft.com",
+                  "publicKey": "abcDEF1234567890abcDEF1234567890abcDEF1234",
+                  "shortId": "0a1b2c",
+                  "fingerprint": "chrome",
+                  "xhttpPath": "/api/data",
+                  "xhttpHost": "www.microsoft.com"
+                }
+              }
+            ],
+            "selection": { "type": "manual", "variantId": "variant-de1-reality" },
+            "routingRules": [
+              {
+                "type": "domain",
+                "values": ["geosite:category-ads"],
+                "outboundTag": "block"
+              },
+              {
+                "type": "domain",
+                "values": ["domain:internal.example.com"],
+                "outboundTag": "direct"
+              },
+              {
+                "type": "ip",
+                "values": ["geoip:cn", "geoip:ru"],
+                "outboundTag": "direct"
+              }
+            ]
+          },
+          {
+            "type": "leaf",
+            "id": "leaf-fi1",
+            "name": "Finland 1",
+            "icon": "🇫🇮",
+            "hidden": false,
+            "variants": [
+              {
+                "id": "variant-fi1-reality",
+                "label": "TCP Reality",
+                "config": {
+                  "protocol": "vless",
+                  "address": "fi1.example.com",
+                  "port": 443,
+                  "uuid": "2a3b4c5d-6e7f-8091-a2b3-c4d5e6f70819",
+                  "network": "tcp",
+                  "security": "reality",
+                  "sni": "www.microsoft.com",
+                  "publicKey": "abcDEF1234567890abcDEF1234567890abcDEF1234",
+                  "shortId": "1b2c3d",
+                  "fingerprint": "chrome"
+                }
+              }
+            ],
+            "selection": { "type": "auto" },
+            "routingRules": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "9a25f56f-dffb-5e6f-9c28-ae7c2b0e2b2b",
+      "name": "My VPN",
+      "url": "https://example.com/sub/9a25f56f",
+      "annotation": null,
+      "customFields": { "Тариф": "Premium" },
+      "root": {
+        "type": "group",
+        "id": "root-premium",
+        "name": "Premium",
+        "icon": null,
+        "hidden": false,
+        "strategy": "select",
+        "children": [
+          {
+            "type": "leaf",
+            "id": "leaf-se1",
+            "name": "Sweden 1 Hysteria2",
+            "icon": "🇸🇪",
+            "hidden": false,
+            "variants": [
+              {
+                "id": "variant-se1-hy2",
+                "label": "Hysteria2",
+                "config": {
+                  "protocol": "hysteria2",
+                  "address": "se1.example.com",
+                  "port": 8443,
+                  "auth": "shared-secret",
+                  "sni": "se1.example.com",
+                  "insecure": false,
+                  "obfsPassword": "optional-salamander-password"
+                }
+              }
+            ],
+            "selection": { "type": "manual", "variantId": "variant-se1-hy2" },
+            "routingRules": [
+              {
+                "type": "domain",
+                "values": ["geosite:netflix", "geosite:disney"],
+                "outboundTag": "proxy"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

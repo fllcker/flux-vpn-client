@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux/core_abstraction/app_settings.dart';
+import 'package:flux/core_abstraction/proxy_node.dart';
 import 'package:flux/engines/singbox/singbox_config_mapper.dart';
 
 Map<String, dynamic> buildConfig({
@@ -8,16 +9,25 @@ Map<String, dynamic> buildConfig({
   List<String> serverIps = const ['203.0.113.7'],
   String upstreamDns = defaultTunDnsServer,
   CoreLogLevel logLevel = CoreLogLevel.warn,
+  List<RoutingRule> routingRules = const [],
+  Map<String, String> ruleSetPaths = const {},
 }) => buildSingBoxTunBridgeConfig(
   socksInPort: socksInPort,
   serverHost: serverHost,
   serverIps: serverIps,
   upstreamDns: upstreamDns,
   logLevel: logLevel,
+  routingRules: routingRules,
+  ruleSetPaths: ruleSetPaths,
 );
 
 List<Map> routeRules(Map<String, dynamic> config) =>
     ((config['route'] as Map)['rules'] as List).cast<Map>();
+
+// List's `==` is reference equality in Dart, not structural — this compares
+// contents, since route rule values are always freshly-built lists.
+bool _listEquals(Object? a, List<Object?> b) =>
+    a is List && a.length == b.length && [for (var i = 0; i < b.length; i++) a[i] == b[i]].every((x) => x);
 
 void main() {
   test('buildSingBoxTunBridgeConfig points the socks outbound at the given port', () {
@@ -223,6 +233,135 @@ void main() {
       final servers = ((config['dns'] as Map)['servers'] as List).cast<Map>();
       final server = servers.firstWhere((s) => s['tag'] == resolver);
       expect(server, isNot(contains('detour')));
+    });
+  });
+
+  group('user routing rules (ServerLeaf.routingRules, трек 21)', () {
+    test('come after all infrastructure rules', () {
+      final config = buildConfig(
+        routingRules: const [
+          DomainRule(values: ['example.com'], outboundTag: 'direct'),
+        ],
+      );
+
+      final rules = routeRules(config);
+      // Последнее инфраструктурное правило — обход IP сервера (direct по
+      // ip_cidr). Пользовательское правило должно идти строго после него.
+      final serverBypassIndex = rules.indexWhere(
+        (r) => r['outbound'] == 'direct' && r.containsKey('ip_cidr'),
+      );
+      final userRuleIndex = rules.indexWhere(
+        (r) => r['domain_keyword'] != null,
+      );
+      expect(serverBypassIndex, greaterThanOrEqualTo(0));
+      expect(userRuleIndex, greaterThan(serverBypassIndex));
+    });
+
+    test('maps plain domain values by xray-style prefix', () {
+      final config = buildConfig(
+        routingRules: const [
+          DomainRule(
+            values: ['bare.example', 'domain:sub.example.com', 'full:exact.example.com', 'regexp:^ad'],
+            outboundTag: 'direct',
+          ),
+        ],
+      );
+
+      final rule = routeRules(
+        config,
+      ).firstWhere((r) => r['outbound'] == 'direct' && r.containsKey('domain_keyword'));
+      expect(rule['domain_keyword'], ['bare.example']);
+      expect(rule['domain_suffix'], ['sub.example.com']);
+      expect(rule['domain'], ['exact.example.com']);
+      expect(rule['domain_regex'], ['^ad']);
+    });
+
+    test('maps "direct"/"block" tags to outbound/action, skips "proxy"', () {
+      final config = buildConfig(
+        routingRules: const [
+          DomainRule(values: ['direct.example'], outboundTag: 'direct'),
+          DomainRule(values: ['blocked.example'], outboundTag: 'block'),
+          DomainRule(values: ['proxied.example'], outboundTag: 'proxy'),
+        ],
+      );
+
+      final rules = routeRules(config);
+      final direct = rules.firstWhere((r) => _listEquals(r['domain_keyword'], ['direct.example']));
+      expect(direct['outbound'], 'direct');
+      expect(direct.containsKey('action'), isFalse);
+
+      final blocked = rules.firstWhere((r) => _listEquals(r['domain_keyword'], ['blocked.example']));
+      expect(blocked['action'], 'reject');
+      expect(blocked.containsKey('outbound'), isFalse);
+
+      expect(rules.any((r) => _listEquals(r['domain_keyword'], ['proxied.example'])), isFalse);
+    });
+
+    test('IpRule maps ip_cidr values and skips "proxy"', () {
+      final config = buildConfig(
+        routingRules: const [
+          IpRule(values: ['1.2.3.0/24'], outboundTag: 'direct'),
+          IpRule(values: ['4.5.6.0/24'], outboundTag: 'proxy'),
+        ],
+      );
+
+      final rules = routeRules(config);
+      expect(
+        rules.any((r) => _listEquals(r['ip_cidr'], ['1.2.3.0/24']) && r['outbound'] == 'direct'),
+        isTrue,
+      );
+      expect(rules.any((r) => _listEquals(r['ip_cidr'], ['4.5.6.0/24'])), isFalse);
+    });
+
+    test('geosite:/geoip: values become rule_set references, not domain/ip_cidr', () {
+      final config = buildConfig(
+        routingRules: const [
+          DomainRule(values: ['geosite:category-ads'], outboundTag: 'block'),
+          IpRule(values: ['geoip:cn'], outboundTag: 'direct'),
+        ],
+        ruleSetPaths: const {
+          'geosite-category-ads': 'C:/geo/geosite-category-ads.json',
+          'geoip-cn': 'C:/geo/geoip-cn.json',
+        },
+      );
+
+      final rules = routeRules(config);
+      final domainRule = rules.firstWhere(
+        (r) => _listEquals(r['rule_set'], ['geosite-category-ads']),
+      );
+      expect(domainRule['action'], 'reject');
+      expect(domainRule.containsKey('domain'), isFalse);
+      expect(domainRule.containsKey('domain_keyword'), isFalse);
+
+      final ipRule = rules.firstWhere((r) => _listEquals(r['rule_set'], ['geoip-cn']));
+      expect(ipRule['outbound'], 'direct');
+      expect(ipRule.containsKey('ip_cidr'), isFalse);
+
+      final ruleSets = (config['route'] as Map)['rule_set'] as List;
+      expect(ruleSets, hasLength(2));
+      final ruleSetsByTag = {
+        for (final rs in ruleSets.cast<Map>()) rs['tag'] as String: rs,
+      };
+      expect(ruleSetsByTag['geosite-category-ads']!['path'], 'C:/geo/geosite-category-ads.json');
+      expect(ruleSetsByTag['geosite-category-ads']!['format'], 'source');
+      expect(ruleSetsByTag['geoip-cn']!['path'], 'C:/geo/geoip-cn.json');
+    });
+
+    test('geoRuleSetReferences collects unique tags across rules', () {
+      final tags = geoRuleSetReferences(const [
+        DomainRule(values: ['geosite:ads', 'geosite:ads', 'plain.example'], outboundTag: 'direct'),
+        IpRule(values: ['geoip:cn'], outboundTag: 'block'),
+      ]);
+      expect(tags, {'geosite-ads', 'geoip-cn'});
+    });
+
+    test('omits route.rule_set entirely when no geosite/geoip references exist', () {
+      final config = buildConfig(
+        routingRules: const [
+          DomainRule(values: ['plain.example'], outboundTag: 'direct'),
+        ],
+      );
+      expect((config['route'] as Map).containsKey('rule_set'), isFalse);
     });
   });
 }

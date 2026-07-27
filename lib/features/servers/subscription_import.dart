@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
@@ -52,12 +54,25 @@ class LinkImportFailure extends LinkImportResult {
   const LinkImportFailure(this.reason);
 }
 
+/// Подтип [LinkImportFailure] — конкретно "домен недоступен" (DNS resolve
+/// failure, connection refused, таймаут), а не обычная ошибка сервера
+/// (4xx/5xx, которая означает, что домен как раз жив). Только на этот
+/// подтип реагирует фоллбек на альтернативные домены подписки —
+/// см. [refreshSubscription], ROADMAP.md трек 23.
+class DomainUnavailableFailure extends LinkImportFailure {
+  const DomainUnavailableFailure(super.reason);
+}
+
+const _defaultDomainTimeout = Duration(milliseconds: 2500);
+
 /// Разбирает то, что пользователь вставил в поле "Добавить сервер" — как
 /// делают остальные клиенты, это всегда ссылка: либо `vless://...`/
 /// `hysteria2://...`(`hy2://`), либо http(s):// адрес подписки.
 Future<LinkImportResult> importLink(
   String rawInput, {
   bool autoGroup = true,
+  Duration timeout = _defaultDomainTimeout,
+  http.Client? client,
 }) async {
   final link = rawInput.trim();
 
@@ -92,11 +107,16 @@ Future<LinkImportResult> importLink(
   final String body;
   final http.Response response;
   try {
-    response = await http.get(Uri.parse(link));
+    response = await (client?.get(Uri.parse(link)) ?? http.get(Uri.parse(link)))
+        .timeout(timeout);
     if (response.statusCode != 200) {
       return LinkImportFailure(S.downloadFailedHttp(response.statusCode));
     }
     body = response.body;
+  } on SocketException catch (e) {
+    return DomainUnavailableFailure(S.downloadFailedGeneric(e));
+  } on TimeoutException catch (e) {
+    return DomainUnavailableFailure(S.downloadFailedGeneric(e));
   } catch (e) {
     return LinkImportFailure(S.downloadFailedGeneric(e));
   }
@@ -166,8 +186,44 @@ Future<LinkImportResult> refreshSubscription(
   Subscription subscription, {
   bool autoGroup = true,
   bool resetOrder = false,
+  http.Client? client,
 }) async {
-  final result = await importLink(subscription.url, autoGroup: autoGroup);
+  final timeout = Duration(milliseconds: subscription.domainTimeoutMs);
+  var result = await importLink(
+    subscription.url,
+    autoGroup: autoGroup,
+    timeout: timeout,
+    client: client,
+  );
+  var fetchedFallbackDomains = subscription.fallbackDomains;
+  // Не `null`, только если реально сработал фоллбек — тогда именно этот url
+  // (а не то, что скажет тело ответа) должен стать новым `Subscription.url`.
+  // Для xray-json/base64-источников `fetched.url` и так совпадает с ним
+  // (`importLink` кладёт туда `link` как есть), но для MJ `content` присылает
+  // свой собственный `url` в JSON — сервис может не знать/не обновить его
+  // под адрес зеркала, поэтому не полагаемся на тело ответа в этом случае.
+  String? workingUrl;
+
+  // Домен основного url недоступен (DNS/connect/timeout — не обычная
+  // ошибка сервера) — перебираем фоллбек-домены подписки, см.
+  // ROADMAP.md, трек 23. Не срабатывает на первичном импорте — там этот
+  // код не вызывается вовсе, `Subscription` с фоллбек-секцией на этот
+  // момент уже должна существовать локально с прошлого успешного фетча.
+  if (result is DomainUnavailableFailure) {
+    final fallback = await _tryFallbackDomains(
+      subscription,
+      autoGroup: autoGroup,
+      timeout: timeout,
+      client: client,
+    );
+    if (fallback != null) {
+      result = fallback.result;
+      workingUrl = fallback.url;
+      if (fallback.fetchedDomains != null) {
+        fetchedFallbackDomains = fallback.fetchedDomains!;
+      }
+    }
+  }
 
   // URL, добавленный как MJ 'subscriptions', продолжает возвращать тот же
   // конверт на рефреше (сервис — источник правды, не xray-json) — находим
@@ -181,7 +237,14 @@ Future<LinkImportResult> refreshSubscription(
     if (match == null) {
       return LinkImportFailure(S.subscriptionNoLongerInMj);
     }
-    return _mergeSubscription(subscription, match, const [], resetOrder: resetOrder);
+    return _mergeSubscription(
+      subscription,
+      match,
+      const [],
+      resetOrder: resetOrder,
+      fallbackDomains: fetchedFallbackDomains,
+      urlOverride: workingUrl,
+    );
   }
   if (result is MjImportResultOk) {
     return LinkImportFailure(S.urlNowReturnsMjNodes);
@@ -195,7 +258,102 @@ Future<LinkImportResult> refreshSubscription(
     fetched,
     result.skipped,
     resetOrder: resetOrder,
+    fallbackDomains: fetchedFallbackDomains,
+    urlOverride: workingUrl,
   );
+}
+
+/// Результат успешного фоллбека — либо статический домен подошёл сразу,
+/// либо после фетча JSON-списка по [Subscription.fallbackDomainsUrl].
+/// [fetchedDomains] — не `null`, только если в этом заходе реально
+/// выполнялся JSON-фетч (даже если сам список оказался пустым) — так
+/// `refreshSubscription` знает, нужно ли заменить сохранённый статический
+/// список свежим.
+class _FallbackAttempt {
+  final LinkImportResult result;
+  final String url;
+  final List<String>? fetchedDomains;
+  const _FallbackAttempt(this.result, this.url, this.fetchedDomains);
+}
+
+/// Перебирает [Subscription.fallbackDomains] по порядку, заменяя только
+/// хост в [Subscription.url] и оставляя path/query как есть; если список
+/// исчерпан и задан [Subscription.fallbackDomainsUrl] — фетчит его
+/// (`{"domains": [...]}`) и перебирает уже этот список. Останавливается на
+/// первом домене, для которого `importLink` не вернул
+/// [DomainUnavailableFailure] (реальная ошибка сервера на фоллбек-домене —
+/// это не "домен недоступен", останавливаемся и на ней, а не пробуем
+/// дальше).
+Future<_FallbackAttempt?> _tryFallbackDomains(
+  Subscription subscription, {
+  required bool autoGroup,
+  required Duration timeout,
+  http.Client? client,
+}) async {
+  Future<_FallbackAttempt?> tryDomains(
+    List<String> domains,
+    List<String>? fetchedDomains,
+  ) async {
+    for (final domain in domains) {
+      final candidateUrl = _withHost(subscription.url, domain);
+      if (candidateUrl == null) continue;
+      final result = await importLink(
+        candidateUrl,
+        autoGroup: autoGroup,
+        timeout: timeout,
+        client: client,
+      );
+      if (result is! DomainUnavailableFailure) {
+        return _FallbackAttempt(result, candidateUrl, fetchedDomains);
+      }
+    }
+    return null;
+  }
+
+  final staticAttempt = await tryDomains(subscription.fallbackDomains, null);
+  if (staticAttempt != null) return staticAttempt;
+
+  final fallbackDomainsUrl = subscription.fallbackDomainsUrl;
+  if (fallbackDomainsUrl == null) return null;
+
+  final fetchedDomains = await _fetchFallbackDomainsList(
+    fallbackDomainsUrl,
+    timeout,
+    client,
+  );
+  if (fetchedDomains == null) return null;
+
+  return tryDomains(fetchedDomains, fetchedDomains);
+}
+
+String? _withHost(String url, String host) {
+  final uri = Uri.tryParse(url);
+  if (uri == null) return null;
+  try {
+    return uri.replace(host: host).toString();
+  } on FormatException {
+    return null;
+  }
+}
+
+/// Фетчит `{"domains": ["example2.com", ...]}` — best-effort: любая ошибка
+/// (сеть, формат) означает "дополнительных доменов нет", не пробрасывается
+/// наружу как ошибка рефреша в целом.
+Future<List<String>?> _fetchFallbackDomainsList(
+  String url,
+  Duration timeout,
+  http.Client? client,
+) async {
+  try {
+    final response = await (client?.get(Uri.parse(url)) ?? http.get(Uri.parse(url)))
+        .timeout(timeout);
+    if (response.statusCode != 200) return null;
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map || decoded['domains'] is! List) return null;
+    return (decoded['domains'] as List).map((v) => v.toString()).toList();
+  } catch (_) {
+    return null;
+  }
 }
 
 LinkImportResult _mergeSubscription(
@@ -203,6 +361,8 @@ LinkImportResult _mergeSubscription(
   Subscription fetched,
   List<ImportSkipped> skipped, {
   required bool resetOrder,
+  required List<String> fallbackDomains,
+  String? urlOverride,
 }) {
   final root = resetOrder
       ? resetSubscriptionOrder(subscription.root, fetched.root)
@@ -210,7 +370,7 @@ LinkImportResult _mergeSubscription(
   final merged = Subscription(
     id: subscription.id,
     name: fetched.name,
-    url: fetched.url,
+    url: urlOverride ?? fetched.url,
     pictureUrl: fetched.pictureUrl,
     annotation: fetched.annotation,
     traffic: fetched.traffic,
@@ -218,6 +378,9 @@ LinkImportResult _mergeSubscription(
     lastRefreshedAt: fetched.lastRefreshedAt,
     autoRefreshOnStartup: subscription.autoRefreshOnStartup,
     customFields: fetched.customFields,
+    fallbackDomains: fallbackDomains,
+    fallbackDomainsUrl: fetched.fallbackDomainsUrl ?? subscription.fallbackDomainsUrl,
+    domainTimeoutMs: fetched.domainTimeoutMs,
     root: root,
   );
   return SubscriptionImportResultOk(merged, skipped);

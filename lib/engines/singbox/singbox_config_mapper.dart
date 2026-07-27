@@ -1,4 +1,5 @@
 import '../../core_abstraction/app_settings.dart';
+import '../../core_abstraction/proxy_node.dart';
 
 /// Фиксированное имя TUN-адаптера — та же причина, что была у
 /// одноимённой xray-константы: без него имя генерируется случайно при
@@ -113,12 +114,24 @@ const _knownDohEndpoints = [
 /// DNS всего остального трафика по-прежнему идёт внутри тоннеля (`remote` с
 /// `detour: xray-socks-out`), так что обход не превращается в DNS-утечку: мимо
 /// тоннеля уходят только bootstrap-запросы про сам сервер, и те по DoT.
+/// [routingRules] — правила роутинга активного `ServerLeaf`
+/// (`ServerLeaf.routingRules`, ROADMAP.md трек 3/21) — генерируют
+/// дополнительные `route.rules` **после** всех правил ниже (инфраструктурные
+/// правила приоритетнее пользовательских). [ruleSetPaths] — пути к уже
+/// сконвертированным JSON rule-set'ам geosite/geoip-категорий, на которые
+/// эти правила могут ссылаться (`geosite:`/`geoip:`-значения) — ключ вида
+/// `geosite-category-ads`/`geoip-cn` (см. [geoRuleSetReferences] и
+/// `geo_ruleset_cache.dart`); резолвится и передаётся вызывающей стороной
+/// (`SingBoxEngineWindows.start`), а не тут — эта функция остаётся чистой
+/// синхронной, конвертация же асинхронная (читает файл с диска).
 Map<String, dynamic> buildSingBoxTunBridgeConfig({
   required int socksInPort,
   required String serverHost,
   List<String> serverIps = const [],
   String upstreamDns = defaultTunDnsServer,
   CoreLogLevel logLevel = CoreLogLevel.warn,
+  List<RoutingRule> routingRules = const [],
+  Map<String, String> ruleSetPaths = const {},
 }) {
   return {
     'log': {'level': logLevel.singBoxName},
@@ -260,7 +273,23 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
             'ip_cidr': [for (final ip in serverIps) _asSingleHostCidr(ip)],
             'outbound': 'direct',
           },
+        // Пользовательские правила — намеренно последними: всё выше это
+        // инфраструктурные страховки (мультикаст, DoH, hijack-dns, обход
+        // адреса сервера), которые не должны переопределяться конфигом
+        // сервиса.
+        ..._userRoutingRules(routingRules),
       ],
+      if (geoRuleSetReferences(routingRules).isNotEmpty)
+        'rule_set': [
+          for (final tag in geoRuleSetReferences(routingRules))
+            {
+              'type': 'local',
+              'tag': tag,
+              'format': 'source',
+              'path': ruleSetPaths[tag] ??
+                  (throw StateError('No rule_set path resolved for $tag')),
+            },
+        ],
       'auto_detect_interface': true,
       // Требуется с sing-box 1.12.0, если у какого-то outbound'а адрес может
       // потребовать резолва: без этого ключа процесс не стартует вообще
@@ -272,6 +301,96 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
     },
   };
 }
+
+/// Теги `geosite-<category>`/`geoip-<category>`, на которые нужно завести
+/// `route.rule_set` — вызывающая сторона (`SingBoxEngineWindows.start`)
+/// резолвит для каждого пути через `geo_ruleset_cache.dart` **до** вызова
+/// [buildSingBoxTunBridgeConfig] (та асинхронная, эта — нет) и передаёт
+/// результат как [ruleSetPaths].
+Set<String> geoRuleSetReferences(List<RoutingRule> rules) {
+  final tags = <String>{};
+  for (final rule in rules) {
+    switch (rule) {
+      case DomainRule(:final values):
+        for (final v in values) {
+          if (v.startsWith('geosite:')) tags.add('geosite-${v.substring(8)}');
+        }
+      case IpRule(:final values):
+        for (final v in values) {
+          if (v.startsWith('geoip:')) tags.add('geoip-${v.substring(6)}');
+        }
+    }
+  }
+  return tags;
+}
+
+/// `outboundTag` из [RoutingRule] — `"direct"`/`"block"`/`"proxy"` (см.
+/// ROADMAP.md, трек 3). `"proxy"` не даёт отдельного правила — `route.final`
+/// уже шлёт туда всё непойманное, лишнее правило было бы балластом.
+/// `"block"` — не outbound-тег в sing-box, а `action: "reject"`.
+List<Map<String, dynamic>> _userRoutingRules(List<RoutingRule> rules) {
+  final result = <Map<String, dynamic>>[];
+  for (final rule in rules) {
+    switch (rule) {
+      case DomainRule(:final values, :final outboundTag):
+        if (outboundTag == 'proxy') continue;
+        final domain = <String>[];
+        final domainSuffix = <String>[];
+        final domainKeyword = <String>[];
+        final domainRegex = <String>[];
+        final geositeTags = <String>[];
+        for (final v in values) {
+          if (v.startsWith('geosite:')) {
+            geositeTags.add('geosite-${v.substring(8)}');
+          } else if (v.startsWith('full:')) {
+            domain.add(v.substring(5));
+          } else if (v.startsWith('domain:')) {
+            domainSuffix.add(v.substring(7));
+          } else if (v.startsWith('regexp:')) {
+            domainRegex.add(v.substring(7));
+          } else {
+            domainKeyword.add(v);
+          }
+        }
+        if (domain.isNotEmpty ||
+            domainSuffix.isNotEmpty ||
+            domainKeyword.isNotEmpty ||
+            domainRegex.isNotEmpty) {
+          result.add({
+            if (domain.isNotEmpty) 'domain': domain,
+            if (domainSuffix.isNotEmpty) 'domain_suffix': domainSuffix,
+            if (domainKeyword.isNotEmpty) 'domain_keyword': domainKeyword,
+            if (domainRegex.isNotEmpty) 'domain_regex': domainRegex,
+            ..._outboundOrAction(outboundTag),
+          });
+        }
+        if (geositeTags.isNotEmpty) {
+          result.add({'rule_set': geositeTags, ..._outboundOrAction(outboundTag)});
+        }
+      case IpRule(:final values, :final outboundTag):
+        if (outboundTag == 'proxy') continue;
+        final ipCidr = <String>[];
+        final geoipTags = <String>[];
+        for (final v in values) {
+          if (v.startsWith('geoip:')) {
+            geoipTags.add('geoip-${v.substring(6)}');
+          } else {
+            ipCidr.add(v);
+          }
+        }
+        if (ipCidr.isNotEmpty) {
+          result.add({'ip_cidr': ipCidr, ..._outboundOrAction(outboundTag)});
+        }
+        if (geoipTags.isNotEmpty) {
+          result.add({'rule_set': geoipTags, ..._outboundOrAction(outboundTag)});
+        }
+    }
+  }
+  return result;
+}
+
+Map<String, dynamic> _outboundOrAction(String outboundTag) =>
+    outboundTag == 'block' ? {'action': 'reject'} : {'outbound': outboundTag};
 
 /// `ip_cidr` требует именно префикс, а не голый адрес. Маска зависит от
 /// семейства адреса: /32 для IPv4, /128 для IPv6.

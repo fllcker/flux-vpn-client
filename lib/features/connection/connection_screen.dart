@@ -8,6 +8,8 @@ import '../../app/layout_breakpoints.dart';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
 import '../../core_abstraction/core_config_provider.dart';
+import '../../engines/geo_assets.dart';
+import '../../engines/singbox/geo_ruleset_cache.dart';
 import '../../widgets/globe/country_centroids.dart';
 import '../../widgets/globe/shader_background.dart';
 import '../../widgets/globe/sphere_globe.dart';
@@ -48,6 +50,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _autoRefreshSubscriptions();
       _pingAllOnStartup();
+      _ensureGeoAssets();
     });
   }
 
@@ -78,6 +81,26 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   void _pingAllOnStartup() {
     if (!ref.read(appSettingsProvider).pingAllOnStartup) return;
     pingAllLeaves(ref, flattenAllLeaves(ref.read(coreConfigProvider)));
+  }
+
+  /// Только Windows — на Android этот же файл качает `FluxVpnService.kt`
+  /// сам, отдельно, при старте туннеля (см. ROADMAP.md, трек 20).
+  /// Best-effort и не блокирует UI — как и остальные вызовы в этом же
+  /// `addPostFrameCallback`. После докачки сразу прогревает кэш rule-set'ов
+  /// (`pregenerateGeoRuleSets`, трек 21) для категорий, уже встречающихся в
+  /// текущих подписках — иначе первое подключение к TUN после (пере)установки
+  /// само делает эту конвертацию и заметно тормозит (проверено — секунд
+  /// пять на реальных файлах).
+  Future<void> _ensureGeoAssets() async {
+    if (!Platform.isWindows) return;
+    final settings = ref.read(appSettingsProvider);
+    await ensureGeoAssets(geoipUrl: settings.geoipUrl, geositeUrl: settings.geositeUrl);
+    if (!mounted) return;
+    final allRoutingRules = [
+      for (final leaf in flattenAllLeaves(ref.read(coreConfigProvider)))
+        ...leaf.routingRules,
+    ];
+    await pregenerateGeoRuleSets(allRoutingRules);
   }
 
   @override

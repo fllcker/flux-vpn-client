@@ -20,8 +20,18 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val channelName = "flux/vpn"
     private val statusChannelName = "flux/vpn/status"
+    private val deepLinkChannelName = "flux/deeplink"
+    private val deepLinkEventChannelName = "flux/deeplink/stream"
     private val requestVpnPermissionCode = 4242
     private var pendingPermissionResult: MethodChannel.Result? = null
+
+    // Повторные ссылки, пока приложение уже открыто, — см. onNewIntent
+    // ниже (launchMode="singleTop" в AndroidManifest.xml гарантирует, что
+    // ОС переиспользует эту же Activity вместо второй копии). Тот же
+    // паттерн (nullable sink, живёт независимо от вызовов метода), что
+    // VpnStatusBridge — тут не нужен отдельный top-level object, диплинк
+    // всегда приходит именно в Activity, а не в оторванный от неё Service.
+    private var deepLinkEventSink: EventChannel.EventSink? = null
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,10 +57,12 @@ class MainActivity : FlutterActivity() {
                     val configJson = call.argument<String>("configJson")
                     val serverHost = call.argument<String>("serverHost")
                     val mtu = call.argument<Int>("mtu") ?: 1500
+                    val geoipUrl = call.argument<String>("geoipUrl")
+                    val geositeUrl = call.argument<String>("geositeUrl")
                     if (configJson == null || serverHost == null) {
                         result.error("bad_args", "configJson/serverHost required", null)
                     } else {
-                        startVpn(configJson, serverHost, mtu)
+                        startVpn(configJson, serverHost, mtu, geoipUrl, geositeUrl)
                         result.success(null)
                     }
                 }
@@ -76,6 +88,33 @@ class MainActivity : FlutterActivity() {
                 }
             },
         )
+        // flux://... — см. deep_link.dart. Холодный старт: intent.data уже
+        // сидит на этой Activity к моменту первого вызова getInitialLink,
+        // возвращаем один раз. Повторные ссылки, пока приложение уже
+        // открыто, идут через onNewIntent -> deepLinkEventSink.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, deepLinkChannelName).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getInitialLink" -> result.success(intent?.data?.toString())
+                else -> result.notImplemented()
+            }
+        }
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, deepLinkEventChannelName).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+                    deepLinkEventSink = events
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    deepLinkEventSink = null
+                }
+            },
+        )
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent.data?.toString()?.let { deepLinkEventSink?.success(it) }
     }
 
     /** Returns true (via [result]) if permission is already granted; otherwise
@@ -100,11 +139,19 @@ class MainActivity : FlutterActivity() {
         super.onActivityResult(requestCode, resultCode, data)
     }
 
-    private fun startVpn(configJson: String, serverHost: String, mtu: Int) {
+    private fun startVpn(
+        configJson: String,
+        serverHost: String,
+        mtu: Int,
+        geoipUrl: String?,
+        geositeUrl: String?,
+    ) {
         val intent = Intent(this, FluxVpnService::class.java).apply {
             putExtra(FluxVpnService.EXTRA_CONFIG_JSON, configJson)
             putExtra(FluxVpnService.EXTRA_SERVER_HOST, serverHost)
             putExtra(FluxVpnService.EXTRA_MTU, mtu)
+            if (geoipUrl != null) putExtra(FluxVpnService.EXTRA_GEOIP_URL, geoipUrl)
+            if (geositeUrl != null) putExtra(FluxVpnService.EXTRA_GEOSITE_URL, geositeUrl)
         }
         startForegroundService(intent)
     }
