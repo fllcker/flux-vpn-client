@@ -57,6 +57,28 @@ class _PortSelectState<T> extends State<PortSelect<T>> with SingleTickerProvider
   void _open() {
     final box = _triggerKey.currentContext!.findRenderObject() as RenderBox;
     final triggerWidth = box.size.width;
+    final effectiveMinWidth = triggerWidth < widget.minWidth ? widget.minWidth : triggerWidth;
+
+    // Попап растёт от левого края триггера вправо по умолчанию (как раньше),
+    // без учёта границ экрана — на триггере, прижатом к правому краю ряда
+    // (см. `_SettingRow` в settings_page.dart), длинная опция вроде "С
+    // правами администратора" вылезала за пределы окна и обрезалась. Решаем
+    // один раз при открытии: считаем, с какой стороны от триггера реально
+    // больше места, и растим попап в ту сторону, дополнительно ограничивая
+    // его ширину этим пространством — так он физически не может вылезти за
+    // край окна, даже если опция окажется ещё длиннее.
+    final triggerGlobalLeft = box.localToGlobal(Offset.zero).dx;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    const margin = 8.0;
+    final spaceRight = screenWidth - triggerGlobalLeft - margin;
+    final spaceLeft = triggerGlobalLeft + triggerWidth - margin;
+    final growLeft = spaceLeft > spaceRight;
+    final maxPopoverWidth = (growLeft ? spaceLeft : spaceRight).clamp(
+      effectiveMinWidth,
+      double.infinity,
+    );
+    final anchor = growLeft ? Alignment.topRight : Alignment.topLeft;
+
     _entry = OverlayEntry(
       builder: (context) {
         return GestureDetector(
@@ -68,13 +90,18 @@ class _PortSelectState<T> extends State<PortSelect<T>> with SingleTickerProvider
               CompositedTransformFollower(
                 link: _layerLink,
                 showWhenUnlinked: false,
+                targetAnchor: anchor,
+                followerAnchor: anchor,
                 offset: const Offset(0, 4),
                 child: _PopoverSurface(
                   animation: _controller,
                   child: Align(
-                    alignment: Alignment.topLeft,
+                    alignment: anchor,
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(minWidth: triggerWidth < widget.minWidth ? widget.minWidth : triggerWidth),
+                      constraints: BoxConstraints(
+                        minWidth: effectiveMinWidth,
+                        maxWidth: maxPopoverWidth,
+                      ),
                       child: _SelectContent<T>(
                         options: widget.options,
                         value: _value,

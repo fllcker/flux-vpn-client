@@ -216,14 +216,22 @@ class LanguageStep extends ConsumerWidget {
 }
 
 /// Шаг "Автозапуск" — только Windows, `OnboardingFlow` не включает этот шаг
-/// в последовательность на Android вовсе (см. её doc-комментарий).
-class AutostartStep extends ConsumerWidget {
+/// в последовательность на Android вовсе (см. её doc-комментарий). Тот же
+/// полный выбор, что и в `settings_page.dart`'s секции "Система" (трек 24)
+/// — не упрощаем до одного тумблера, раз "с правами администратора"/
+/// "показывать окно" настоящие независимые решения пользователя, а не
+/// деталь для настроек постфактум.
+class AutostartStep extends ConsumerStatefulWidget {
   const AutostartStep({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AutostartStep> createState() => _AutostartStepState();
+}
+
+class _AutostartStepState extends ConsumerState<AutostartStep> {
+  @override
+  Widget build(BuildContext context) {
     final settings = ref.watch(appSettingsProvider);
-    final notifier = ref.read(appSettingsProvider.notifier);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -236,22 +244,88 @@ class AutostartStep extends ConsumerWidget {
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 20),
-        Center(
-          child: PortSwitch(
-            value: settings.autoStartPrivilege != AppAutoStartPrivilege.none,
-            label: Text(S.autoStartLabel),
+        _SettingRow(
+          label: S.autoStartPrivilegeLabel,
+          child: PortSelect<AppAutoStartPrivilege>(
+            initialValue: settings.autoStartPrivilege,
             onChanged: (value) {
-              final privilege = value
-                  ? AppAutoStartPrivilege.standard
-                  : AppAutoStartPrivilege.none;
-              setAutoStartOnBoot(
-                privilege: privilege,
-                showWindow: settings.autoStartShowWindow,
-              );
-              notifier.update((s) => s.copyWith(autoStartPrivilege: privilege));
+              if (value == null) return;
+              _applyAutoStart(privilege: value, showWindow: settings.autoStartShowWindow);
             },
+            options: [
+              PortSelectOption(
+                value: AppAutoStartPrivilege.none,
+                child: Text(S.autoStartPrivilegeNone),
+              ),
+              PortSelectOption(
+                value: AppAutoStartPrivilege.standard,
+                child: Text(S.autoStartPrivilegeStandard),
+              ),
+              PortSelectOption(
+                value: AppAutoStartPrivilege.elevated,
+                child: Text(S.autoStartPrivilegeElevated),
+              ),
+            ],
+            selectedOptionBuilder: (context, value) => Text(switch (value) {
+              AppAutoStartPrivilege.none => S.autoStartPrivilegeNone,
+              AppAutoStartPrivilege.standard => S.autoStartPrivilegeStandard,
+              AppAutoStartPrivilege.elevated => S.autoStartPrivilegeElevated,
+            }),
           ),
         ),
+        if (settings.autoStartPrivilege != AppAutoStartPrivilege.none) ...[
+          const SizedBox(height: 12),
+          PortSwitch(
+            value: settings.autoStartShowWindow,
+            label: Text(S.autoStartShowWindowLabel),
+            onChanged: (value) => _applyAutoStart(
+              privilege: settings.autoStartPrivilege,
+              showWindow: value,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  void _applyAutoStart({
+    required AppAutoStartPrivilege privilege,
+    required bool showWindow,
+  }) {
+    setAutoStartOnBoot(privilege: privilege, showWindow: showWindow);
+    ref
+        .read(appSettingsProvider.notifier)
+        .update((s) => s.copyWith(autoStartPrivilege: privilege, autoStartShowWindow: showWindow));
+    if (privilege == AppAutoStartPrivilege.elevated) {
+      _confirmElevatedAutoStart();
+    }
+  }
+
+  Future<void> _confirmElevatedAutoStart() async {
+    await Future.delayed(const Duration(milliseconds: 1500));
+    final registered = await isElevatedAutoStartActuallyRegistered();
+    if (!mounted) return;
+    PortToaster.of(context).show(
+      PortToast(
+        title: Text(registered ? S.elevatedAutoStartConfirmed : S.elevatedAutoStartDeclined),
+      ),
+    );
+  }
+}
+
+class _SettingRow extends StatelessWidget {
+  final String label;
+  final Widget child;
+  const _SettingRow({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: PortText.p),
+        const SizedBox(height: 6),
+        child,
       ],
     );
   }
