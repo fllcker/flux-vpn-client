@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/layout_breakpoints.dart';
 import '../../app/windows_autostart.dart';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
@@ -313,6 +314,9 @@ class _AutostartStepState extends ConsumerState<AutostartStep> {
   }
 }
 
+/// Тот же паттерн, что `_SettingRow` в `settings_page.dart` — ярлык слева,
+/// контрол справа на одной линии; на узких окнах (см. ROADMAP.md, трек 16)
+/// не помещаются рядом, тогда контрол уходит под ярлык.
 class _SettingRow extends StatelessWidget {
   final String label;
   final Widget child;
@@ -320,11 +324,20 @@ class _SettingRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    if (isMobileLayout(context)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: PortText.p),
+          const SizedBox(height: 6),
+          child,
+        ],
+      );
+    }
+
+    return Row(
       children: [
-        Text(label, style: PortText.p),
-        const SizedBox(height: 6),
+        Expanded(child: Text(label, style: PortText.p)),
         child,
       ],
     );
