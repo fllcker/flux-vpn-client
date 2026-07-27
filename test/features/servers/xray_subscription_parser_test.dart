@@ -89,8 +89,12 @@ const _sampleXrayArray = '''
           "tlsSettings": {"serverName": "se1.example.com", "allowInsecure": true},
           "hysteriaSettings": {
             "version": 2,
-            "auth": "hy2-password",
-            "obfs": {"type": "salamander", "password": "obfs-password"}
+            "auth": "hy2-password"
+          },
+          "finalmask": {
+            "udp": [
+              {"type": "salamander", "settings": {"password": "obfs-password"}}
+            ]
           }
         }
       },

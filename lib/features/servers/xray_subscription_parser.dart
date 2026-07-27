@@ -111,7 +111,6 @@ Hysteria2Config _parseHysteriaOutbound(Map<String, dynamic> outbound) {
   final tlsSettings = streamSettings['tlsSettings'] as Map<String, dynamic>?;
   final hysteriaSettings =
       streamSettings['hysteriaSettings'] as Map<String, dynamic>? ?? const {};
-  final obfs = hysteriaSettings['obfs'] as Map<String, dynamic>?;
 
   return Hysteria2Config(
     address: settings['address'] as String,
@@ -119,8 +118,26 @@ Hysteria2Config _parseHysteriaOutbound(Map<String, dynamic> outbound) {
     auth: hysteriaSettings['auth'] as String,
     sni: tlsSettings?['serverName'] as String?,
     insecure: tlsSettings?['allowInsecure'] as bool? ?? false,
-    obfsPassword: obfs?['password'] as String?,
+    obfsPassword: _parseSalamanderPassword(streamSettings),
   );
+}
+
+/// Salamander в подписках (проверено на живом `?format=xray` от
+/// getmagix.cc) приходит как `streamSettings.finalmask.udp[].settings.password`
+/// — та же актуальная схема Xray-core, что и в `xray_config_mapper.dart`
+/// (`_hysteria2Outbound`), не устаревший `hysteriaSettings.obfs`.
+String? _parseSalamanderPassword(Map<String, dynamic> streamSettings) {
+  final finalMask = streamSettings['finalmask'] as Map<String, dynamic>?;
+  final udpMasks = finalMask?['udp'] as List?;
+  if (udpMasks == null) return null;
+  for (final mask in udpMasks) {
+    if (mask is Map && mask['type'] == 'salamander') {
+      final maskSettings = mask['settings'] as Map<String, dynamic>?;
+      final password = maskSettings?['password'] as String?;
+      if (password != null) return password;
+    }
+  }
+  return null;
 }
 
 /// Разбирает xray-шный блок `"routing"."rules"` (массив объектов

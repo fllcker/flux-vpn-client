@@ -164,8 +164,13 @@ Map<String, dynamic> _streamSettings(VlessConfig server) {
 
 /// xray-core называет протокол `hysteria` (не `hysteria2`), `version: 2`
 /// обязателен и в `settings`, и в `hysteriaSettings` — так xray-core
-/// различает Hysteria v1/v2. `obfs` добавляется только если у сервера задан
-/// пароль обфускации (Salamander опциональна, см. `Hysteria2Config`).
+/// различает Hysteria v1/v2. Salamander-обфускация — НЕ `obfs` внутри
+/// `hysteriaSettings` (формат sing-box) и НЕ отдельный `udpmasks` (старая,
+/// уже переименованная схема из PR XTLS/Xray-core#5508) — в актуальной
+/// версии ядра (проверено по вендоренному исходнику в go.mod
+/// `tool/android-xray-lite/src`, `infra/conf/transport_finalmask.go`) это
+/// `finalmask.udp` на уровне `streamSettings`:
+/// `{"finalmask": {"udp": [{"type": "salamander", "settings": {"password": "..."}}]}}`.
 Map<String, dynamic> _hysteria2Outbound(Hysteria2Config server) => {
   'protocol': 'hysteria',
   'tag': 'proxy',
@@ -185,8 +190,15 @@ Map<String, dynamic> _hysteria2Outbound(Hysteria2Config server) => {
       'version': 2,
       'auth': server.auth,
       'udpIdleTimeout': 120,
-      if (server.obfsPassword != null)
-        'obfs': {'type': 'salamander', 'password': server.obfsPassword},
     },
+    if (server.obfsPassword != null)
+      'finalmask': {
+        'udp': [
+          {
+            'type': 'salamander',
+            'settings': {'password': server.obfsPassword},
+          },
+        ],
+      },
   },
 };

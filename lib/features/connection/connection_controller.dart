@@ -115,6 +115,7 @@ class ConnectionController extends Notifier<ConnectionUiState> {
       switch (status) {
         case EngineStatus.connected:
           state = ConnectionConnected(
+            leafId: leaf.id,
             serverName: leaf.name,
             connectedAt: DateTime.now(),
             mode: mode,

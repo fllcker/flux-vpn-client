@@ -63,6 +63,7 @@ class FluxVpnService : VpnService() {
         }
 
         startForeground(NOTIFICATION_ID, buildNotification())
+        Log.d(TAG, "configJson: $configJson")
         try {
             startTunnel(configJson, serverHost, mtu)
         } catch (e: Exception) {

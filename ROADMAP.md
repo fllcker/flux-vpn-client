@@ -1360,3 +1360,61 @@ SOCKS/HTTP, переиспользует существующие `_outbound`/`_
    эту настройку).
 4. Показывать текущую версию/дату скачанных баз в настройках (рядом с
    "Обновить") — иначе непонятно, устарели они или нет.
+
+## 21. Роутинг-правила не работают в TUN-режиме на Windows — не начато
+
+**Баг:** доменные routing rules (`DomainRule`, трек 3) в Proxy-режиме на
+Windows работают, в TUN-режиме — нет, весь трафик уходит в прокси
+независимо от правил. Android не затронут (проверено: подписка без
+routingRules, потом с ними — правила применяются корректно), баг только
+в Windows-мосте `TunBridgeEngine`.
+
+**Причина (подтверждено логами sing-box + xray за одну сессию, DEBUG
+уровень, `%AppData%\flux\logs\flux_singbox_primary_singbox.log` +
+`flux_xray_primary_xray.log`):** архитектура моста — sing-box перехватывает
+TUN-трафик и шлёт его единственным SOCKS5-outbound'ом на xray, который уже
+сам говорит с VLESS/Hysteria2-сервером (см. `singbox_config_mapper.dart`).
+Routing rules пользователя (direct/block/proxy) вшиты только в конфиг
+xray (`buildXrayConfig`/`_routing`, `xray_config_mapper.dart`) — у
+sing-box в `route.rules` таких правил нет вообще, там только
+служебные (sniff, DoH-reject, dns hijack, обход адреса сервера).
+
+sing-box **сниффит** домен для собственных нужд (лог: `router: sniffed
+protocol: tls, domain: region1.google-analytics.com`), но при
+проксировании через `xray-socks-out` дозванивается по уже резолвленному
+IP, не по домену (лог: `outbound/socks[xray-socks-out]: outbound
+connection to 216.239.32.36:443`). До xray домен не долетает вообще — в
+логе xray на этот же коннект: `proxy/socks: TCP Connect request to
+tcp:216.239.32.36:443` → `app/dispatcher: default route for
+tcp:216.239.32.36:443` (т.е. ни один DomainRule не смог сматчиться,
+xray просто не видит домена, только голый IP). IP-based `IpRule`
+теоретически должны работать и сейчас — IP до xray доходит верно, ломаются
+именно доменные правила.
+
+**План (черновой, не проработан):** матчинг direct/block должен
+происходить на стороне sing-box, а не полагаться на то, что домен
+долетит через SOCKS5-мост до xray:
+
+1. Генерировать в `singbox_config_mapper.dart` дополнительные
+   `route.rules` из `leaf.routingRules` — `DomainRule` → `{domain/
+   domain_suffix: [...], outbound: "direct"}` или `{..., action:
+   "reject"}` для `block`; `IpRule` → аналогично через `ip_cidr` (эти,
+   возможно, и так работают, но стоит явно продублировать на sing-box,
+   не полагаться на xray за мостом).
+2. Нужен реальный `direct`-outbound для пользовательского "не через
+   тоннель" трафика (сейчас единственный `direct` в конфиге — служебный,
+   только для обхода адреса самого VPN-сервера, см. комментарий в
+   `singbox_config_mapper.dart` про `route_exclude_address`) — проверить,
+   что переиспользование того же тега не потащит непреднамеренно чужой
+   пользовательский трафик через него/не сломает существующий обход.
+3. geosite/geoip-префиксы в правилах (`geosite:category-ads`,
+   `geoip:cn`, трек 3/20) — sing-box использует свой формат rule-set
+   (`.srs`), а не `geosite.dat`/`geoip.dat` от xray; нужно либо тянуть
+   отдельные sing-box rule-set файлы, либо резолвить такие префиксы в
+   конкретные домены/подсети на стороне приложения перед генерацией
+   конфига (иначе geosite/geoip-правила в TUN так и останутся
+   нерабочими даже после фикса domain/ip-правил).
+4. Тестировать только по инструкции пользователя (`не тести proxy/tun
+   режим в приложении сам!!!`, см. `CLAUDE.md`) — фикс проверяется через
+   логи `%AppData%\flux\logs\flux_singbox_*.log`/`flux_xray_*.log` за
+   реальную TUN-сессию, которую делает пользователь.

@@ -7,6 +7,8 @@ import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../l10n/strings.dart';
 import '../../widgets/port_ui/port_ui.dart';
+import '../connection/connection_controller.dart';
+import '../connection/connection_state.dart';
 import '../ping/ping_all.dart';
 import '../ping/ping_cache.dart';
 import '../ping/pick_best_by_latency.dart';
@@ -68,15 +70,37 @@ class ServerListContent extends ConsumerWidget {
     final selectedId =
         ref.watch(selectedServerIdProvider) ??
         (allLeaves.isNotEmpty ? allLeaves.first.id : null);
+    // Переподключаемся к [leafId] с обновлённым конфигом, если во время
+    // активного соединения пользователь выбрал другой сервер или другой
+    // вариант подключения у текущего — тем же режимом (Proxy/TUN). Раньше
+    // выбор только обновлял состояние UI ("какой сервер выделен"), а движок
+    // продолжал жить со старым конфигом, пока пользователь вручную не
+    // дёргал выключение/включение — выглядело так, будто смена
+    // сервера/варианта вообще ни на что не влияет.
+    void reconnectToLeafIfActive(String leafId) {
+      final connectionState = ref.read(connectionControllerProvider);
+      if (connectionState is! ConnectionConnected) return;
+      final updatedLeaf = flattenAllLeaves(ref.read(coreConfigProvider))
+          .where((l) => l.id == leafId)
+          .firstOrNull;
+      if (updatedLeaf != null) {
+        ref
+            .read(connectionControllerProvider.notifier)
+            .connectToServer(updatedLeaf, mode: connectionState.mode);
+      }
+    }
+
     void onSelectLeaf(String id) {
       ref.read(selectedServerIdProvider.notifier).select(id);
       onAfterSelect?.call();
+      reconnectToLeafIfActive(id);
     }
 
     void onSelectVariant(String leafId, String variantId) {
       ref.read(coreConfigProvider.notifier).selectVariant(leafId, variantId);
       ref.read(selectedServerIdProvider.notifier).select(leafId);
       onAfterSelect?.call();
+      reconnectToLeafIfActive(leafId);
     }
 
     void onHideLeaf(String leafId) {

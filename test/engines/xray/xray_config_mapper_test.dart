@@ -60,4 +60,47 @@ void main() {
         .toList();
     expect(outboundTags, containsAll(['proxy', 'direct', 'block']));
   });
+
+  // Salamander — не `obfs` внутри `hysteriaSettings` (формат sing-box) и не
+  // отдельный `udpmasks` (устаревшая схема из PR XTLS/Xray-core#5508,
+  // с тех пор переименована) — актуальная схема (проверено по вендоренному
+  // исходнику xray-core, `infra/conf/transport_finalmask.go`) кладёт маски
+  // под `finalmask.udp` на уровне `streamSettings`.
+  test('buildXrayConfig maps Hysteria2 Salamander obfs to finalmask.udp', () {
+    const server = Hysteria2Config(
+      address: 'hy2.example.com',
+      port: 443,
+      auth: 'secret',
+      obfsPassword: 'obfs-pass',
+    );
+
+    final config = buildXrayConfig(server, socksPort: 10808, httpPort: 10809);
+    final outbound = (config['outbounds'] as List).first as Map;
+    final streamSettings = outbound['streamSettings'] as Map;
+
+    expect(streamSettings['finalmask'], {
+      'udp': [
+        {
+          'type': 'salamander',
+          'settings': {'password': 'obfs-pass'},
+        },
+      ],
+    });
+    expect(
+      (streamSettings['hysteriaSettings'] as Map).containsKey('obfs'),
+      isFalse,
+    );
+  });
+
+  test('buildXrayConfig omits finalmask when no obfs password is set', () {
+    const server = Hysteria2Config(
+      address: 'hy2.example.com',
+      port: 443,
+      auth: 'secret',
+    );
+
+    final config = buildXrayConfig(server, socksPort: 10808, httpPort: 10809);
+    final outbound = (config['outbounds'] as List).first as Map;
+    expect((outbound['streamSettings'] as Map).containsKey('finalmask'), isFalse);
+  });
 }
