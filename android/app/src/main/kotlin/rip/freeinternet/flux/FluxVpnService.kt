@@ -3,10 +3,13 @@ package rip.freeinternet.flux
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.service.quicksettings.TileService
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import go.Seq
@@ -28,6 +31,7 @@ class FluxVpnService : VpnService() {
         const val ACTION_STOP = "rip.freeinternet.flux.STOP_VPN"
         const val EXTRA_CONFIG_JSON = "configJson"
         const val EXTRA_SERVER_HOST = "serverHost"
+        const val EXTRA_SERVER_NAME = "serverName"
         const val EXTRA_MTU = "mtu"
         const val EXTRA_GEOIP_URL = "geoipUrl"
         const val EXTRA_GEOSITE_URL = "geositeUrl"
@@ -42,10 +46,41 @@ class FluxVpnService : VpnService() {
         private const val NOTIFICATION_CHANNEL_ID = "flux_vpn"
         private const val NOTIFICATION_ID = 1
         private const val TAG = "FluxVpnService"
+
+        // Кэш последнего успешного подключения — не часть Flutter/Dart вовсе,
+        // читается и пишется полностью нативно, чтобы Quick Settings-плитка
+        // (`FluxQuickTile.kt`, ROADMAP.md — Android Quick Settings Tile) могла
+        // поднять/погасить тоннель без открытия приложения и без Flutter-
+        // движка. Пишется в onStartCommand на каждый реальный старт (в т.ч.
+        // если стартовала сама плитка из уже сохранённых значений —
+        // идемпотентно, ничего не меняется).
+        const val PREFS_NAME = "flux_last_connection"
+        const val PREF_CONFIG_JSON = "configJson"
+        const val PREF_SERVER_HOST = "serverHost"
+        const val PREF_SERVER_NAME = "serverName"
+        const val PREF_MTU = "mtu"
+        const val PREF_GEOIP_URL = "geoipUrl"
+        const val PREF_GEOSITE_URL = "geositeUrl"
+
+        // Плитка не может биндиться напрямую к работающему Service, чтобы
+        // узнать состояние — читает этот флаг (тот же процесс, один class
+        // loader) и просит систему обновить себя через requestTileUpdate,
+        // когда флаг меняется вне собственного onClick/onStartListening.
+        @Volatile
+        var isRunning: Boolean = false
+            private set
+
+        private fun requestTileUpdate(context: Context) {
+            TileService.requestListeningState(
+                context,
+                ComponentName(context, FluxQuickTile::class.java),
+            )
+        }
     }
 
     private var tunInterface: ParcelFileDescriptor? = null
     private var coreController: CoreController? = null
+    private var activeServerName: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -66,6 +101,7 @@ class FluxVpnService : VpnService() {
 
         val configJson = intent?.getStringExtra(EXTRA_CONFIG_JSON)
         val serverHost = intent?.getStringExtra(EXTRA_SERVER_HOST)
+        val serverName = intent?.getStringExtra(EXTRA_SERVER_NAME)
         val mtu = intent?.getIntExtra(EXTRA_MTU, 1500) ?: 1500
         val geoipUrl = intent?.getStringExtra(EXTRA_GEOIP_URL) ?: DEFAULT_GEOIP_URL
         val geositeUrl = intent?.getStringExtra(EXTRA_GEOSITE_URL) ?: DEFAULT_GEOSITE_URL
@@ -74,6 +110,8 @@ class FluxVpnService : VpnService() {
             stopSelf()
             return START_NOT_STICKY
         }
+        activeServerName = serverName
+        cacheLastConnection(configJson, serverHost, serverName, mtu, geoipUrl, geositeUrl)
 
         startForeground(NOTIFICATION_ID, buildNotification())
         Log.d(TAG, "configJson: $configJson")
@@ -151,6 +189,8 @@ class FluxVpnService : VpnService() {
             // (caught in onStartCommand), not through this callback.
             override fun startup(): Long {
                 Log.i(TAG, "xray-core started")
+                isRunning = true
+                requestTileUpdate(applicationContext)
                 VpnStatusBridge.emitStarted()
                 return 0
             }
@@ -183,7 +223,32 @@ class FluxVpnService : VpnService() {
             Log.w(TAG, "closing tun fd failed", e)
         }
         tunInterface = null
-        if (wasRunning) VpnStatusBridge.emitStopped()
+        activeServerName = null
+        if (wasRunning) {
+            isRunning = false
+            requestTileUpdate(applicationContext)
+            VpnStatusBridge.emitStopped()
+        }
+    }
+
+    /** Пишется на каждый реальный старт (включая старт самой плиткой из уже
+     * сохранённых значений — идемпотентно). См. doc-комментарий у [PREFS_NAME]. */
+    private fun cacheLastConnection(
+        configJson: String,
+        serverHost: String,
+        serverName: String?,
+        mtu: Int,
+        geoipUrl: String,
+        geositeUrl: String,
+    ) {
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+            .putString(PREF_CONFIG_JSON, configJson)
+            .putString(PREF_SERVER_HOST, serverHost)
+            .putString(PREF_SERVER_NAME, serverName)
+            .putInt(PREF_MTU, mtu)
+            .putString(PREF_GEOIP_URL, geoipUrl)
+            .putString(PREF_GEOSITE_URL, geositeUrl)
+            .apply()
     }
 
     /** Downloads geoip.dat/geosite.dat into a real file the first time, and
@@ -231,7 +296,7 @@ class FluxVpnService : VpnService() {
         }
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle("Flux")
-            .setContentText("VPN connected")
+            .setContentText(activeServerName?.let { "VPN connected — $it" } ?: "VPN connected")
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setOngoing(true)
             .build()

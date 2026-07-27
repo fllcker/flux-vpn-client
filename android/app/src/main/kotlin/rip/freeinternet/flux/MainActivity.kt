@@ -56,13 +56,14 @@ class MainActivity : FlutterActivity() {
                 "start" -> {
                     val configJson = call.argument<String>("configJson")
                     val serverHost = call.argument<String>("serverHost")
+                    val serverName = call.argument<String>("serverName")
                     val mtu = call.argument<Int>("mtu") ?: 1500
                     val geoipUrl = call.argument<String>("geoipUrl")
                     val geositeUrl = call.argument<String>("geositeUrl")
                     if (configJson == null || serverHost == null) {
                         result.error("bad_args", "configJson/serverHost required", null)
                     } else {
-                        startVpn(configJson, serverHost, mtu, geoipUrl, geositeUrl)
+                        startVpn(configJson, serverHost, serverName, mtu, geoipUrl, geositeUrl)
                         result.success(null)
                     }
                 }
@@ -142,6 +143,7 @@ class MainActivity : FlutterActivity() {
     private fun startVpn(
         configJson: String,
         serverHost: String,
+        serverName: String?,
         mtu: Int,
         geoipUrl: String?,
         geositeUrl: String?,
@@ -149,6 +151,7 @@ class MainActivity : FlutterActivity() {
         val intent = Intent(this, FluxVpnService::class.java).apply {
             putExtra(FluxVpnService.EXTRA_CONFIG_JSON, configJson)
             putExtra(FluxVpnService.EXTRA_SERVER_HOST, serverHost)
+            if (serverName != null) putExtra(FluxVpnService.EXTRA_SERVER_NAME, serverName)
             putExtra(FluxVpnService.EXTRA_MTU, mtu)
             if (geoipUrl != null) putExtra(FluxVpnService.EXTRA_GEOIP_URL, geoipUrl)
             if (geositeUrl != null) putExtra(FluxVpnService.EXTRA_GEOSITE_URL, geositeUrl)

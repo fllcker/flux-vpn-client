@@ -1991,3 +1991,52 @@ Windows-only) — проверка визуальная, пользовател�
    нового состояния заводить не нужно, только сборка меню.
 3. Зависит от иконок, которые делает пользователь — реализация не
    начинается до их готовности (ждём ассеты).
+
+---
+
+## 27. Android Quick Settings Tile — вкл/выкл VPN из шторки — сделано
+
+**Идея:** как у WireGuard — плитка в шторке быстрых настроек Android,
+мгновенно включающая/выключающая VPN без открытия приложения.
+
+**Реализовано** полностью нативно (Kotlin), без участия Flutter-движка в
+рантайме плитки:
+
+- `FluxVpnService.kt` кэширует параметры каждого реального старта
+  (`configJson`/`serverHost`/`serverName`/`mtu`/`geoipUrl`/`geositeUrl`) в
+  `SharedPreferences` (`PREFS_NAME = "flux_last_connection"`) — пишется в
+  `onStartCommand` при любом старте, в т.ч. когда сама плитка перезапускает
+  из уже сохранённых значений (идемпотентно). Новый статический
+  `@Volatile isRunning: Boolean` (companion object) — `true`/`false`
+  выставляется в `CoreCallbackHandler.startup()`/`stopTunnel()`, после чего
+  вызывается `TileService.requestListeningState(...)`, чтобы плитка
+  обновилась, даже если не видна в шторке в момент смены статуса. Заодно
+  уведомление о подключении получило имя сервера в тексте.
+- Новый `FluxQuickTile.kt` (`TileService`) — по клику: если `isRunning` —
+  шлёт `FluxVpnService`'у `ACTION_STOP`; если нет — читает кэш и **если** он
+  есть **и** `VpnService.prepare(this) == null` (пользователь уже когда-то
+  дал согласие на VPN) — стартует `FluxVpnService` напрямую с
+  закэшированными extras. Фоллбек в обоих отрицательных случаях (кэша нет
+  / согласия ещё не было) — просто открыть приложение
+  (`startActivityAndCollapse`, с веткой под API 34+ на `PendingIntent`-
+  перегрузку вместо депрекейтнутой `Intent`-версии).
+- Иконка плитки — `android/app/src/main/res/drawable/ic_tile_vpn.xml`,
+  vector с путём стандартного Material-глифа `vpn_key` (система сама
+  тонирует под активное/неактивное состояние).
+- `AndroidManifest.xml` — `<service>` с
+  `android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"` и
+  intent-filter `android.service.quicksettings.action.QS_TILE`. Новых
+  `<uses-permission>` не потребовалось.
+- Проброс имени сервера для кэша/уведомления/подписи плитки:
+  `xray_engine_android.dart` → `invokeMethod('start', {..., 'serverName':
+  leaf.name})` → `MainActivity.kt` → `EXTRA_SERVER_NAME`.
+
+**Не реализовано осознанно:** обновление кэша при рефреше конфига уже
+активного сервера без нового явного подключения через приложение (ротация
+UUID/пароля на сервере долетит только со следующим реальным `start`) — не
+более хрупко, чем у большинства подобных клиентов. iOS/другие платформы не
+затронуты — Quick Settings это Android-специфичный UI.
+
+Собрано (`flutter build apk --debug`) без ошибок. Ручная проверка (добавить
+плитку в шторку, подключиться один раз из приложения, затем переключать из
+шторки без открытия приложения) — за пользователем.

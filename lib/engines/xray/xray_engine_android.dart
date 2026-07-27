@@ -102,6 +102,7 @@ class XrayEngineAndroid implements CoreEngine {
     await _channel.invokeMethod('start', {
       'configJson': jsonEncode(xrayConfig),
       'serverHost': serverIp,
+      'serverName': leaf.name,
       'mtu': 1500,
       'geoipUrl': geoipUrl,
       'geositeUrl': geositeUrl,
