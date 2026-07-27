@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../app/layout_breakpoints.dart';
+import '../../app/notifications.dart';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
 import '../../core_abstraction/connection_session.dart';
@@ -13,6 +14,7 @@ import '../../core_abstraction/proxy_node.dart';
 import '../../engines/geo_assets.dart';
 import '../../engines/singbox/geo_ruleset_cache.dart';
 import '../../engines/xray/windows_elevation.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/globe/country_centroids.dart';
 import '../../widgets/globe/shader_background.dart';
 import '../../widgets/globe/sphere_globe.dart';
@@ -114,6 +116,13 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     final settings = ref.read(appSettingsProvider);
     await ensureGeoAssets(geoipUrl: settings.geoipUrl, geositeUrl: settings.geositeUrl);
     if (!mounted) return;
+    // ensureGeoAssets — best-effort, сама не сообщает об успехе/неудаче
+    // (см. её doc-комментарий) — единственный внешний способ узнать,
+    // получилось ли, это проверить сами файлы после вызова. Не меняем её
+    // сигнатуру ради одного уведомления — трек 25.
+    if (!File(geoipFilePath()).existsSync() || !File(geositeFilePath()).existsSync()) {
+      showFluxNotification(title: S.notificationGeoAssetsFailedTitle);
+    }
     final allRoutingRules = [
       for (final leaf in flattenAllLeaves(ref.read(coreConfigProvider)))
         ...leaf.routingRules,
@@ -150,15 +159,18 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
         ? ConnectionMode.tun
         : ConnectionMode.proxy;
 
+    // Реальный UI-фидбэк об ошибке подключения (в т.ч. при скрытом окне) уже
+    // приходит отдельно — `connectToServer` сама переводит состояние в
+    // `ConnectionError`, а `ConnectionNotifications` (трек 25, слушает
+    // `connectionControllerProvider` глобально) на это шлёт тост. `catch`
+    // ниже — просто страховка на случай синхронного исключения до самого
+    // перехода состояния, не роняем экран из-за фонового автодействия при
+    // старте.
     try {
       await ref
           .read(connectionControllerProvider.notifier)
           .connectToServer(leaf, mode: mode);
-    } catch (_) {
-      // Реальный UI-фидбэк об ошибке автоподключения при скрытом окне —
-      // ROADMAP.md, трек 25 (уведомления). Тут — best-effort, не роняем
-      // экран из-за фонового автодействия при старте.
-    }
+    } catch (_) {}
   }
 
   @override

@@ -1,5 +1,6 @@
 import 'app_locale.dart';
 import '../core_abstraction/app_settings.dart';
+import '../core_abstraction/connection_session.dart';
 
 bool get _en => AppLocale.effective == AppLanguage.en;
 
@@ -33,6 +34,26 @@ abstract final class S {
   static String get trayDisconnect => _en ? 'Disconnect' : 'Отключить';
   static String get trayConnect => _en ? 'Connect' : 'Подключить';
   static String get trayExit => _en ? 'Exit' : 'Выход';
+  static String get trayStatusConnected => _en ? 'Connected' : 'Подключено';
+  static String get trayStatusConnecting => _en ? 'Connecting…' : 'Подключение…';
+
+  // app/connection_notifications.dart — трек 25
+  static String get notificationConnectedTitle =>
+      _en ? 'Connected' : 'Подключено';
+  static String notificationConnectedBody(String serverName, ConnectionMode mode) {
+    final modeLabel = mode == ConnectionMode.tun ? 'TUN' : (_en ? 'Proxy' : 'Прокси');
+    return '$serverName — $modeLabel';
+  }
+
+  static String get notificationDisconnectedTitle =>
+      _en ? 'Disconnected' : 'Отключено';
+  static String get notificationErrorTitle =>
+      _en ? 'Connection error' : 'Ошибка подключения';
+  static String get notificationGeoAssetsFailedTitle => _en
+      ? 'Failed to download routing databases'
+      : 'Не удалось скачать базы роутинга';
+  static String get showNotificationsLabel =>
+      _en ? 'Show notifications' : 'Показывать уведомления';
 
   // server_list_panel.dart
   static String routingTitleFor(String serverName) =>

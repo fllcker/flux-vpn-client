@@ -531,6 +531,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ),
           ],
+          const SizedBox(height: 12),
+          PortSwitch(
+            value: settings.showNotifications,
+            label: Text(S.showNotificationsLabel),
+            onChanged: (value) =>
+                notifier.update((s) => s.copyWith(showNotifications: value)),
+          ),
         ],
       ),
       _SettingsSection.logs => Column(

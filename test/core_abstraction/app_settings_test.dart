@@ -57,4 +57,22 @@ void main() {
     expect(updated.autoStartShowWindow, isFalse);
     expect(updated.autoConnectMode, ConnectionMode.proxy);
   });
+
+  group('showNotifications (трек 25)', () {
+    test('defaults to true', () {
+      const settings = AppSettings();
+      expect(settings.showNotifications, isTrue);
+    });
+
+    test('round-trips false through JSON', () {
+      const settings = AppSettings(showNotifications: false);
+      final restored = AppSettings.fromJson(settings.toJson());
+      expect(restored.showNotifications, isFalse);
+    });
+
+    test('missing key defaults to true (back-compat for existing settings.json)', () {
+      final settings = AppSettings.fromJson({});
+      expect(settings.showNotifications, isTrue);
+    });
+  });
 }

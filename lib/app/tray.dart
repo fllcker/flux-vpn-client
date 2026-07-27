@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../core_abstraction/connection_session.dart';
 import '../core_abstraction/core_config_provider.dart';
 import '../l10n/strings.dart';
 import '../features/connection/connection_controller.dart';
@@ -29,20 +30,60 @@ class FluxTray with TrayListener {
     if (!Platform.isWindows) return;
 
     trayManager.addListener(this);
-    await trayManager.setIcon('assets/tray_icon.ico');
+    await _updateIcon();
     await trayManager.setToolTip('Flux');
     await _updateMenu();
 
-    container.listen(connectionControllerProvider, (_, _) => _updateMenu());
+    container.listen(connectionControllerProvider, (_, _) {
+      _updateIcon();
+      _updateMenu();
+    });
+  }
+
+  /// Иконка меняется по режиму активного подключения (ROADMAP.md, трек 26)
+  /// — отдельные `.ico` для Proxy/TUN, поставленные пользователем
+  /// (`assets/tray_icon_proxy.ico`/`tray_icon_tun.ico`), тот же
+  /// мульти-резолюшн набор размеров, что и у дефолтной `tray_icon.ico`.
+  Future<void> _updateIcon() async {
+    final state = container.read(connectionControllerProvider);
+    final path = switch (state) {
+      ConnectionConnected(mode: ConnectionMode.proxy) =>
+        'assets/tray_icon_proxy.ico',
+      ConnectionConnected(mode: ConnectionMode.tun) => 'assets/tray_icon_tun.ico',
+      _ => 'assets/tray_icon.ico',
+    };
+    await trayManager.setIcon(path);
   }
 
   Future<void> _updateMenu() async {
-    final connected = container.read(connectionControllerProvider)
-        is ConnectionConnected;
+    final state = container.read(connectionControllerProvider);
+    final connected = state is ConnectionConnected;
+
+    // Информационные строки (имя сервера/режим/статус) — только когда есть
+    // что показать, не плодим пустые пункты в состоянии Off. `disabled`
+    // делает их некликабельными — это подпись, не действие.
+    final infoItems = switch (state) {
+      ConnectionConnected(:final serverName, :final mode) => [
+        MenuItem(key: 'info-server', label: serverName, disabled: true),
+        MenuItem(
+          key: 'info-mode',
+          label: mode == ConnectionMode.tun ? 'TUN' : S.throughProxy,
+          disabled: true,
+        ),
+        MenuItem(key: 'info-status', label: S.trayStatusConnected, disabled: true),
+        MenuItem.separator(),
+      ],
+      ConnectionConnecting() => [
+        MenuItem(key: 'info-status', label: S.trayStatusConnecting, disabled: true),
+        MenuItem.separator(),
+      ],
+      _ => const <MenuItem>[],
+    };
 
     await trayManager.setContextMenu(
       Menu(
         items: [
+          ...infoItems,
           MenuItem(key: 'show', label: S.trayOpen),
           MenuItem(key: 'toggle', label: connected ? S.trayDisconnect : S.trayConnect),
           MenuItem.separator(),

@@ -76,6 +76,11 @@ dependencies:
   tray_manager: ^0.5.3
   package_info_plus: ^10.2.1
 
+  # Системные Windows-уведомления при подключении/отключении (см.
+  # ROADMAP.md, трек 25) — тот же издатель (leanflutter), что и
+  # tray_manager/window_manager выше.
+  local_notifier: ^0.1.6
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

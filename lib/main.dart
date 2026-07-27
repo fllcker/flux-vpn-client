@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app/app_title_bar.dart';
+import 'app/connection_notifications.dart';
 import 'app/deep_link.dart';
+import 'app/notifications.dart';
 import 'app/single_instance.dart';
 import 'app/tray.dart';
 import 'core_abstraction/app_settings.dart';
@@ -100,6 +102,8 @@ void main(List<String> args) async {
   // перехват в `_FluxAppState.onWindowClose` (main.dart, WindowListener).
   await windowManager.setPreventClose(true);
   await FluxTray(container).init();
+  await initLocalNotifier();
+  ConnectionNotifications(container).init();
 
   windowManager.waitUntilReadyToShow(windowOptions, () async {
     await _warmUpOverlays();

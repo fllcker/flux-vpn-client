@@ -99,6 +99,11 @@ class AppSettings {
   /// автозапуска почему-то не сработала.
   final ConnectionMode autoConnectMode;
 
+  /// Системные Windows-уведомления при подключении/отключении/ошибке (см.
+  /// ROADMAP.md, трек 25) — `true` по умолчанию, это и есть сама фича, не
+  /// скрытая опция; тумблер даёт отключить, если мешают.
+  final bool showNotifications;
+
   final TunCoreType tunCoreType;
 
   /// Апстрим-резолвер TUN-режима. В Proxy-режиме не используется намеренно:
@@ -143,6 +148,7 @@ class AppSettings {
     this.autoStartShowWindow = false,
     this.autoConnectOnStartup = false,
     this.autoConnectMode = ConnectionMode.proxy,
+    this.showNotifications = true,
     this.tunCoreType = TunCoreType.singBox,
     this.tunDnsServer = defaultTunDnsServer,
     this.coreLogLevel = CoreLogLevel.warn,
@@ -195,6 +201,7 @@ class AppSettings {
       json['autoConnectMode'],
       ConnectionMode.proxy,
     ),
+    showNotifications: json['showNotifications'] as bool? ?? true,
     tunCoreType: _enumFromJson(
       TunCoreType.values,
       json['tunCoreType'],
@@ -227,6 +234,7 @@ class AppSettings {
     'autoStartShowWindow': autoStartShowWindow,
     'autoConnectOnStartup': autoConnectOnStartup,
     'autoConnectMode': autoConnectMode.name,
+    'showNotifications': showNotifications,
     'tunCoreType': tunCoreType.name,
     'tunDnsServer': tunDnsServer,
     'coreLogLevel': coreLogLevel.name,
@@ -248,6 +256,7 @@ class AppSettings {
     bool? autoStartShowWindow,
     bool? autoConnectOnStartup,
     ConnectionMode? autoConnectMode,
+    bool? showNotifications,
     TunCoreType? tunCoreType,
     String? tunDnsServer,
     CoreLogLevel? coreLogLevel,
@@ -269,6 +278,7 @@ class AppSettings {
       autoStartShowWindow: autoStartShowWindow ?? this.autoStartShowWindow,
       autoConnectOnStartup: autoConnectOnStartup ?? this.autoConnectOnStartup,
       autoConnectMode: autoConnectMode ?? this.autoConnectMode,
+      showNotifications: showNotifications ?? this.showNotifications,
       tunCoreType: tunCoreType ?? this.tunCoreType,
       tunDnsServer: tunDnsServer ?? this.tunDnsServer,
       coreLogLevel: coreLogLevel ?? this.coreLogLevel,
