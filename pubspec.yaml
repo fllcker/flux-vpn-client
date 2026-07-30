@@ -81,6 +81,24 @@ dependencies:
   # tray_manager/window_manager выше.
   local_notifier: ^0.1.6
 
+  # Свой видеофон (HomeBackground.customVideo) — юзер подсовывает
+  # произвольный видеофайл, он копируется в аппдату и крутится в лупе.
+  # video_player закрывает Android/iOS, video_player_win — Windows через
+  # Media Foundation (без нативных бинарников в отличие от media_kit —
+  # решили не тащить libmpv/FFmpeg ради размера инсталлятора).
+  video_player: ^2.13.0
+  video_player_win: ^3.2.2
+
+  # Выбор видеофайла системным диалогом. Версии file_picker 8.0.6–11.x
+  # зависят от win32 ^5.x, конфликтуют с нашим win32 ^6.3.0 (job
+  # object/elevation, см. child_process_job.dart) — только 12.x (пока beta)
+  # совместим.
+  file_picker: ">=12.0.0-beta.1 <13.0.0"
+
+  # Каталог для копии выбранного видеофайла — кроссплатформенно, в отличие
+  # от `app_paths.dart` (там хардкод под %APPDATA%, Windows-only).
+  path_provider: ^2.1.6
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

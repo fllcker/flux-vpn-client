@@ -55,7 +55,12 @@ class WelcomeStep extends StatelessWidget {
 class BackgroundStep extends ConsumerWidget {
   const BackgroundStep({super.key});
 
-  static const _options = HomeBackground.values;
+  // customVideo намеренно не в онбординге — на этом шаге ещё нет
+  // выбранного видеофайла (тот выбирается в settings_page.dart), карточка
+  // без превью была бы бессмысленной.
+  static final _options = HomeBackground.values
+      .where((b) => b != HomeBackground.customVideo)
+      .toList();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -105,6 +110,7 @@ class _BackgroundPreviewCard extends StatelessWidget {
     HomeBackground.simpleGradient => 'Simple Gradient',
     HomeBackground.colorBends => 'Color Bends',
     HomeBackground.galaxy => 'Galaxy',
+    HomeBackground.customVideo => S.backgroundCustomVideo,
   };
 
   Widget get _preview => switch (value) {
@@ -132,6 +138,9 @@ class _BackgroundPreviewCard extends StatelessWidget {
       assetPath: 'shaders/color_bends.frag',
     ),
     HomeBackground.galaxy => const ShaderBackground(assetPath: 'shaders/galaxy.frag'),
+    // Не в `_options` (см. выше) — сюда управление не попадает никогда,
+    // но `_preview` должен быть тотальным.
+    HomeBackground.customVideo => ColoredBox(color: PortColors.background),
   };
 
   @override

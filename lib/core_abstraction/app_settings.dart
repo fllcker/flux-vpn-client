@@ -8,8 +8,10 @@ enum AppLanguage { system, ru, en }
 
 /// Фон главного экрана подключения (за карточкой Off/Proxy/TUN).
 /// `simpleGradient`/`colorBends`/`galaxy` — шейдерные фоны, см.
-/// ROADMAP.md, "Фон — шейдерные эффекты".
-enum HomeBackground { none, globe, simpleGradient, colorBends, galaxy }
+/// ROADMAP.md, "Фон — шейдерные эффекты". `customVideo` — свой видеофайл
+/// юзера (путь к копии — `AppSettings.customVideoPath`), см.
+/// `video_background.dart`.
+enum HomeBackground { none, globe, simpleGradient, colorBends, galaxy, customVideo }
 
 /// Способ проверки пинга сервера — как в Happ: через локальный
 /// прокси-порт xray (реальная задержка "как будет ощущаться"), напрямую по
@@ -126,6 +128,13 @@ class AppSettings {
   /// запусками.
   final String? lastSelectedServerId;
 
+  /// Путь к скопированному видеофайлу для `HomeBackground.customVideo` —
+  /// абсолютный путь внутри аппдаты (`video_background_storage.dart`), не
+  /// оригинальный путь, который выбрал юзер (тот может быть на съёмном
+  /// диске/временной папке и исчезнуть). `null`, если файл ещё не выбран —
+  /// тогда `customVideo` в UI ведёт себя как `none`.
+  final String? customVideoPath;
+
   /// Первый запуск показывает онбординг (`lib/features/onboarding/`) вместо
   /// `ConnectionScreen` — см. `main.dart`. Дефолт этого поля НАРОЧНО разный
   /// между конструктором (`false`) и `fromJson` (`true`, см. ниже): если
@@ -155,6 +164,7 @@ class AppSettings {
     this.geoipUrl = defaultGeoipUrl,
     this.geositeUrl = defaultGeositeUrl,
     this.lastSelectedServerId,
+    this.customVideoPath,
     this.onboardingCompleted = false,
   });
 
@@ -216,6 +226,7 @@ class AppSettings {
     geoipUrl: json['geoipUrl'] as String? ?? defaultGeoipUrl,
     geositeUrl: json['geositeUrl'] as String? ?? defaultGeositeUrl,
     lastSelectedServerId: json['lastSelectedServerId'] as String?,
+    customVideoPath: json['customVideoPath'] as String?,
     // ?? true, не ?? false — см. комментарий у поля: отсутствие ключа тут
     // значит "апгрейд с версии, где онбординга не было", а не "первый
     // запуск" (тот идёт через конструктор напрямую, когда файла нет вовсе).
@@ -241,6 +252,7 @@ class AppSettings {
     'geoipUrl': geoipUrl,
     'geositeUrl': geositeUrl,
     if (lastSelectedServerId != null) 'lastSelectedServerId': lastSelectedServerId,
+    if (customVideoPath != null) 'customVideoPath': customVideoPath,
     'onboardingCompleted': onboardingCompleted,
   };
 
@@ -263,6 +275,11 @@ class AppSettings {
     String? geoipUrl,
     String? geositeUrl,
     String? lastSelectedServerId,
+    String? customVideoPath,
+    // Обычный `?? this.` не даёт стереть путь (null означает "не менять",
+    // как везде в этом copyWith) — а стирать нужно, когда юзер убирает
+    // видеофон (см. `settings_page.dart`, `_clearCustomVideo`).
+    bool clearCustomVideoPath = false,
     bool? onboardingCompleted,
   }) {
     return AppSettings(
@@ -285,6 +302,9 @@ class AppSettings {
       geoipUrl: geoipUrl ?? this.geoipUrl,
       geositeUrl: geositeUrl ?? this.geositeUrl,
       lastSelectedServerId: lastSelectedServerId ?? this.lastSelectedServerId,
+      customVideoPath: clearCustomVideoPath
+          ? null
+          : (customVideoPath ?? this.customVideoPath),
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
     );
   }

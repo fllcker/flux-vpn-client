@@ -19,6 +19,7 @@ import '../../widgets/globe/country_centroids.dart';
 import '../../widgets/globe/shader_background.dart';
 import '../../widgets/globe/sphere_globe.dart';
 import '../../widgets/globe/starfield.dart';
+import '../../widgets/globe/video_background.dart';
 import '../../widgets/port_ui/port_ui.dart';
 import '../ping/ping_all.dart';
 import '../servers/flag_emoji.dart';
@@ -175,8 +176,14 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final homeBackground = ref.watch(appSettingsProvider).homeBackground;
-    final showBackground = homeBackground != HomeBackground.none;
+    final settings = ref.watch(appSettingsProvider);
+    final homeBackground = settings.homeBackground;
+    // customVideo без выбранного файла ведёт себя как none — юзер мог
+    // переключиться на этот пункт в настройках, но ещё не выбрать видео.
+    final showBackground =
+        homeBackground != HomeBackground.none &&
+        (homeBackground != HomeBackground.customVideo ||
+            settings.customVideoPath != null);
 
     final mainContent = Stack(
       children: [
@@ -216,6 +223,9 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
             ),
             HomeBackground.galaxy => const Positioned.fill(
               child: ShaderBackground(assetPath: 'shaders/galaxy.frag'),
+            ),
+            HomeBackground.customVideo => Positioned.fill(
+              child: VideoBackground(filePath: settings.customVideoPath!),
             ),
           },
         const ConnectPanel(),

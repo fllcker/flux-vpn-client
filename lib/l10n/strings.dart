@@ -133,6 +133,15 @@ abstract final class S {
   static String get homeBackgroundLabel => _en ? 'Home background' : 'Фон на главной';
   static String get backgroundNone => _en ? 'None' : 'Нет';
   static String get backgroundGlobe => _en ? 'Globe' : 'Планета';
+  static String get backgroundCustomVideo => _en ? 'Custom video' : 'Своё видео';
+  static String get chooseVideoFileLabel => _en ? 'Choose file…' : 'Выбрать файл…';
+  static String get changeVideoFileLabel => _en ? 'Change file…' : 'Заменить файл…';
+  static String get removeVideoFileLabel => _en ? 'Remove' : 'Убрать';
+  static String get noVideoFileSelected =>
+      _en ? 'No video selected yet' : 'Видео ещё не выбрано';
+  static String videoImportFailure(Object error) => _en
+      ? 'Could not import video: $error'
+      : 'Не удалось импортировать видео: $error';
 
   // settings_page.dart — пинг
   static String get checkMethodLabel => _en ? 'Check method' : 'Способ проверки';

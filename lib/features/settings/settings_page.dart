@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -17,6 +18,7 @@ import '../../l10n/strings.dart';
 import '../../widgets/port_ui/port_ui.dart';
 import '../servers/flatten_leaves.dart';
 import 'about_info.dart';
+import 'custom_video_storage.dart';
 
 enum _SettingsSection {
   personalization(LucideIcons.palette),
@@ -76,6 +78,7 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   _SettingsSection _section = _SettingsSection.personalization;
   bool _updatingGeoAssets = false;
+  bool _importingVideo = false;
 
   @override
   Widget build(BuildContext context) {
@@ -296,11 +299,55 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   value: HomeBackground.galaxy,
                   child: Text('Galaxy'),
                 ),
+                PortSelectOption(
+                  value: HomeBackground.customVideo,
+                  child: Text(S.backgroundCustomVideo),
+                ),
               ],
               selectedOptionBuilder: (context, value) =>
                   Text(_homeBackgroundLabel(value)),
             ),
           ),
+          if (settings.homeBackground == HomeBackground.customVideo) ...[
+            const SizedBox(height: 12),
+            _SettingRow(
+              label: settings.customVideoPath == null
+                  ? S.noVideoFileSelected
+                  : settings.customVideoPath!.split(
+                      Platform.isWindows ? '\\' : '/',
+                    ).last,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  PortButton.outline(
+                    leading: _importingVideo
+                        ? null
+                        : const Icon(LucideIcons.fileVideo, size: 16),
+                    onPressed: _importingVideo
+                        ? null
+                        : () => _pickVideoFile(context, notifier),
+                    child: Text(
+                      _importingVideo
+                          ? '…'
+                          : settings.customVideoPath == null
+                          ? S.chooseVideoFileLabel
+                          : S.changeVideoFileLabel,
+                    ),
+                  ),
+                  if (settings.customVideoPath != null) ...[
+                    const SizedBox(width: 8),
+                    PortButton.outline(
+                      leading: const Icon(LucideIcons.x, size: 16),
+                      onPressed: _importingVideo
+                          ? null
+                          : () => _removeVideoFile(settings, notifier),
+                      child: Text(S.removeVideoFileLabel),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ],
       ),
       _SettingsSection.ping => Column(
@@ -656,6 +703,45 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
+  Future<void> _pickVideoFile(
+    BuildContext context,
+    AppSettingsController notifier,
+  ) async {
+    final pickedFile = await FilePicker.pickFile(type: FileType.video);
+    final pickedPath = pickedFile?.path;
+    if (pickedPath == null) return;
+
+    setState(() => _importingVideo = true);
+    try {
+      final storedPath = await importCustomVideo(pickedPath);
+      notifier.update(
+        (s) => s.copyWith(
+          homeBackground: HomeBackground.customVideo,
+          customVideoPath: storedPath,
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      PortToaster.of(context).show(PortToast(title: Text(S.videoImportFailure(e))));
+    } finally {
+      if (mounted) setState(() => _importingVideo = false);
+    }
+  }
+
+  Future<void> _removeVideoFile(
+    AppSettings settings,
+    AppSettingsController notifier,
+  ) async {
+    final path = settings.customVideoPath;
+    if (path != null) await deleteCustomVideo(path);
+    notifier.update(
+      (s) => s.copyWith(
+        homeBackground: HomeBackground.none,
+        clearCustomVideoPath: true,
+      ),
+    );
+  }
+
   String _themeModeLabel(AppThemeMode mode) => switch (mode) {
     AppThemeMode.system => S.themeSystem,
     AppThemeMode.light => S.themeLight,
@@ -676,6 +762,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     HomeBackground.simpleGradient => 'Simple Gradient',
     HomeBackground.colorBends => 'Color Bends',
     HomeBackground.galaxy => 'Galaxy',
+    HomeBackground.customVideo => S.backgroundCustomVideo,
   };
 
   String _pingModeLabel(PingMode mode) => switch (mode) {
