@@ -25,16 +25,20 @@ import 'dart:io';
 /// (например по имени процесса) — заменить на `runElevatedMacos` через
 /// подписанный хелпер, когда появится Developer-аккаунт.
 Future<Process> startElevatedMacos(String executable, List<String> arguments) {
-  // AppleScript-строка собирается из отдельных shell-аргументов через ' '
-  // как разделитель — ни исполняемый путь, ни аргументы sing-box-конфига
-  // (сгенерированный нами JSON-файл во `fluxLogDirectory()`) не содержат
-  // пользовательского ввода извне, так что экранирование кавычек тут не
-  // нужно, но одинарные кавычки вокруг всей команды всё равно обязательны
-  // для `do shell script`.
-  final shellCommand = ([executable, ...arguments]).join(' ');
+  // Каждый токен — в одинарных кавычках: `fluxLogDirectory()` живёт под
+  // `~/Library/Application Support/flux/...`, и без кавычек пробел в
+  // "Application Support" разбивает путь на два отдельных shell-аргумента,
+  // после чего sing-box падает с "no such file or directory" на конфиге —
+  // тот же класс бага, что уже был в geo_assets.dart (см. ROADMAP.md).
+  final shellCommand = [executable, ...arguments].map(_shellQuote).join(' ');
+  // Кавычки самого AppleScript-строкового литерала — экранируем то, что
+  // осталось снаружи одинарных кавычек (сами одинарные кавычки для `do
+  // shell script` не нужно трогать, значение внутри них шелл не парсит).
   final escaped = shellCommand.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
   return Process.start('osascript', [
     '-e',
     'do shell script "$escaped" with administrator privileges',
   ]);
 }
+
+String _shellQuote(String value) => "'${value.replaceAll("'", "'\\''")}'";
