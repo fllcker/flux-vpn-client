@@ -52,31 +52,55 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
 
   @override
   Widget build(BuildContext context) {
-    final titleRow = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          Image.asset(
-            'assets/icon.png',
-            width: 20,
-            height: 20,
-            color: PortColors.foreground,
-            colorBlendMode: BlendMode.srcIn,
-          ),
-          const SizedBox(width: 8),
-          Text('Flux', style: PortText.small),
-        ],
-      ),
+    final logo = Image.asset(
+      'assets/icon.png',
+      width: 20,
+      height: 20,
+      color: PortColors.foreground,
+      colorBlendMode: BlendMode.srcIn,
     );
 
+    // На macOS `TitleBarStyle.hidden` (main.dart) убирает только текст
+    // заголовка — нативные traffic lights (закрыть/свернуть/развернуть)
+    // остаются слева поверх окна. Рисовать там же свои лого/кнопки нельзя —
+    // логотип сдвинут в центр, а свои min/max/close вообще не нужны, ими и
+    // так управляют traffic lights.
+    final titleRow = Platform.isMacOS
+        ? Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              logo,
+              const SizedBox(width: 8),
+              Text('Flux', style: PortText.small),
+            ],
+          )
+        : Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                logo,
+                const SizedBox(width: 8),
+                Text('Flux', style: PortText.small),
+              ],
+            ),
+          );
+
+    // Нативный macOS-тайтлбар с traffic lights — 28pt; 40 (Windows/прочее)
+    // тут был бы непропорционально толстым по сравнению с самими traffic
+    // lights (те же 28pt слева, см. SizedBox(width: 70) выше).
+    final barHeight = Platform.isMacOS ? 28.0 : 40.0;
+
     return Container(
-      height: 40,
+      height: barHeight,
       decoration: BoxDecoration(
         color: PortColors.background,
         border: Border(bottom: BorderSide(color: PortColors.border)),
       ),
       child: Row(
         children: [
+          // Ширина traffic lights в hidden-режиме — см. Apple HIG, тот же
+          // отступ использует сам AppKit под системный трафлайт-кластер.
+          if (Platform.isMacOS) const SizedBox(width: 70),
           // DragToMoveArea/minimize/maximize/close — окно с рамкой и
           // системными кнопками есть только на десктопе (см. main.dart,
           // `TitleBarStyle.hidden` — кастомный тайтлбар вместо системного).
@@ -90,17 +114,22 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
           _TitleBarButton(
             icon: widget.settingsOpen ? LucideIcons.x : LucideIcons.settings,
             iconSize: 13,
+            height: barHeight,
             active: widget.settingsOpen,
             onPressed: widget.onToggleSettings,
           ),
-          if (Platform.isWindows || Platform.isMacOS) ...[
+          // Свои min/max/close нужны только на Windows — на macOS это уже
+          // делают нативные traffic lights (см. выше).
+          if (Platform.isWindows) ...[
             _TitleBarButton(
               icon: LucideIcons.minus,
+              height: barHeight,
               onPressed: () => windowManager.minimize(),
             ),
             _TitleBarButton(
               icon: _maximized ? LucideIcons.copy : LucideIcons.square,
               iconSize: _maximized ? 13 : 12,
+              height: barHeight,
               onPressed: () => windowManager.isMaximized().then((maximized) {
                 if (maximized) {
                   windowManager.unmaximize();
@@ -124,6 +153,7 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
 class _TitleBarButton extends StatefulWidget {
   final IconData icon;
   final double iconSize;
+  final double height;
   final Color? hoverColor;
   final bool active;
   final VoidCallback onPressed;
@@ -132,6 +162,7 @@ class _TitleBarButton extends StatefulWidget {
     required this.icon,
     required this.onPressed,
     this.iconSize = 14,
+    this.height = 40,
     this.hoverColor,
     this.active = false,
   });
@@ -161,7 +192,7 @@ class _TitleBarButtonState extends State<_TitleBarButton> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           width: 46,
-          height: 40,
+          height: widget.height,
           color: background,
           alignment: Alignment.center,
           child: Icon(widget.icon, size: widget.iconSize, color: iconColor),

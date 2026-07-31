@@ -50,6 +50,7 @@ class FluxTray with TrayListener {
   /// сконвертированы из тех же `.ico`).
   Future<void> _updateIcon() async {
     final state = container.read(connectionControllerProvider);
+    final connected = state is ConnectionConnected;
     final path = switch (state) {
       ConnectionConnected(mode: ConnectionMode.proxy) =>
         Platform.isMacOS
@@ -64,7 +65,12 @@ class FluxTray with TrayListener {
             ? 'assets/tray_icon_macos.png'
             : 'assets/tray_icon.ico',
     };
-    await trayManager.setIcon(path);
+    // Off-иконка на macOS — однотонный контур без цвета, поэтому рисуем её
+    // как template image: система сама красит её под текущую (свето-
+    // /тёмную) тему меню-бара по альфа-каналу, вместо фиксированного серого,
+    // который на светлой теме сливался с фоном. Proxy/TUN-иконки цветные
+    // (статус-индикация), их шаблоном не делаем — так и было раньше.
+    await trayManager.setIcon(path, isTemplate: Platform.isMacOS && !connected);
   }
 
   Future<void> _updateMenu() async {

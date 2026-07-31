@@ -85,28 +85,78 @@ CLAUDE.md: proxy/TUN-режим Claude в этом проекте сам не т
   `NSAppleEventManager`) сверены по документации/по аналогии с Android
   (`MainActivity.kt`), но первая реальная компиляция — на Маке.
 
+## Обновление (2026-07-31, реальный Mac, macOS 15.3.1, Xcode 16.4)
+
+Пользователь перешёл на Mac. Поставлены Flutter (brew cask) и CocoaPods
+(brew), Xcode 16.4 через App Store (macOS 15.3.1 не поддерживает Xcode 26 —
+взята последняя версия под Sequoia, апгрейд ОС не потребовался).
+
+- **Первая сборка** — `flutter build macos --debug` сначала упала:
+  `FluxDeepLink.swift` лежал в `macos/Runner/`, но не был добавлен в
+  `Runner.xcodeproj/project.pbxproj` (писался вслепую без Xcode, поэтому не
+  попал ни в `PBXFileReference`/`PBXBuildFile`, ни в Sources build phase).
+  Добавлено вручную в `.pbxproj` — после этого сборка прошла чисто.
+- **Copy Files build phase — сделано**: добавлен Run Script build phase
+  "Bundle xray + sing-box" в `Runner.xcodeproj/project.pbxproj` (после
+  `Bundle Framework`, перед Flutter assemble script), копирует
+  `assets/xray-macos/` → `Contents/Resources/xray/` и
+  `assets/sing-box-macos/` → `Contents/Resources/sing-box/` через `rsync`
+  (no-op с предупреждением, если каталог-источник ещё не заполнен fetch-
+  скриптом). TODO-пометки в обоих `SOURCE.md` больше не актуальны.
+- **Бинарники загружены и проверены** — `fetch_xray_macos.sh`/
+  `fetch_sing_box_macos.sh` отработали, `xray version`/`sing-box version`
+  запускаются из собранного бандла по путям, которые ожидают
+  `defaultMacosXrayExecutablePath()`/`defaultMacosSingBoxExecutablePath()`.
+  Само proxy/TUN-подключение НЕ тестировалось (см. CLAUDE.md — Claude не
+  тестирует proxy/TUN в этом проекте ни на одной платформе); это должен
+  проверить пользователь лично.
+- `flutter analyze` — чисто.
+- **Первый реальный запуск приложения** выявил 4 бага, все найдены и
+  исправлены:
+  - **`about_info.dart` показывал "не найден" для xray-core/sing-box** —
+    файл жёстко импортировал и вызывал Windows-функции путей
+    (`defaultXrayExecutablePath()`/`defaultSingBoxExecutablePath()`) без
+    ветки `Platform.isMacOS`. Добавлено ветвление на
+    `defaultMacosXrayExecutablePath()`/`defaultMacosSingBoxExecutablePath()`.
+  - **Proxy-подключение мгновенно отваливалось** — настоящая причина
+    (нашлась в `~/Library/Application Support/flux/logs/flux_xray_primary.log`):
+    `open geosite.dat: no such file or directory`. `geo_assets.dart`
+    строил `geoipFilePath()`/`geositeFilePath()` через хардкод `\\`
+    вместо `Platform.pathSeparator` — на Windows совпадало с реальным
+    разделителем случайно, на macOS файлы скачивались в файл с
+    буквальным `\` в имени вместо `geo/geoip.dat`/`geo/geosite.dat`, xray
+    не находил geosite-базу для правила `geosite:category-gov-ru` и падал
+    сразу после старта. Исправлено, файлы-мусор с `\` в имени удалены.
+    После фикса пользователь подтвердил: **Proxy-режим подключается и
+    работает**.
+  - **Трей-иконка казалась отсутствующей в состоянии "выключено"** — код
+    был в порядке (ассеты объявлены, путь верный, `FluxTray.init()` не
+    падает — уведомления после неё стартуют штатно). Настоящая причина:
+    дефолтная off-иконка (`tray_icon_macos.png`) — блёклый серый контур
+    без заливки, при уменьшении до реального размера строки меню (18px)
+    становится почти нечитаемой и сливается со светлой темой. Proxy/TUN-
+    иконки остались видны, т.к. они цветные и жирные ("PROXY"/"TUN").
+    Исправлено — off-иконка теперь рисуется как `isTemplate: true`
+    (`tray.dart`), macOS сам красит её под текущую тему меню-бара по
+    альфа-каналу; Proxy/TUN-иконки остались цветными (`isTemplate: false`)
+    для статус-индикации.
+  - **Тайтлбар перекрывал нативные traffic lights** — `TitleBarStyle.hidden`
+    (window_manager) на macOS убирает только текст заголовка, сами
+    traffic lights (закрыть/свернуть/развернуть) остаются нативными и
+    рисуются поверх окна слева. Кастомные кнопки min/max/close на macOS
+    были лишними — убраны (оставлены только на Windows), лого сдвинуто в
+    центр, слева зарезервирован отступ под traffic lights, высота бара
+    уменьшена до 28pt (нативный масштаб) вместо общих 40.
+
 ## Что осталось до паритета с Windows
 
 Порядок — примерно в порядке "что нужно раньше".
 
-1. **Первая сборка в Xcode** — открыть `macos/Runner.xcworkspace`, дать
-   `flutter build macos`/`flutter run -d macos` собраться, исправить то, что
-   всплывёт (скорее всего: мелкие Swift-опечатки, deployment target,
-   podspec-конфликты у `window_manager`/`tray_manager`/`local_notifier` —
-   ни разу не собирались вместе на этом проекте).
-2. **Xcode Copy Files build phase** — `windows/CMakeLists.txt` копирует
-   `assets/xray`/`assets/sing-box` рядом с `flux.exe` при каждой сборке; для
-   macOS такой шаг ещё не настроен (не делается из Xcode-проекта без
-   Xcode). Нужно добавить build phase, кладущую `assets/xray-macos/` →
-   `Flux.app/Contents/Resources/xray/` и `assets/sing-box-macos/` →
-   `.../Resources/sing-box/` — пути, которые уже ожидают
-   `defaultMacosXrayExecutablePath()`/`defaultMacosSingBoxExecutablePath()`.
-   См. TODO в `assets/xray-macos/SOURCE.md` и `assets/sing-box-macos/SOURCE.md`.
-3. **Proxy-режим — первый реальный сквозной тест**: запустить `fetch_xray_macos.sh`,
-   собрать, подключиться к серверу, убедиться что `networksetup` реально
-   переключает системный прокси и браузер идёт через xray. Это единственный
-   режим, не упирающийся в entitlements — имеет смысл довести и проверить
-   раньше TUN.
+1. ~~Первая сборка в Xcode~~ — готово, см. обновление выше.
+2. ~~Xcode Copy Files build phase~~ — готово, см. обновление выше.
+3. ~~Proxy-режим — первый реальный сквозной тест~~ — готово, пользователь
+   подтвердил: подключается и работает (после фикса geo-путей, см.
+   обновление выше).
 4. **TUN-режим — реальная проверка `osascript`-элевации**: убедиться, что
    диалог пароля показывается, `sing-box` реально поднимает `utun` с
    `auto_route`, трафик идёт через тоннель. Отдельно проверить обрыв/`stop()`
