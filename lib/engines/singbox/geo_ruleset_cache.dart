@@ -82,7 +82,8 @@ Future<String> _ruleSetPath({
   final sourceFile = File(sourcePath);
   final mtime = sourceFile.statSync().modified.millisecondsSinceEpoch;
   final cachePath =
-      '${ensureFluxGeoRuleSetDirectory()}\\$prefix-${_sanitize(category)}-$mtime.json';
+      '${ensureFluxGeoRuleSetDirectory()}${Platform.pathSeparator}'
+      '$prefix-${_sanitize(category)}-$mtime.json';
 
   final cacheFile = File(cachePath);
   if (cacheFile.existsSync()) return cachePath;
@@ -97,7 +98,8 @@ Future<String> _ruleSetPath({
 /// `category-ads`, `cn`) — только страховка от случайных `/`/`\` в значении
 /// (сервис прислал что-то странное в `geosite:...` — не даём этому вырваться
 /// за пределы каталога rule-set'ов).
-String _sanitize(String category) => category.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+String _sanitize(String category) =>
+    category.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
 
 Map<String, dynamic> _geositeRuleSetJson(GeoSiteEntry entry) {
   final domain = <String>[];
@@ -132,6 +134,8 @@ Map<String, dynamic> _geositeRuleSetJson(GeoSiteEntry entry) {
 Map<String, dynamic> _geoipRuleSetJson(GeoIpEntry entry) => {
   'version': 1,
   'rules': [
-    {'ip_cidr': [for (final c in entry.cidrs) c.cidr]},
+    {
+      'ip_cidr': [for (final c in entry.cidrs) c.cidr],
+    },
   ],
 };

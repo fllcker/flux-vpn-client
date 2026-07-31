@@ -60,12 +60,7 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
         connectionState is ConnectionStopping;
 
     if (selectedLeaf == null) {
-      return Center(
-        child: Text(
-          S.selectServerHint,
-          style: PortText.muted,
-        ),
-      );
+      return Center(child: Text(S.selectServerHint, style: PortText.muted));
     }
 
     final selection = switch (connectionState) {
@@ -89,7 +84,9 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
       // (см. ROADMAP.md, трек 16) — тап по карточке открывает тот же bottom
       // sheet, что и плавающая кнопка сверху, чтобы сменить сервер было
       // можно и отсюда.
-      onTap: isMobileLayout(context) ? () => openServerListSheet(context) : null,
+      onTap: isMobileLayout(context)
+          ? () => openServerListSheet(context)
+          : null,
       child: Container(
         // На Android симметричный 12/12 выглядел так, будто слева места
         // больше, чем справа — сама иконка (см. ServerIcon) уже круглая с
@@ -201,7 +198,14 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
       case ConnectSelection.proxy:
         await controller.connectToServer(leaf, mode: ConnectionMode.proxy);
       case ConnectSelection.tun:
-        if (isRunningElevated()) {
+        // isRunningElevated() — Windows-only FFI (shell32.dll, см.
+        // windows_elevation.dart), падает при вызове на macOS так же, как
+        // и на Android (см. комментарий выше). На macOS TUN через
+        // NetworkExtension/System Extension (TunBridgeEngineMacOSNe) вообще
+        // не требует root/элевейта — есть системный запрос на активацию
+        // расширения (см. NetworkExtensionBridge.swift), но не Windows-style
+        // UAC-релонч всего приложения.
+        if (Platform.isMacOS || isRunningElevated()) {
           await controller.connectToServer(leaf, mode: ConnectionMode.tun);
           return;
         }

@@ -148,6 +148,94 @@ CLAUDE.md: proxy/TUN-режим Claude в этом проекте сам не т
     центр, слева зарезервирован отступ под traffic lights, высота бара
     уменьшена до 28pt (нативный масштаб) вместо общих 40.
 
+## Обновление (2026-07-31 вечер, реальный Mac): TUN через NetworkExtension
+
+За один вечер тестирования `osascript`-стопгэпа (см. выше, п.4) вскрылись
+структурные проблемы (осиротевшие root-процессы, конфликт маршрутов с
+другими системными VPN, повторный пароль на каждый disconnect) — решили не
+чинить костыль дальше, а сразу написать правильный дизайн:
+`NetworkExtension`/`NEPacketTunnelProvider` через System Extension. Как и
+весь остальной macOS-порт — написано вслепую (нет платного Developer
+аккаунта → System Extension в принципе не подписывается и не активируется
+на этой машине), но в этот раз "вслепую" означало не "не проверено вообще",
+а "проверено всем, чем можно проверить без подписи": реальная компиляция
+и линковка Swift/Go-кода против настоящего `libbox` через
+`xcodebuild ... CODE_SIGNING_ALLOWED=NO` — см. ниже, сколько реальных багов
+это поймало до того, как код попал к другу.
+
+- **Тулинг** — `gem install xcodeproj` (программное редактирование
+  `project.pbxproj` вместо ручной правки текста — для целого нового таргета
+  с Info.plist/entitlements/build-фазами хождение по pbxproj руками слишком
+  рискованно), Go + `github.com/sagernet/gomobile` (форк, НЕ
+  `golang.org/x/mobile` — sing-box использует свой, `v0.1.12`, см.
+  `scripts/build_libbox_macos.sh`).
+- **`Libbox.xcframework`** — собран `gomobile bind` из
+  `SagerNet/sing-box/experimental/libbox` (тот же пакет, которым пользуется
+  официальный `SagerNet/sing-box-for-apple`) через
+  `go run ./cmd/internal/build_libbox -target apple -platform macos`. Не
+  хранится в git (`macos/Frameworks/Libbox.xcframework`, см. её `SOURCE.md`),
+  пересобирается `scripts/build_libbox_macos.sh` — не требует dev-аккаунта,
+  только Go + Xcode command line tools.
+- **`FluxTunnelExtension`** — новый Xcode-таргет (System Extension,
+  `com.apple.product-type.system-extension`), добавлен через
+  `.build-tools/add_tunnel_extension_target.rb` (`xcodeproj` gem). НЕ
+  подключён Copy Files-фазой/зависимостью к `Runner` — иначе обычная
+  `flutter build macos` ломалась бы прямо сейчас (таргет не подписывается
+  без энтайтлмента); друг подключит вручную (Xcode UI, "Embed System
+  Extensions") или доработает тот же скрипт, когда получит аккаунт.
+  - `PacketTunnelProvider.swift` — тонкий `NEPacketTunnelProvider`,
+    поднимает `libbox` (`LibboxSetup`/`LibboxNewCommandServer`) с тем же
+    JSON-конфигом, что строит `buildSingBoxTunBridgeConfig`
+    (`singbox_config_mapper.dart`), плюс запускает `xray` обычным дочерним
+    процессом (`Process`, без sudo/root — System Extension, в отличие от
+    App Extension, не в контейнере приложения и может спавнить процессы;
+    xray тут не поднимает TUN сам, ему нужен только исходящий сокет к
+    серверу).
+  - `FluxPlatformInterface.swift` — реализация `LibboxPlatformInterfaceProtocol`,
+    единственный по-настоящему нужный метод — `openTun`: транслирует
+    `LibboxTunOptions` (адреса/маршруты/DNS, которые раньше sing-box сам
+    настраивал через `auto_route` на голом `utun`) в
+    `NEPacketTunnelNetworkSettings` + `setTunnelNetworkSettings` — именно
+    поэтому новый TUN не проигрывает по приоритету другим системным VPN
+    (см. инцидент с v2RayTun выше). Raw fd для libbox достаётся из
+    `packetFlow` через `value(forKeyPath: "socket.fileDescriptor")` — тот
+    же приватный KVC-приём, что и у WireGuardKit и подобных.
+  - **Реальные баги, пойманные компиляцией/линковкой** (не гадание —
+    `xcodebuild` в буквальном смысле on): протоколы libbox называются с
+    суффиксом `Protocol` (`LibboxPlatformInterfaceProtocol`, не
+    `LibboxPlatformInterface` — то имя занято Go-backed классом), несколько
+    методов переименованы относительно заголовка (`autoDetectControl`
+    вместо `autoDetectInterfaceControl`, `send` вместо `sendNotification`),
+    throws-метод не может одновременно возвращать Optional (throws сам
+    выражает "нет значения"), свободные C-функции (`LibboxSetup`,
+    `LibboxNewCommandServer`) не получают автоматический throws-бриджинг
+    (в отличие от методов), линковке не хватало `SystemConfiguration.framework`
+    и `-lresolv` (Go-рантайм/Chromium-код внутри libbox), System Extension
+    (в отличие от App Extension) требует собственной точки входа —
+    добавлен `main.swift` с `NEProvider.startSystemExtensionMode()`, CocoaPods
+    прописывает `-framework local_notifier` в общий для всех таргетов
+    `OTHER_LDFLAGS` — пришлось явно переопределить для нового таргета.
+- **`NetworkExtensionBridge.swift`** (`macos/Runner/`) — активация System
+  Extension (`OSSystemExtensionRequest`) + `NETunnelProviderManager` +
+  `flux/vpn` MethodChannel/`flux/vpn/status` EventChannel — те же имена
+  каналов, что на Android (`MainActivity.kt`/`VpnStatusBridge.kt`,
+  `xray_engine_android.dart`), тот же паттерн (оптимистичный `connected`
+  сразу после старта, асинхронные `stopped`/`error` через EventChannel).
+  Реально компилируется в составе обычной `flutter build macos`.
+- **`TunBridgeEngineMacOSNe`** (`lib/engines/singbox/tun_bridge_engine_macos_ne.dart`)
+  — новая Dart-реализация `CoreEngine`, подключена в `connection_controller.dart`
+  вместо `TunBridgeEngineMacOS` для `ConnectionMode.tun` на macOS. Старый
+  `osascript`-стопгэп (`TunBridgeEngineMacOS`/`SingBoxEngineMacOS`/
+  `macos_elevation.dart`) **не удалён** — рабочий, сегодня же продебажен на
+  реальном Маке, оставлен как референс/fallback, просто больше не
+  используется по умолчанию.
+- **Чего не хватает / не проверено**: буквально всё в рантайме — активация
+  расширения, `openTun` при реальном коннекте, поведение `xray`-подпроцесса
+  внутри System Extension, XPC/sandbox-нюансы, которые могут вскрыться
+  только при реальной активации с подписью. Это первая точка, которую
+  нужно тестировать другу, когда появится dev-аккаунт (см. "Открытые
+  вопросы" ниже).
+
 ## Что осталось до паритета с Windows
 
 Порядок — примерно в порядке "что нужно раньше".
@@ -157,8 +245,11 @@ CLAUDE.md: proxy/TUN-режим Claude в этом проекте сам не т
 3. ~~Proxy-режим — первый реальный сквозной тест~~ — готово, пользователь
    подтвердил: подключается и работает (после фикса geo-путей, см.
    обновление выше).
-4. **TUN-режим — реальная проверка `osascript`-элевации** (готовится к
-   первому запуску пользователем):
+4. **TUN-режим** — по умолчанию теперь `TunBridgeEngineMacOSNe`
+   (`NetworkExtension`/System Extension, см. обновление выше) — реальная
+   проверка активации/подключения возможна только у друга с dev-аккаунтом.
+   Ниже — история с осознанно оставленным старым `osascript`-стопгэпом
+   (`TunBridgeEngineMacOS`), актуальна, если решат откатиться на него:
    - **Найден и исправлен баг до первого теста**: `startElevatedMacos`
      (`macos_elevation.dart`) склеивал `executable`/аргументы через голый
      пробел без кавычек — путь к sing-box-конфигу лежит в
@@ -217,13 +308,15 @@ CLAUDE.md: proxy/TUN-режим Claude в этом проекте сам не т
 
 ## Открытые вопросы / зависит от Developer-аккаунта друга
 
-- **`NetworkExtension`/`NEPacketTunnelProvider`** — правильный долгосрочный
-  дизайн TUN на macOS (см. PLAN.md, изначальный набросок), не требует root
-  и не имеет проблемы с `osascript`/kill из п.4 выше. Требует платного
-  Apple Developer аккаунта для энтайтлмента
-  `com.apple.developer.networking.networkextension` — недоступно, пока не
-  появится аккаунт. До тех пор `TunBridgeEngineMacOS`/`osascript`-элевация —
-  единственный путь к TUN.
+- **`NetworkExtension`/`NEPacketTunnelProvider`** — уже написан
+  (`FluxTunnelExtension`, `TunBridgeEngineMacOSNe`, см. обновление выше по
+  дате), реально компилируется и линкуется, но не подписан и не активирован
+  — требует платного Apple Developer аккаунта для энтайтлмента
+  `com.apple.developer.networking.networkextension`. Первая реальная
+  проверка (активация расширения, реальный `openTun`, поведение
+  `xray`-подпроцесса внутри System Extension) — у друга, когда появится
+  аккаунт. `TunBridgeEngineMacOS`/`osascript`-элевация оставлена в коде как
+  рабочий fallback, но больше не используется по умолчанию.
 - **Подпись и нотаризация** — без Developer ID Application-сертификата
   собранный `.app` будет блокироваться Gatekeeper при скачивании
   (`"Flux" is damaged and can't be opened` или похожее) — раздать друзьям

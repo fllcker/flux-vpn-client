@@ -5,3 +5,7 @@
 # Xcode-related
 **/dgph
 **/xcuserdata/
+build/
+
+# Собирается scripts/build_libbox_macos.sh, см. Frameworks/SOURCE.md
+Frameworks/Libbox.xcframework/

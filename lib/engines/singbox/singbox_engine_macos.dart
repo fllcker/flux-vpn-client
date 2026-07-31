@@ -57,19 +57,40 @@ class SingBoxEngineMacOS {
     ).writeAsString(jsonEncode(config));
     _configFile = configFile;
 
+    // logFilePath, а не _pipeLogs(process): `process` тут — сам osascript,
+    // не sing-box, и его stdout/stderr пусты, пока elevated shell не
+    // завершится сам (не по нашему kill()) — см. doc-комментарий
+    // startElevatedMacos. Редирект стандартного вывода сразу в файл на
+    // уровне shell — единственный способ увидеть логи sing-box, пока он ещё
+    // работает.
+    final logPath = '${ensureFluxLogDirectory()}/flux_singbox_$id.log';
     final process = await startElevatedMacos(executablePath, [
       'run',
       '-c',
       configFile.path,
-    ]);
+    ], logFilePath: logPath);
     _process = process;
-    unawaited(_pipeLogs(process));
 
     unawaited(
       process.exitCode.then((_) {
         _statusController.add(EngineStatus.stopped);
       }),
     );
+
+    // `Process.start('osascript', ...)` возвращается почти мгновенно — это
+    // запуск самого osascript, а не подтверждение того, что пользователь
+    // ответил на системный диалог пароля и `sing-box` реально поднялся.
+    // Плохой конфиг (например невалидное имя TUN-интерфейса) валит sing-box
+    // за доли секунды — двух секунд с запасом достаточно, чтобы отличить
+    // "стартовал" от "уже упал", не размечая UI как "подключено" раньше
+    // времени (см. ROADMAP.md).
+    final exitedEarly = await process.exitCode
+        .timeout(const Duration(seconds: 2), onTimeout: () => -1)
+        .then((code) => code != -1);
+    if (exitedEarly) {
+      _statusController.add(EngineStatus.error);
+      return;
+    }
 
     _statusController.add(EngineStatus.connected);
   }
@@ -90,30 +111,20 @@ class SingBoxEngineMacOS {
 
   Future<void> stop() async {
     _statusController.add(EngineStatus.stopping);
+    // _process тут — сам osascript, не sing-box: process.kill() на нём не
+    // убивает реальный процесс (см. предупреждение в macos_elevation.dart,
+    // подтверждено на реальном Маке — без этого sing-box копится от root
+    // бесконечно после каждого "Отключить"). Настоящее убийство — отдельной
+    // elevated-командой по пути конфига, который уникален на сессию.
     _process?.kill();
     await _process?.exitCode;
     _process = null;
+    if (_configFile != null) {
+      await killElevatedMacos(_configFile!.path);
+    }
     await _configFile?.delete();
     _configFile = null;
     _statusController.add(EngineStatus.stopped);
-  }
-
-  /// См. `SingBoxEngineWindows._pipeLogs`.
-  Future<void> _pipeLogs(Process process) async {
-    final logFile = File('${ensureFluxLogDirectory()}/flux_singbox_$id.log');
-    final sink = logFile.openWrite(mode: FileMode.write);
-    try {
-      await Future.wait([
-        process.stdout
-            .transform(const SystemEncoding().decoder)
-            .forEach(sink.write),
-        process.stderr
-            .transform(const SystemEncoding().decoder)
-            .forEach(sink.write),
-      ]);
-    } finally {
-      await sink.close();
-    }
   }
 }
 

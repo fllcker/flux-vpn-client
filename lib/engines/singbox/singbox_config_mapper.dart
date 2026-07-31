@@ -1,10 +1,17 @@
+import 'dart:io';
+
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/proxy_node.dart';
 
 /// Фиксированное имя TUN-адаптера — та же причина, что была у
 /// одноимённой xray-константы: без него имя генерируется случайно при
 /// каждом запуске, и адаптеры-призраки от прошлых сессий накапливаются
-/// вместо переиспользования одного и того же.
+/// вместо переиспользования одного и того же. Актуально только для
+/// Windows/Linux — на macOS этой проблемы вообще нет (Darwin-ядро само
+/// выдаёт и освобождает `utunN` при закрытии интерфейса, копиться нечему),
+/// а кастомное имя там и не разрешено: `sing-box` с любым значением, кроме
+/// `utunN`, падает на старте (`bad tun name`), поэтому `interface_name` на
+/// macOS не задаём вовсе (см. [buildSingBoxTunBridgeConfig]).
 const tunInterfaceName = 'flux-tun0';
 
 /// Публичные резолверы, к которым браузеры ходят своим DoH (Chrome — «Secure
@@ -177,7 +184,7 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
       {
         'type': 'tun',
         'tag': 'tun-in',
-        'interface_name': tunInterfaceName,
+        if (!Platform.isMacOS) 'interface_name': tunInterfaceName,
         'address': ['172.19.0.1/30', 'fdfe:dcba:9876::1/126'],
         'mtu': 1500,
         'auto_route': true,
@@ -235,11 +242,7 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
         // сразу, а не по таймауту. Наш собственный DoT к тому же 8.8.8.8 идёт по
         // 853 и под правило не попадает; DNS-серверы вдобавок дозваниваются в
         // обход route-правил, так что задеть их тут нечем.
-        {
-          'ip_cidr': _knownDohEndpoints,
-          'port': 443,
-          'action': 'reject',
-        },
+        {'ip_cidr': _knownDohEndpoints, 'port': 443, 'action': 'reject'},
         // QUIC здесь СОЗНАТЕЛЬНО не блокируется, хотя напрашивается: какое-то
         // время тут стоял `{network: udp, port: 443, action: reject}`. Поводом
         // был шторм — 313 UDP-сессий за 70 секунд, все до одной на порт 443, из
@@ -286,7 +289,8 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
               'type': 'local',
               'tag': tag,
               'format': 'source',
-              'path': ruleSetPaths[tag] ??
+              'path':
+                  ruleSetPaths[tag] ??
                   (throw StateError('No rule_set path resolved for $tag')),
             },
         ],
@@ -365,7 +369,10 @@ List<Map<String, dynamic>> _userRoutingRules(List<RoutingRule> rules) {
           });
         }
         if (geositeTags.isNotEmpty) {
-          result.add({'rule_set': geositeTags, ..._outboundOrAction(outboundTag)});
+          result.add({
+            'rule_set': geositeTags,
+            ..._outboundOrAction(outboundTag),
+          });
         }
       case IpRule(:final values, :final outboundTag):
         if (outboundTag == 'proxy') continue;
@@ -382,7 +389,10 @@ List<Map<String, dynamic>> _userRoutingRules(List<RoutingRule> rules) {
           result.add({'ip_cidr': ipCidr, ..._outboundOrAction(outboundTag)});
         }
         if (geoipTags.isNotEmpty) {
-          result.add({'rule_set': geoipTags, ..._outboundOrAction(outboundTag)});
+          result.add({
+            'rule_set': geoipTags,
+            ..._outboundOrAction(outboundTag),
+          });
         }
     }
   }

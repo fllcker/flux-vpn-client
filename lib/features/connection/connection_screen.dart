@@ -160,8 +160,14 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     // `TunBridgeEngine.start()` и так бросил бы `StateError` без прав
     // администратора, но лучше подключиться в Proxy, чем не подключиться
     // вовсе.
+    // isRunningElevated() — Windows-only FFI (shell32.dll), на macOS у
+    // приложения в целом нет понятия "elevated" (см. connect_panel.dart) —
+    // TUN там идёт через NetworkExtension/System Extension
+    // (TunBridgeEngineMacOSNe), без root вообще, поэтому проверку тут
+    // пропускаем через Platform.isMacOS, а не вызываем функцию вовсе.
     final mode =
-        settings.autoConnectMode == ConnectionMode.tun && isRunningElevated()
+        settings.autoConnectMode == ConnectionMode.tun &&
+            (Platform.isMacOS || isRunningElevated())
         ? ConnectionMode.tun
         : ConnectionMode.proxy;
 

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- TODO(dev-account): значение packet-tunnel-provider-systemextension —
+	System Extension (не App Extension), см. Info.plist. Выдаётся только
+	платным Apple Developer-аккаунтам — до появления аккаунта у друга этот
+	таргет не подпишется и не соберётся до конца (см.
+	docs/internal/macos/ROADMAP.md). -->
+	<key>com.apple.developer.networking.networkextension</key>
+	<array>
+		<string>packet-tunnel-provider-systemextension</string>
+	</array>
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
+</dict>
+</plist>

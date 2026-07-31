@@ -10,6 +10,7 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     registerDeepLinkChannels(messenger: flutterViewController.engine.binaryMessenger)
+    NetworkExtensionBridge.shared.register(messenger: flutterViewController.engine.binaryMessenger)
 
     super.awakeFromNib()
   }
