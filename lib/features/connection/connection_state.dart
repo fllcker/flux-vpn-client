@@ -14,11 +14,13 @@ class ConnectionConnecting extends ConnectionUiState {
 
 class ConnectionConnected extends ConnectionUiState {
   final String leafId;
+  final String? variantId;
   final String serverName;
   final DateTime connectedAt;
   final ConnectionMode mode;
   const ConnectionConnected({
     required this.leafId,
+    required this.variantId,
     required this.serverName,
     required this.connectedAt,
     required this.mode,

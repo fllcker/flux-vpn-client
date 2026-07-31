@@ -59,6 +59,21 @@ class ConnectionController extends Notifier<ConnectionUiState> {
     ServerLeaf leaf, {
     ConnectionMode mode = ConnectionMode.proxy,
   }) async {
+    // Клик по уже активному серверу/варианту/режиму (напр. повторный тап по
+    // тому же серверу в списке, см. ROADMAP.md) не должен приводить к
+    // полному disconnect+reconnect — сверяем не только leafId, но и активный
+    // вариант подключения (xhttp/hysteria2/...) и режим (Proxy/TUN): смена
+    // любого из них — это осознанный реконнект (см. `server_list_panel.dart`
+    // `reconnectToLeafIfActive`, `connect_panel.dart` `_onSelectionChanged`),
+    // а вот "тот же сервер, тот же вариант, тот же режим" — no-op.
+    final current = state;
+    if (current is ConnectionConnected &&
+        current.leafId == leaf.id &&
+        current.variantId == leaf.activeVariant?.id &&
+        current.mode == mode) {
+      return;
+    }
+
     final generation = ++_generation;
     state = const ConnectionConnecting();
 
@@ -121,6 +136,7 @@ class ConnectionController extends Notifier<ConnectionUiState> {
         case EngineStatus.connected:
           state = ConnectionConnected(
             leafId: leaf.id,
+            variantId: leaf.activeVariant?.id,
             serverName: leaf.name,
             connectedAt: DateTime.now(),
             mode: mode,
