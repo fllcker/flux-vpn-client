@@ -165,12 +165,18 @@ CLAUDE.md: proxy/TUN-режим Claude в этом проекте сам не т
    `sing-box`-процесс (это может остаться зависшим TUN-адаптером/процессом
    после "Отключить" — надо проверить и, если так, убивать `sing-box`
    отдельно, например по имени процесса через `pkill`).
-5. **App-иконка** — `flutter create` сгенерировал дефолтную Flutter-иконку
-   в `Assets.xcassets/AppIcon.appiconset/`; `flutter_launcher_icons` в
-   `pubspec.yaml` пока настроен только на `android: true` — нужно либо
-   прогнать его и на macOS (проверить, поддерживает ли текущая версия
-   пакета macOS-таргет), либо руками сгенерировать `.icns`/App Icon set из
-   `assets/icon.png`.
+5. ~~App-иконка~~ — готово. `flutter_launcher_icons` 0.14.4 поддерживает
+   `macos:` секцию — добавлена в `pubspec.yaml`, генерирует
+   `Assets.xcassets/AppIcon.appiconset/*.png` из отдельного source-файла
+   `docs/media/icon_with_black.png` (не `assets/icon.png` — тот прозрачный
+   контур-логотип без фона, Apple ожидает непрозрачную заливку до краёв
+   иконки; `icon_with_black.png` уже с фоном/скруглением). Побочный эффект
+   пакета: каждый прогон `dart run flutter_launcher_icons` заодно
+   переписывает `android/.../AndroidManifest.xml` (иконку quick-settings
+   tile `FluxQuickTile` на `@mipmap/ic_launcher`) — приходится откатывать
+   этот файл вручную после каждого запуска. Дока в Dock/LaunchServices
+   аггрессивно кеширует иконку по пути бандла — после пересборки помогает
+   `lsregister -f <path>` + `touch <path>` + `killall Dock`.
 6. **Автозапуск** — `macos_autostart.dart` (LaunchAgent-plist) написан, но
    ни разу не выполнялся: проверить, что `launchctl` реально подхватывает
    plist без явного `launchctl load` (сейчас код полагается на то, что
