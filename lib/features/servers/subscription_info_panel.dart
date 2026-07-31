@@ -451,7 +451,14 @@ class _InfoRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        // baseline, не start — label (PortText.muted, дефолтный line-height
+        // шрифта) и value (PortText.small, height: 1) имеют разную высоту
+        // строки, из-за чего start выравнивал верх текстовых боксов, а не
+        // видимые глифы: value visually сидел выше label. Baseline
+        // выравнивает по фактической базовой линии символов независимо от
+        // разницы в line-height.
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
         children: [
           Text(label, style: PortText.muted),
           const SizedBox(width: 12),

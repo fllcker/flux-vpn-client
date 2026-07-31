@@ -93,11 +93,22 @@ class FluxTray with TrayListener {
     );
   }
 
+  // bringAppToFront: true — иначе Windows не делает наше окно foreground
+  // перед TrackPopupMenu (нативная реализация меню в tray_manager), а без
+  // этого сам Win32 не закрывает popup-меню по клику вне его — оно виснет,
+  // пока не выбран пункт. См. tray_manager_plugin.cpp: SetForegroundWindow
+  // вызывается только при bringAppToFront == true. Параметр помечен
+  // deprecated в пакете (обещают убрать в будущем — Windows-only), но замены
+  // пока нет, а без него баг возвращается — используем осознанно.
   @override
-  void onTrayIconMouseDown() => trayManager.popUpContextMenu();
+  void onTrayIconMouseDown() =>
+      // ignore: deprecated_member_use
+      trayManager.popUpContextMenu(bringAppToFront: true);
 
   @override
-  void onTrayIconRightMouseDown() => trayManager.popUpContextMenu();
+  void onTrayIconRightMouseDown() =>
+      // ignore: deprecated_member_use
+      trayManager.popUpContextMenu(bringAppToFront: true);
 
   @override
   Future<void> onTrayMenuItemClick(MenuItem menuItem) async {
