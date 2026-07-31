@@ -7,7 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../app/app_paths.dart';
 import '../../app/layout_breakpoints.dart';
-import '../../app/windows_autostart.dart';
+import '../../app/autostart.dart';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
 import '../../core_abstraction/connection_session.dart';
@@ -313,9 +313,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             _SettingRow(
               label: settings.customVideoPath == null
                   ? S.noVideoFileSelected
-                  : settings.customVideoPath!.split(
-                      Platform.isWindows ? '\\' : '/',
-                    ).last,
+                  : settings.customVideoPath!
+                        .split(Platform.pathSeparator)
+                        .last,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -467,7 +467,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onSubmitted: (value) {
               final url = value.trim();
               notifier.update(
-                (s) => s.copyWith(geoipUrl: url.isEmpty ? defaultGeoipUrl : url),
+                (s) =>
+                    s.copyWith(geoipUrl: url.isEmpty ? defaultGeoipUrl : url),
               );
             },
           ),
@@ -480,8 +481,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onSubmitted: (value) {
               final url = value.trim();
               notifier.update(
-                (s) =>
-                    s.copyWith(geositeUrl: url.isEmpty ? defaultGeositeUrl : url),
+                (s) => s.copyWith(
+                  geositeUrl: url.isEmpty ? defaultGeositeUrl : url,
+                ),
               );
             },
           ),
@@ -567,7 +569,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   // только если автозапуск настроен как elevated (иначе на
                   // старте автоподключение всё равно откатится на Proxy,
                   // см. connection_screen.dart).
-                  if (settings.autoStartPrivilege == AppAutoStartPrivilege.elevated)
+                  if (settings.autoStartPrivilege ==
+                      AppAutoStartPrivilege.elevated)
                     const PortSelectOption(
                       value: ConnectionMode.tun,
                       child: Text('TUN'),
@@ -651,7 +654,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }) {
     setAutoStartOnBoot(privilege: privilege, showWindow: showWindow);
     notifier.update(
-      (s) => s.copyWith(autoStartPrivilege: privilege, autoStartShowWindow: showWindow),
+      (s) => s.copyWith(
+        autoStartPrivilege: privilege,
+        autoStartShowWindow: showWindow,
+      ),
     );
     if (privilege == AppAutoStartPrivilege.elevated) {
       _confirmElevatedAutoStart();
@@ -665,19 +671,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     PortToaster.of(context).show(
       PortToast(
         title: Text(
-          registered ? S.elevatedAutoStartConfirmed : S.elevatedAutoStartDeclined,
+          registered
+              ? S.elevatedAutoStartConfirmed
+              : S.elevatedAutoStartDeclined,
         ),
       ),
     );
   }
 
-  String _autoStartPrivilegeLabel(AppAutoStartPrivilege privilege) => switch (privilege) {
-    AppAutoStartPrivilege.none => S.autoStartPrivilegeNone,
-    AppAutoStartPrivilege.standard => S.autoStartPrivilegeStandard,
-    AppAutoStartPrivilege.elevated => S.autoStartPrivilegeElevated,
-  };
+  String _autoStartPrivilegeLabel(AppAutoStartPrivilege privilege) =>
+      switch (privilege) {
+        AppAutoStartPrivilege.none => S.autoStartPrivilegeNone,
+        AppAutoStartPrivilege.standard => S.autoStartPrivilegeStandard,
+        AppAutoStartPrivilege.elevated => S.autoStartPrivilegeElevated,
+      };
 
-  Future<void> _updateGeoAssets(BuildContext context, AppSettings settings) async {
+  Future<void> _updateGeoAssets(
+    BuildContext context,
+    AppSettings settings,
+  ) async {
     setState(() => _updatingGeoAssets = true);
     try {
       await forceUpdateGeoAssets(
@@ -692,7 +704,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ];
       await pregenerateGeoRuleSets(allRoutingRules);
       if (!context.mounted) return;
-      PortToaster.of(context).show(PortToast(title: Text(S.geoAssetsUpdateSuccess)));
+      PortToaster.of(
+        context,
+      ).show(PortToast(title: Text(S.geoAssetsUpdateSuccess)));
     } catch (e) {
       if (!context.mounted) return;
       PortToaster.of(
@@ -722,7 +736,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       );
     } catch (e) {
       if (!context.mounted) return;
-      PortToaster.of(context).show(PortToast(title: Text(S.videoImportFailure(e))));
+      PortToaster.of(
+        context,
+      ).show(PortToast(title: Text(S.videoImportFailure(e))));
     } finally {
       if (mounted) setState(() => _importingVideo = false);
     }

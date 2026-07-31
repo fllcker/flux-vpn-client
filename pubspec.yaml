@@ -143,6 +143,9 @@ flutter:
     - assets/tray_icon.ico
     - assets/tray_icon_proxy.ico
     - assets/tray_icon_tun.ico
+    - assets/tray_icon_macos.png
+    - assets/tray_icon_proxy_macos.png
+    - assets/tray_icon_tun_macos.png
 
   shaders:
     - shaders/color_bends.frag

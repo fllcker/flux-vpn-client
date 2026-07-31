@@ -113,15 +113,19 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   /// само делает эту конвертацию и заметно тормозит (проверено — секунд
   /// пять на реальных файлах).
   Future<void> _ensureGeoAssets() async {
-    if (!Platform.isWindows) return;
+    if (!(Platform.isWindows || Platform.isMacOS)) return;
     final settings = ref.read(appSettingsProvider);
-    await ensureGeoAssets(geoipUrl: settings.geoipUrl, geositeUrl: settings.geositeUrl);
+    await ensureGeoAssets(
+      geoipUrl: settings.geoipUrl,
+      geositeUrl: settings.geositeUrl,
+    );
     if (!mounted) return;
     // ensureGeoAssets — best-effort, сама не сообщает об успехе/неудаче
     // (см. её doc-комментарий) — единственный внешний способ узнать,
     // получилось ли, это проверить сами файлы после вызова. Не меняем её
     // сигнатуру ради одного уведомления — трек 25.
-    if (!File(geoipFilePath()).existsSync() || !File(geositeFilePath()).existsSync()) {
+    if (!File(geoipFilePath()).existsSync() ||
+        !File(geositeFilePath()).existsSync()) {
       showFluxNotification(title: S.notificationGeoAssetsFailedTitle);
     }
     final allRoutingRules = [
@@ -136,7 +140,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   /// последним в `_runStartupSequence()`, когда дерево серверов и
   /// `lastSelectedServerId` уже точно актуальны.
   Future<void> _autoConnectOnStartup() async {
-    if (!Platform.isWindows) return;
+    if (!(Platform.isWindows || Platform.isMacOS)) return;
     final settings = ref.read(appSettingsProvider);
     if (!settings.autoConnectOnStartup) return;
 
@@ -156,7 +160,8 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     // `TunBridgeEngine.start()` и так бросил бы `StateError` без прав
     // администратора, но лучше подключиться в Proxy, чем не подключиться
     // вовсе.
-    final mode = settings.autoConnectMode == ConnectionMode.tun && isRunningElevated()
+    final mode =
+        settings.autoConnectMode == ConnectionMode.tun && isRunningElevated()
         ? ConnectionMode.tun
         : ConnectionMode.proxy;
 

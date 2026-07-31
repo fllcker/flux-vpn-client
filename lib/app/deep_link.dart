@@ -16,18 +16,13 @@ void registerFluxUriProtocolIfNeeded() {
   if (!Platform.isWindows) return;
 
   final exePath = Platform.resolvedExecutable;
-  final protocolKey = CURRENT_USER.create(
-    'Software\\Classes\\$fluxUriScheme',
-  );
+  final protocolKey = CURRENT_USER.create('Software\\Classes\\$fluxUriScheme');
   protocolKey
     ..setValue('', const RegistryValue.string('URL:Flux Protocol'))
     ..setValue('URL Protocol', const RegistryValue.string(''));
 
   final commandKey = protocolKey.create('shell\\open\\command');
-  commandKey.setValue(
-    '',
-    RegistryValue.string('"$exePath" "%1"'),
-  );
+  commandKey.setValue('', RegistryValue.string('"$exePath" "%1"'));
 }
 
 /// Достаёт ссылку (`vless://...` или `https://...`) из аргумента вида
@@ -64,32 +59,34 @@ String? extractFluxDeepLinkFromArgs(List<String> args) {
   return null;
 }
 
-// --- Android ---------------------------------------------------------------
+// --- Android/macOS -----------------------------------------------------
 //
-// Регистрация схемы — не в Dart, а в `android/app/src/main/AndroidManifest.
-// xml` (intent-filter с `android:scheme="flux"` на MainActivity). У Android
-// нет второго процесса/loopback-IPC, как на Windows (см.
-// `single_instance.dart`) — одна Activity с `launchMode="singleTop"`, ОС
-// сама переиспользует её для повторных ссылок и присылает их через
-// `onNewIntent` (`MainActivity.kt`), а не через новый запуск процесса.
-// Поэтому обвязка тут принципиально другая: холодный старт — один вызов
-// метода за уже случившимся `intent.data`, повторные ссылки, пока
-// приложение уже открыто, — `EventChannel`.
-const _androidDeepLinkChannel = MethodChannel('flux/deeplink');
-const _androidDeepLinkEventChannel = EventChannel('flux/deeplink/stream');
+// Регистрация схемы — не в Dart: в `android/app/src/main/AndroidManifest.
+// xml` (intent-filter с `android:scheme="flux"` на MainActivity) для
+// Android, и в `macos/Runner/Info.plist` (`CFBundleURLTypes`) для macOS. Ни
+// у Android, ни у macOS нет Windows-style второго процесса/loopback-IPC
+// (см. `single_instance.dart`) — Android переиспользует единственную
+// Activity (`launchMode="singleTop"`) и присылает повторные ссылки через
+// `onNewIntent` (`MainActivity.kt`), macOS точно так же переиспользует
+// единственный процесс (`LSMultipleInstancesProhibited` в Info.plist) и
+// присылает их через Apple Event `kAEGetURL`, перехваченный в
+// `AppDelegate.swift`. Оба шлют результат в Dart одинаково — через один и
+// тот же канал, поэтому обвязка тут общая, а не дублируется по платформе.
+const _nativeDeepLinkChannel = MethodChannel('flux/deeplink');
+const _nativeDeepLinkEventChannel = EventChannel('flux/deeplink/stream');
 
-Future<String?> androidInitialDeepLink() async {
-  if (!Platform.isAndroid) return null;
+Future<String?> nativeInitialDeepLink() async {
+  if (!Platform.isAndroid && !Platform.isMacOS) return null;
   try {
-    return await _androidDeepLinkChannel.invokeMethod<String>('getInitialLink');
+    return await _nativeDeepLinkChannel.invokeMethod<String>('getInitialLink');
   } catch (_) {
     return null;
   }
 }
 
-Stream<String> get androidDeepLinkStream {
-  if (!Platform.isAndroid) return const Stream.empty();
-  return _androidDeepLinkEventChannel.receiveBroadcastStream().map(
+Stream<String> get nativeDeepLinkStream {
+  if (!Platform.isAndroid && !Platform.isMacOS) return const Stream.empty();
+  return _nativeDeepLinkEventChannel.receiveBroadcastStream().map(
     (event) => event as String,
   );
 }

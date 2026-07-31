@@ -34,13 +34,14 @@ void main(List<String> args) async {
   String? initialDeepLink;
   Stream<String> incomingDeepLinks = const Stream.empty();
 
-  if (Platform.isAndroid) {
-    // Одна Activity с launchMode="singleTop" (AndroidManifest.xml) — ни
-    // второго процесса, ни loopback-IPC тут нет и не нужно, ОС сама
-    // переиспользует ту же Activity для повторных ссылок и присылает их
-    // через onNewIntent (MainActivity.kt).
-    initialDeepLink = await androidInitialDeepLink();
-    incomingDeepLinks = androidDeepLinkStream;
+  if (Platform.isAndroid || Platform.isMacOS) {
+    // Android: одна Activity с launchMode="singleTop" (AndroidManifest.xml).
+    // macOS: LSMultipleInstancesProhibited (Info.plist) — тоже один процесс.
+    // Ни там, ни там нет Windows-style второго процесса/loopback-IPC, ОС
+    // сама переиспользует уже запущенный процесс для повторных ссылок и
+    // присылает их через platform channel (см. `deep_link.dart`), а не argv.
+    initialDeepLink = await nativeInitialDeepLink();
+    incomingDeepLinks = nativeDeepLinkStream;
   } else {
     // Windows передаёт зарегистрированный `flux://...` URL как аргумент
     // командной строки — как при первом запуске, так и при повторном клике по
@@ -53,9 +54,9 @@ void main(List<String> args) async {
     }
     incomingDeepLinks = (instance as PrimaryInstance).incomingDeepLinks;
   }
-  // Автозапуск при старте Windows передаёт этот флаг (см.
-  // `windows_autostart.dart`), чтобы не мозолить окном при входе в систему —
-  // окно остаётся скрытым, доступно через иконку в трее.
+  // Автозапуск при старте передаёт этот флаг (см. `autostart.dart`), чтобы не
+  // мозолить окном при входе в систему — окно остаётся скрытым, доступно
+  // через иконку в трее.
   final startMinimized = args.contains('--minimized');
 
   // window_manager/tray_manager have no Android implementation — calling
@@ -63,8 +64,10 @@ void main(List<String> args) async {
   // tray.dart/deep_link.dart, which already self-guard), so on Android the
   // unhandled exception from ensureInitialized() aborted main() before
   // runApp() ever ran — black screen, nothing else wrong.
-  if (Platform.isWindows) {
+  if (Platform.isWindows || Platform.isMacOS) {
     await windowManager.ensureInitialized();
+    // Регистрация flux:// в реестре нужна только на Windows — на macOS это
+    // декларативно (Info.plist, CFBundleURLTypes), функция сама no-op там.
     registerFluxUriProtocolIfNeeded();
   }
 
@@ -96,7 +99,7 @@ void main(List<String> args) async {
     ),
   );
 
-  if (!Platform.isWindows) return;
+  if (!Platform.isWindows && !Platform.isMacOS) return;
 
   // Закрытие окна (крестик/Alt+F4) сворачивает в трей вместо выхода — сам
   // перехват в `_FluxAppState.onWindowClose` (main.dart, WindowListener).
@@ -158,7 +161,7 @@ class _FluxAppState extends ConsumerState<FluxApp>
   @override
   void initState() {
     super.initState();
-    if (Platform.isWindows) windowManager.addListener(this);
+    if (Platform.isWindows || Platform.isMacOS) windowManager.addListener(this);
     WidgetsBinding.instance.addObserver(this);
     _deepLinkSub = widget.incomingDeepLinks.listen(_handleIncomingDeepLink);
     if (widget.initialDeepLink case final link?) {
@@ -170,7 +173,9 @@ class _FluxAppState extends ConsumerState<FluxApp>
 
   @override
   void dispose() {
-    if (Platform.isWindows) windowManager.removeListener(this);
+    if (Platform.isWindows || Platform.isMacOS) {
+      windowManager.removeListener(this);
+    }
     WidgetsBinding.instance.removeObserver(this);
     _deepLinkSub?.cancel();
     super.dispose();
@@ -194,7 +199,7 @@ class _FluxAppState extends ConsumerState<FluxApp>
   void onWindowClose() => windowManager.hide();
 
   Future<void> _handleIncomingDeepLink(String link) async {
-    if (Platform.isWindows) {
+    if (Platform.isWindows || Platform.isMacOS) {
       await windowManager.show();
       await windowManager.focus();
     }

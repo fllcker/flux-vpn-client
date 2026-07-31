@@ -29,7 +29,7 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
   @override
   void initState() {
     super.initState();
-    if (!Platform.isWindows) return;
+    if (!Platform.isWindows && !Platform.isMacOS) return;
     windowManager.addListener(this);
     windowManager.isMaximized().then((value) {
       if (mounted) setState(() => _maximized = value);
@@ -38,7 +38,9 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
 
   @override
   void dispose() {
-    if (Platform.isWindows) windowManager.removeListener(this);
+    if (Platform.isWindows || Platform.isMacOS) {
+      windowManager.removeListener(this);
+    }
     super.dispose();
   }
 
@@ -81,7 +83,7 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
           // На Android своя навигация (жест "назад"/системная панель),
           // window_manager там не зарегистрирован вообще.
           Expanded(
-            child: Platform.isWindows
+            child: (Platform.isWindows || Platform.isMacOS)
                 ? DragToMoveArea(child: titleRow)
                 : titleRow,
           ),
@@ -91,7 +93,7 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
             active: widget.settingsOpen,
             onPressed: widget.onToggleSettings,
           ),
-          if (Platform.isWindows) ...[
+          if (Platform.isWindows || Platform.isMacOS) ...[
             _TitleBarButton(
               icon: LucideIcons.minus,
               onPressed: () => windowManager.minimize(),

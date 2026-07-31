@@ -10,17 +10,20 @@ import '../../core_abstraction/core_config.dart';
 import '../../core_abstraction/core_engine.dart';
 import '../../core_abstraction/engine_manager_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
+import '../../engines/singbox/singbox_engine_macos.dart';
 import '../../engines/singbox/singbox_engine_windows.dart';
 import '../../engines/singbox/tun_bridge_engine.dart';
+import '../../engines/singbox/tun_bridge_engine_macos.dart';
 import '../../engines/xray/xray_engine_android.dart';
+import '../../engines/xray/xray_engine_macos.dart';
 import '../../engines/xray/xray_engine_windows.dart';
 import '../../l10n/strings.dart';
 import 'connection_state.dart';
 
 final connectionControllerProvider =
     NotifierProvider<ConnectionController, ConnectionUiState>(
-  ConnectionController.new,
-);
+      ConnectionController.new,
+    );
 
 /// Первый сквозной сценарий из PLAN.md ("Ближайшие шаги", п.4): выбрать
 /// сервер → подключиться через движок конкретного режима → увидеть статус.
@@ -107,6 +110,24 @@ class ConnectionController extends Notifier<ConnectionUiState> {
           geoipUrl: settings.geoipUrl,
           geositeUrl: settings.geositeUrl,
         );
+      }
+      if (Platform.isMacOS) {
+        return switch (mode) {
+          ConnectionMode.proxy => XrayEngineMacOS(
+            id: id,
+            xrayExecutablePath: defaultMacosXrayExecutablePath(),
+            logLevel: settings.coreLogLevel,
+          ),
+          ConnectionMode.tun => switch (settings.tunCoreType) {
+            TunCoreType.singBox => TunBridgeEngineMacOS(
+              id: id,
+              xrayExecutablePath: defaultMacosXrayExecutablePath(),
+              singBoxExecutablePath: defaultMacosSingBoxExecutablePath(),
+              upstreamDns: settings.tunDnsServer,
+              logLevel: settings.coreLogLevel,
+            ),
+          },
+        };
       }
       return switch (mode) {
         ConnectionMode.proxy => XrayEngineWindows(

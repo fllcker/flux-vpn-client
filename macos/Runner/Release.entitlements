@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- См. комментарий в DebugProfile.entitlements: сандбокс отключён из-за
+	дочерних процессов xray/sing-box и записи вне контейнера приложения. -->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<!-- TODO(dev-account): com.apple.developer.networking.networkextension —
+	см. DebugProfile.entitlements. -->
+</dict>
+</plist>

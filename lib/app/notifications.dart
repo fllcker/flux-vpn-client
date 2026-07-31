@@ -9,11 +9,11 @@ import 'package:local_notifier/local_notifier.dart';
 /// (`connection_notifications.dart`), этот файл не знает про
 /// `ConnectionUiState` вообще.
 Future<void> initLocalNotifier() async {
-  if (!Platform.isWindows) return;
+  if (!Platform.isWindows && !Platform.isMacOS) return;
   await localNotifier.setup(appName: 'Flux');
 }
 
 void showFluxNotification({required String title, String? body}) {
-  if (!Platform.isWindows) return;
+  if (!Platform.isWindows && !Platform.isMacOS) return;
   LocalNotification(title: title, body: body ?? '').show();
 }

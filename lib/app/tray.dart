@@ -27,7 +27,7 @@ class FluxTray with TrayListener {
   FluxTray(this.container);
 
   Future<void> init() async {
-    if (!Platform.isWindows) return;
+    if (!Platform.isWindows && !Platform.isMacOS) return;
 
     trayManager.addListener(this);
     await _updateIcon();
@@ -44,13 +44,25 @@ class FluxTray with TrayListener {
   /// — отдельные `.ico` для Proxy/TUN, поставленные пользователем
   /// (`assets/tray_icon_proxy.ico`/`tray_icon_tun.ico`), тот же
   /// мульти-резолюшн набор размеров, что и у дефолтной `tray_icon.ico`.
+  ///
+  /// macOS-версия `tray_manager` не умеет `.ico` — ей нужен растровый
+  /// `.png` под размер строки меню (см. `assets/tray_icon*_macos.png`,
+  /// сконвертированы из тех же `.ico`).
   Future<void> _updateIcon() async {
     final state = container.read(connectionControllerProvider);
     final path = switch (state) {
       ConnectionConnected(mode: ConnectionMode.proxy) =>
-        'assets/tray_icon_proxy.ico',
-      ConnectionConnected(mode: ConnectionMode.tun) => 'assets/tray_icon_tun.ico',
-      _ => 'assets/tray_icon.ico',
+        Platform.isMacOS
+            ? 'assets/tray_icon_proxy_macos.png'
+            : 'assets/tray_icon_proxy.ico',
+      ConnectionConnected(mode: ConnectionMode.tun) =>
+        Platform.isMacOS
+            ? 'assets/tray_icon_tun_macos.png'
+            : 'assets/tray_icon_tun.ico',
+      _ =>
+        Platform.isMacOS
+            ? 'assets/tray_icon_macos.png'
+            : 'assets/tray_icon.ico',
     };
     await trayManager.setIcon(path);
   }
@@ -70,11 +82,19 @@ class FluxTray with TrayListener {
           label: mode == ConnectionMode.tun ? 'TUN' : S.throughProxy,
           disabled: true,
         ),
-        MenuItem(key: 'info-status', label: S.trayStatusConnected, disabled: true),
+        MenuItem(
+          key: 'info-status',
+          label: S.trayStatusConnected,
+          disabled: true,
+        ),
         MenuItem.separator(),
       ],
       ConnectionConnecting() => [
-        MenuItem(key: 'info-status', label: S.trayStatusConnecting, disabled: true),
+        MenuItem(
+          key: 'info-status',
+          label: S.trayStatusConnecting,
+          disabled: true,
+        ),
         MenuItem.separator(),
       ],
       _ => const <MenuItem>[],
@@ -85,7 +105,10 @@ class FluxTray with TrayListener {
         items: [
           ...infoItems,
           MenuItem(key: 'show', label: S.trayOpen),
-          MenuItem(key: 'toggle', label: connected ? S.trayDisconnect : S.trayConnect),
+          MenuItem(
+            key: 'toggle',
+            label: connected ? S.trayDisconnect : S.trayConnect,
+          ),
           MenuItem.separator(),
           MenuItem(key: 'exit', label: S.trayExit),
         ],
