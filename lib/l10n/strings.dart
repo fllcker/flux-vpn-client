@@ -56,8 +56,6 @@ abstract final class S {
       _en ? 'Show notifications' : 'Показывать уведомления';
 
   // server_list_panel.dart
-  static String routingTitleFor(String serverName) =>
-      _en ? 'Routing — $serverName' : 'Роутинг — $serverName';
   static String get cannotPingInTun =>
       _en ? "Can't ping in TUN mode" : 'Нельзя пинговать в TUN-режиме';
   static String get pingBlocksTunDescription => _en
@@ -68,7 +66,6 @@ abstract final class S {
       _en ? 'No servers yet — add a subscription or a link.' : 'Пока нет серверов — добавьте подписку или ссылку.';
 
   // server_row.dart
-  static String get routing => _en ? 'Routing' : 'Роутинг';
   static String get hide => _en ? 'Hide' : 'Скрыть';
 
   // subscription_info_panel.dart
@@ -87,12 +84,6 @@ abstract final class S {
   static String get hiddenServers => _en ? 'Hidden servers' : 'Скрытые серверы';
   static String get restore => _en ? 'Restore' : 'Вернуть';
   static String get deleteSubscription => _en ? 'Delete subscription' : 'Удалить подписку';
-  static String get rulesDifferBetweenServers =>
-      _en ? 'Rules differ between servers' : 'Правила различаются по серверам';
-  static String get setSameRulesForAll =>
-      _en ? 'Set the same rules for all' : 'Задать одинаковые правила для всех';
-  static String get noRulesAllViaProxy =>
-      _en ? 'No rules — all traffic goes through the proxy' : 'Правил нет — весь трафик через прокси';
   static String get expired => _en ? 'expired' : 'истекла';
   static String get lessThanADay => _en ? 'less than a day' : 'меньше дня';
 
@@ -112,6 +103,17 @@ abstract final class S {
   static String get direct => _en ? 'Direct' : 'Напрямую';
   static String get block => _en ? 'Block' : 'Блокировать';
   static String get save => _en ? 'Save' : 'Сохранить';
+  static String get presetNameLabel => _en ? 'Preset name' : 'Название пресета';
+  static String get presetNamePlaceholder =>
+      _en ? 'e.g. Gaming mode' : 'например, Gaming mode';
+
+  // settings_page.dart — секция "Роутинг"
+  static String get activeRoutingLabel => _en ? 'Active routing' : 'Активный роутинг';
+  static String get serverRoutingPreset => _en ? 'Server routing' : 'Роутинг сервера';
+  static String get serverRoutingPresetDescription => _en
+      ? 'Each server uses its own routing, if it has one — same as before.'
+      : 'Каждый сервер использует свой роутинг, если он есть — как и раньше.';
+  static String get createPresetLabel => _en ? 'Create preset' : 'Создать пресет';
 
   // settings_page.dart — навигация секций
   static String get sectionPersonalization => _en ? 'Personalization' : 'Персонализация';

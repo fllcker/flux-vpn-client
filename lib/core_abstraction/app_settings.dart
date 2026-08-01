@@ -145,6 +145,13 @@ class AppSettings {
   /// когда файл есть, но поля в нём нет (апгрейд с версии до онбординга).
   final bool onboardingCompleted;
 
+  /// Id активного пресета роутинга (`CoreConfig.routingPresets`) — локальное
+  /// предпочтение машины, как [lastSelectedServerId], не часть Magic JSON
+  /// профиля. `null` — специальный пресет "Роутинг сервера": каждый сервер
+  /// использует свой `ServerLeaf.routingRules` как раньше (дефолт,
+  /// воспроизводит поведение до реворка роутинга на пресеты).
+  final String? activeRoutingPresetId;
+
   const AppSettings({
     this.themeMode = AppThemeMode.dark,
     this.language = AppLanguage.system,
@@ -166,6 +173,7 @@ class AppSettings {
     this.lastSelectedServerId,
     this.customVideoPath,
     this.onboardingCompleted = false,
+    this.activeRoutingPresetId,
   });
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -231,6 +239,7 @@ class AppSettings {
     // значит "апгрейд с версии, где онбординга не было", а не "первый
     // запуск" (тот идёт через конструктор напрямую, когда файла нет вовсе).
     onboardingCompleted: json['onboardingCompleted'] as bool? ?? true,
+    activeRoutingPresetId: json['activeRoutingPresetId'] as String?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -254,6 +263,8 @@ class AppSettings {
     if (lastSelectedServerId != null) 'lastSelectedServerId': lastSelectedServerId,
     if (customVideoPath != null) 'customVideoPath': customVideoPath,
     'onboardingCompleted': onboardingCompleted,
+    if (activeRoutingPresetId != null)
+      'activeRoutingPresetId': activeRoutingPresetId,
   };
 
   AppSettings copyWith({
@@ -281,6 +292,11 @@ class AppSettings {
     // видеофон (см. `settings_page.dart`, `_clearCustomVideo`).
     bool clearCustomVideoPath = false,
     bool? onboardingCompleted,
+    String? activeRoutingPresetId,
+    // Как `clearCustomVideoPath`: обычный `?? this.` не даёт вернуться к
+    // пресету "Роутинг сервера" (null), раз null здесь и так значит "не
+    // менять" — см. `settings_page.dart`.
+    bool clearActiveRoutingPresetId = false,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -306,6 +322,9 @@ class AppSettings {
           ? null
           : (customVideoPath ?? this.customVideoPath),
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
+      activeRoutingPresetId: clearActiveRoutingPresetId
+          ? null
+          : (activeRoutingPresetId ?? this.activeRoutingPresetId),
     );
   }
 }

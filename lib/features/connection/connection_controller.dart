@@ -7,7 +7,9 @@ import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
 import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config.dart';
+import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/core_engine.dart';
+import '../../core_abstraction/effective_routing.dart';
 import '../../core_abstraction/engine_manager_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../engines/singbox/singbox_engine_macos.dart';
@@ -172,7 +174,21 @@ class ConnectionController extends Notifier<ConnectionUiState> {
       }
     });
 
-    final config = CoreConfig(standaloneNodes: [leaf]);
+    // Разрешаем эффективные правила роутинга ровно один раз тут, до передачи
+    // в движок: активный пресет (`AppSettings.activeRoutingPresetId`)
+    // подменяет `leaf.routingRules` для всех серверов сразу, кроме пресета
+    // "Роутинг сервера" (null) — см. `effective_routing.dart`. Движки
+    // (`XrayEngineWindows` и т.д.) продолжают читать `routingRules` прямо с
+    // листа в `CoreConfig`, не зная о пресетах вовсе.
+    final coreConfig = ref.read(coreConfigProvider);
+    final effectiveLeaf = leaf.withRoutingRules(
+      effectiveRoutingRules(
+        leaf: leaf,
+        activePresetId: settings.activeRoutingPresetId,
+        presets: coreConfig.routingPresets,
+      ),
+    );
+    final config = CoreConfig(standaloneNodes: [effectiveLeaf]);
 
     try {
       await engine.start(config);

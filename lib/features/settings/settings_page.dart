@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../app/app_paths.dart';
 import '../../app/layout_breakpoints.dart';
@@ -12,13 +13,24 @@ import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
 import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config_provider.dart';
+import '../../core_abstraction/routing_preset.dart';
 import '../../engines/geo_assets.dart';
 import '../../engines/singbox/geo_ruleset_cache.dart';
 import '../../l10n/strings.dart';
 import '../../widgets/port_ui/port_ui.dart';
 import '../servers/flatten_leaves.dart';
+import '../servers/routing_rules_dialog.dart';
 import 'about_info.dart';
 import 'custom_video_storage.dart';
+
+const _uuid = Uuid();
+
+/// Sentinel-значение для [PortSelect] пресета "Роутинг сервера" —
+/// `AppSettings.activeRoutingPresetId == null` уже занят семантикой "не
+/// менять" внутри самого `PortSelect` (см. его doc-комментарий про
+/// `_value == null`), поэтому в UI используем отдельную нешаримую строку и
+/// конвертируем её в/из `null` на границе.
+const _serverRoutingPresetId = '__server_routing__';
 
 enum _SettingsSection {
   personalization(LucideIcons.palette),
@@ -459,6 +471,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       _SettingsSection.routing => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _RoutingPresetsSection(settings: settings, notifier: notifier),
+          const SizedBox(height: 24),
           Text(S.geoipUrlLabel, style: PortText.small),
           const SizedBox(height: 6),
           PortInput(
@@ -1011,4 +1025,121 @@ class _SettingRow extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Выбор активного пресета роутинга + управление списком пресетов —
+/// заменяет собой прежние per-server/per-subscription диалоги
+/// (`server_row.dart`, `subscription_info_panel.dart`): теперь роутинг
+/// настраивается один раз здесь и применяется ко всем серверам сразу.
+class _RoutingPresetsSection extends ConsumerWidget {
+  final AppSettings settings;
+  final AppSettingsController notifier;
+
+  const _RoutingPresetsSection({required this.settings, required this.notifier});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final presets = ref.watch(coreConfigProvider).routingPresets;
+    final activeId = settings.activeRoutingPresetId ?? _serverRoutingPresetId;
+
+    void selectPreset(String? value) {
+      if (value == null) return;
+      notifier.update(
+        (s) => value == _serverRoutingPresetId
+            ? s.copyWith(clearActiveRoutingPresetId: true)
+            : s.copyWith(activeRoutingPresetId: value),
+      );
+    }
+
+    void createPreset() {
+      showRoutingRulesDialog(
+        context,
+        title: S.createPresetLabel,
+        initialName: '',
+        initialRules: const [],
+        onSave: (name, rules) => ref
+            .read(coreConfigProvider.notifier)
+            .addRoutingPreset(RoutingPreset(id: _uuid.v4(), name: name, rules: rules)),
+      );
+    }
+
+    void editPreset(RoutingPreset preset) {
+      showRoutingRulesDialog(
+        context,
+        title: preset.name,
+        initialName: preset.name,
+        initialRules: preset.rules,
+        onSave: (name, rules) => ref
+            .read(coreConfigProvider.notifier)
+            .updateRoutingPreset(preset.copyWith(name: name, rules: rules)),
+      );
+    }
+
+    void deletePreset(RoutingPreset preset) {
+      if (settings.activeRoutingPresetId == preset.id) {
+        notifier.update((s) => s.copyWith(clearActiveRoutingPresetId: true));
+      }
+      ref.read(coreConfigProvider.notifier).deleteRoutingPreset(preset.id);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(S.activeRoutingLabel, style: PortText.small),
+        const SizedBox(height: 6),
+        PortSelect<String>(
+          initialValue: activeId,
+          onChanged: selectPreset,
+          options: [
+            PortSelectOption(
+              value: _serverRoutingPresetId,
+              child: Text(S.serverRoutingPreset),
+            ),
+            for (final preset in presets)
+              PortSelectOption(value: preset.id, child: Text(preset.name)),
+          ],
+          selectedOptionBuilder: (context, value) => Text(
+            value == _serverRoutingPresetId
+                ? S.serverRoutingPreset
+                : _presetName(presets, value) ?? S.serverRoutingPreset,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(S.serverRoutingPresetDescription, style: PortText.muted),
+        if (presets.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          for (final preset in presets)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: [
+                  Expanded(child: Text(preset.name, style: PortText.small)),
+                  PortIconButton.ghost(
+                    icon: const Icon(LucideIcons.pencil, size: 14),
+                    onPressed: () => editPreset(preset),
+                  ),
+                  PortIconButton.ghost(
+                    icon: const Icon(LucideIcons.trash2, size: 14),
+                    onPressed: () => deletePreset(preset),
+                  ),
+                ],
+              ),
+            ),
+        ],
+        const SizedBox(height: 12),
+        PortButton.outline(
+          leading: const Icon(LucideIcons.plus, size: 16),
+          onPressed: createPreset,
+          child: Text(S.createPresetLabel),
+        ),
+      ],
+    );
+  }
+}
+
+String? _presetName(List<RoutingPreset> presets, String id) {
+  for (final preset in presets) {
+    if (preset.id == id) return preset.name;
+  }
+  return null;
 }

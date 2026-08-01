@@ -16,7 +16,6 @@ import 'filter_hidden_nodes.dart';
 import 'flatten_leaves.dart';
 import 'import_subscription_sheet.dart';
 import 'proxy_tree_list.dart';
-import 'routing_rules_dialog.dart';
 import 'selected_server_provider.dart';
 import 'subscription_info_panel.dart';
 
@@ -105,18 +104,6 @@ class ServerListContent extends ConsumerWidget {
 
     void onHideLeaf(String leafId) {
       ref.read(coreConfigProvider.notifier).setHidden(leafId, true);
-    }
-
-    void onEditRoutingLeaf(String leafId) {
-      final leaf = allLeaves.where((l) => l.id == leafId).firstOrNull;
-      if (leaf == null) return;
-      showRoutingRulesDialog(
-        context,
-        title: S.routingTitleFor(leaf.name),
-        initialRules: leaf.routingRules,
-        onSave: (rules) =>
-            ref.read(coreConfigProvider.notifier).setRoutingRules(leafId, rules),
-      );
     }
 
     // Информация о подписке — всегда всплывающая поверх главного экрана, не
@@ -232,7 +219,6 @@ class ServerListContent extends ConsumerWidget {
                           selectedLeafId: selectedId,
                           onSelectLeaf: onSelectLeaf,
                           onSelectVariant: onSelectVariant,
-                          onEditRoutingLeaf: onEditRoutingLeaf,
                           onPingLeaf: onPingLeaf,
                           latencyForLeaf: (id) => pingCache[id]?.latencyMs,
                           pingingLeafIds: pingingLeafIds,
@@ -253,7 +239,6 @@ class ServerListContent extends ConsumerWidget {
                           onSelectLeaf: onSelectLeaf,
                           onSelectVariant: onSelectVariant,
                           onHideLeaf: onHideLeaf,
-                          onEditRoutingLeaf: onEditRoutingLeaf,
                           onPingLeaf: onPingLeaf,
                           latencyForLeaf: (id) => pingCache[id]?.latencyMs,
                           pingingLeafIds: pingingLeafIds,

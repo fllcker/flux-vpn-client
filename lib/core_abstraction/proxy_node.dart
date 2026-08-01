@@ -2,11 +2,13 @@ import 'server_config.dart';
 
 enum GroupStrategy { select, urlTest, fallback, loadBalance }
 
-/// Правило роутинга — живёт на [ServerLeaf], не на [CoreConfig] или
-/// [Subscription], т.к. в xray-json подписке роутинг обычно приходит
-/// отдельным блоком `"routing"` внутри JSON-объекта каждого сервера (данные
-/// конкретного сервера, не подписки/приложения целиком) — см. ROADMAP.md,
-/// трек 3.
+/// Правило роутинга. Живёт на [ServerLeaf] (в xray-json подписке роутинг
+/// обычно приходит отдельным блоком `"routing"` внутри JSON-объекта каждого
+/// сервера) — это фоллбек-набор для пресета "Роутинг сервера". Основной
+/// UX-путь теперь — именованные [RoutingPreset] (`routing_preset.dart`),
+/// один из которых выбирается активным на уровне приложения
+/// (`AppSettings.activeRoutingPresetId`) и подменяет правила листа для всех
+/// серверов сразу, см. `effective_routing.dart`.
 ///
 /// Значения в [DomainRule.values]/[IpRule.values] хранятся как есть, один в
 /// один с xray-шным синтаксисом (`"example.com"`, `"domain:sub.example.com"`,
@@ -305,33 +307,6 @@ ProxyNode setNodeHidden(ProxyNode node, String nodeId, bool hidden) {
       strategy: group.strategy,
       children: group.children
           .map((c) => setNodeHidden(c, nodeId, hidden))
-          .toList(),
-    ),
-  };
-}
-
-/// Ищет [ServerLeaf] с [leafId] в дереве и возвращает копию дерева с его
-/// [ServerLeaf.routingRules], заменённым на [rules]. Остальные узлы
-/// возвращаются как есть — используется и для одного сервера, и (вызовом по
-/// каждому листу подписки) для bulk-применения одинаковых правил на всю
-/// подписку, см. ROADMAP.md, трек 3.
-ProxyNode setLeafRoutingRules(
-  ProxyNode node,
-  String leafId,
-  List<RoutingRule> rules,
-) {
-  return switch (node) {
-    ServerLeaf leaf when leaf.id == leafId => leaf.withRoutingRules(rules),
-    ServerLeaf leaf => leaf,
-    AutoSelectMarker marker => marker,
-    ServerGroup group => ServerGroup(
-      id: group.id,
-      name: group.name,
-      icon: group.icon,
-      hidden: group.hidden,
-      strategy: group.strategy,
-      children: group.children
-          .map((c) => setLeafRoutingRules(c, leafId, rules))
           .toList(),
     ),
   };

@@ -21,7 +21,6 @@ class ServerRow extends StatefulWidget {
   // Скрытие доступно только серверам внутри подписки, не standalone-нодам
   // (см. ROADMAP.md, трек 2) — null здесь значит "не показывать пункт".
   final VoidCallback? onHide;
-  final VoidCallback? onEditRouting;
   // Задержка из кэша пинга (см. ROADMAP.md, трек 4) — null значит "ещё не
   // измеряли". onPing == null скрывает индикатор целиком.
   final int? latencyMs;
@@ -37,7 +36,6 @@ class ServerRow extends StatefulWidget {
     required this.onSelect,
     required this.onToggleExpand,
     this.onHide,
-    this.onEditRouting,
     this.latencyMs,
     this.pinging = false,
     this.onPing,
@@ -59,22 +57,14 @@ class _ServerRowState extends State<ServerRow> {
         : const Color(0x00000000);
 
     final onHide = widget.onHide;
-    final onEditRouting = widget.onEditRouting;
-    if (onHide == null && onEditRouting == null) return _buildRow(background);
+    if (onHide == null) return _buildRow(background);
 
     final items = [
-      if (onEditRouting != null)
-        PortContextMenuItem(
-          leading: const Icon(LucideIcons.route, size: 14),
-          onPressed: onEditRouting,
-          child: Text(S.routing),
-        ),
-      if (onHide != null)
-        PortContextMenuItem(
-          leading: const Icon(LucideIcons.eyeOff, size: 14),
-          onPressed: onHide,
-          child: Text(S.hide),
-        ),
+      PortContextMenuItem(
+        leading: const Icon(LucideIcons.eyeOff, size: 14),
+        onPressed: onHide,
+        child: Text(S.hide),
+      ),
     ];
 
     // На Android/iOS правого клика нет, а вешать открытие меню на long

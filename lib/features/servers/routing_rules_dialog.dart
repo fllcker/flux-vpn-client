@@ -13,18 +13,19 @@ import '../../widgets/port_ui/port_ui.dart';
 /// объектов с одним значением каждый.
 enum _RuleKind { domain, ip }
 
-/// Диалог редактирования правил роутинга одного сервера — тот же диалог
-/// переиспользуется для bulk-применения на всю подписку (см.
-/// `subscription_info_panel.dart`), разница только в том, куда уходит
-/// [onSave]. См. ROADMAP.md, трек 3.
+/// Диалог создания/редактирования именованного пресета роутинга
+/// (`routing_preset.dart`) — вызывается из настроек (`settings_page.dart`),
+/// см. ROADMAP.md, трек 3.
 class RoutingRulesDialog extends StatefulWidget {
   final String title;
+  final String initialName;
   final List<RoutingRule> initialRules;
-  final ValueChanged<List<RoutingRule>> onSave;
+  final void Function(String name, List<RoutingRule> rules) onSave;
 
   const RoutingRulesDialog({
     super.key,
     required this.title,
+    required this.initialName,
     required this.initialRules,
     required this.onSave,
   });
@@ -35,6 +36,7 @@ class RoutingRulesDialog extends StatefulWidget {
 
 class _RoutingRulesDialogState extends State<RoutingRulesDialog> {
   late List<RoutingRule> _rules;
+  late final TextEditingController _nameController;
   final _valueController = TextEditingController();
   _RuleKind _kind = _RuleKind.domain;
   String _outboundTag = 'proxy';
@@ -43,10 +45,12 @@ class _RoutingRulesDialogState extends State<RoutingRulesDialog> {
   void initState() {
     super.initState();
     _rules = List.of(widget.initialRules);
+    _nameController = TextEditingController(text: widget.initialName);
   }
 
   @override
   void dispose() {
+    _nameController.dispose();
     _valueController.dispose();
     super.dispose();
   }
@@ -74,7 +78,9 @@ class _RoutingRulesDialogState extends State<RoutingRulesDialog> {
   }
 
   void _save() {
-    widget.onSave(_rules);
+    final name = _nameController.text.trim();
+    if (name.isEmpty) return;
+    widget.onSave(name, _rules);
     Navigator.of(context).pop();
   }
 
@@ -88,6 +94,13 @@ class _RoutingRulesDialogState extends State<RoutingRulesDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
+            Text(S.presetNameLabel, style: PortText.small),
+            const SizedBox(height: 6),
+            PortInput(
+              controller: _nameController,
+              placeholder: S.presetNamePlaceholder,
+            ),
+            const SizedBox(height: 16),
             if (_rules.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -226,20 +239,22 @@ String _tagLabel(String outboundTag) => switch (outboundTag) {
   _ => S.throughProxy,
 };
 
-/// Показывает диалог редактирования правил роутинга одного сервера/подписки
-/// по центру окна — тот же стиль, что и остальные диалоги приложения (см.
+/// Показывает диалог создания/редактирования пресета роутинга по центру
+/// окна — тот же стиль, что и остальные диалоги приложения (см.
 /// `showSettingsDialog`, `showAddServerDialog`).
 Future<void> showRoutingRulesDialog(
   BuildContext context, {
   required String title,
+  required String initialName,
   required List<RoutingRule> initialRules,
-  required ValueChanged<List<RoutingRule>> onSave,
+  required void Function(String name, List<RoutingRule> rules) onSave,
 }) {
   return showPortDialog(
     context: context,
     barrierColor: dialogBarrierColor,
     builder: (_) => RoutingRulesDialog(
       title: title,
+      initialName: initialName,
       initialRules: initialRules,
       onSave: onSave,
     ),

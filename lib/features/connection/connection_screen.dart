@@ -128,9 +128,13 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
         !File(geositeFilePath()).existsSync()) {
       showFluxNotification(title: S.notificationGeoAssetsFailedTitle);
     }
+    // Прогреваем geo-ассеты и правил с листьев (пресет "Роутинг сервера"),
+    // и всех сохранённых пресетов — активный пресет может смениться в
+    // настройках без пересоздания этого экрана, дешевле прогреть всё сразу.
+    final coreConfig = ref.read(coreConfigProvider);
     final allRoutingRules = [
-      for (final leaf in flattenAllLeaves(ref.read(coreConfigProvider)))
-        ...leaf.routingRules,
+      for (final leaf in flattenAllLeaves(coreConfig)) ...leaf.routingRules,
+      for (final preset in coreConfig.routingPresets) ...preset.rules,
     ];
     await pregenerateGeoRuleSets(allRoutingRules);
   }
