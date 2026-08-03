@@ -111,15 +111,23 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
   # Генерирует android/app/src/main/res/mipmap-*/ic_launcher.png из
-  # assets/icon.png (см. `flutter_icons:` ниже) — запускается вручную
-  # (`dart run flutter_launcher_icons`), не на каждой сборке. Только Android
-  # (android: true), Windows-иконку это не трогает.
+  # assets/icon.png и macos/Runner/Assets.xcassets/AppIcon.appiconset/*.png
+  # из docs/media/icon_with_black.png (см. `flutter_icons:` ниже) —
+  # запускается вручную (`dart run flutter_launcher_icons`), не на каждой
+  # сборке. Windows-иконку это не трогает (там свой .ico, см.
+  # windows/runner/resources). macOS использует отдельный source-файл с
+  # фоном/скруглением — Apple ожидает непрозрачную заливку до краёв
+  # (см. README пакета), а assets/icon.png прозрачный контур-логотип, из
+  # него выходит "голый" контур без фона.
   flutter_launcher_icons: ^0.14.4
 
 flutter_launcher_icons:
   android: true
   ios: false
   image_path: "assets/icon.png"
+  macos:
+    generate: true
+    image_path: "docs/media/icon_with_black.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

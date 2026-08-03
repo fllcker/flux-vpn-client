@@ -12,10 +12,9 @@ import '../../core_abstraction/core_engine.dart';
 import '../../core_abstraction/effective_routing.dart';
 import '../../core_abstraction/engine_manager_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
-import '../../engines/singbox/singbox_engine_macos.dart';
 import '../../engines/singbox/singbox_engine_windows.dart';
 import '../../engines/singbox/tun_bridge_engine.dart';
-import '../../engines/singbox/tun_bridge_engine_macos.dart';
+import '../../engines/singbox/tun_bridge_engine_macos_ne.dart';
 import '../../engines/xray/xray_engine_android.dart';
 import '../../engines/xray/xray_engine_macos.dart';
 import '../../engines/xray/xray_engine_windows.dart';
@@ -149,10 +148,8 @@ class ConnectionController extends Notifier<ConnectionUiState> {
             logLevel: settings.coreLogLevel,
           ),
           ConnectionMode.tun => switch (settings.tunCoreType) {
-            TunCoreType.singBox => TunBridgeEngineMacOS(
+            TunCoreType.singBox => TunBridgeEngineMacOSNe(
               id: id,
-              xrayExecutablePath: defaultMacosXrayExecutablePath(),
-              singBoxExecutablePath: defaultMacosSingBoxExecutablePath(),
               upstreamDns: settings.tunDnsServer,
               logLevel: settings.coreLogLevel,
             ),

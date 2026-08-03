@@ -1,4 +1,5 @@
 import 'connection_session.dart';
+import 'home_tile_config.dart';
 
 /// Тема оформления — `system` следует настройке ОС, см. [AppSettings].
 enum AppThemeMode { system, light, dark }
@@ -152,6 +153,12 @@ class AppSettings {
   /// воспроизводит поведение до реворка роутинга на пресеты).
   final String? activeRoutingPresetId;
 
+  /// Раскладка плиток главного экрана (`HomeTileGrid`,
+  /// `lib/features/connection/home_tiles/`) — порядок в списке = порядок в
+  /// сетке (flow-раскладка, без явных col/row координат). Дефолт
+  /// [defaultHomeTiles] воспроизводит вид до появления кастомизации 1:1.
+  final List<HomeTileConfig> homeTiles;
+
   const AppSettings({
     this.themeMode = AppThemeMode.dark,
     this.language = AppLanguage.system,
@@ -174,6 +181,7 @@ class AppSettings {
     this.customVideoPath,
     this.onboardingCompleted = false,
     this.activeRoutingPresetId,
+    this.homeTiles = defaultHomeTiles,
   });
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -240,6 +248,11 @@ class AppSettings {
     // запуск" (тот идёт через конструктор напрямую, когда файла нет вовсе).
     onboardingCompleted: json['onboardingCompleted'] as bool? ?? true,
     activeRoutingPresetId: json['activeRoutingPresetId'] as String?,
+    homeTiles: json['homeTiles'] == null
+        ? defaultHomeTiles
+        : (json['homeTiles'] as List)
+              .map((t) => HomeTileConfig.fromJson(t as Map<String, dynamic>))
+              .toList(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -265,6 +278,7 @@ class AppSettings {
     'onboardingCompleted': onboardingCompleted,
     if (activeRoutingPresetId != null)
       'activeRoutingPresetId': activeRoutingPresetId,
+    'homeTiles': homeTiles.map((t) => t.toJson()).toList(),
   };
 
   AppSettings copyWith({
@@ -297,6 +311,7 @@ class AppSettings {
     // пресету "Роутинг сервера" (null), раз null здесь и так значит "не
     // менять" — см. `settings_page.dart`.
     bool clearActiveRoutingPresetId = false,
+    List<HomeTileConfig>? homeTiles,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -325,6 +340,7 @@ class AppSettings {
       activeRoutingPresetId: clearActiveRoutingPresetId
           ? null
           : (activeRoutingPresetId ?? this.activeRoutingPresetId),
+      homeTiles: homeTiles ?? this.homeTiles,
     );
   }
 }

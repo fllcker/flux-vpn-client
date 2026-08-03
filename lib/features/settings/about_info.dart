@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../engines/singbox/singbox_engine_macos.dart';
 import '../../engines/singbox/singbox_engine_windows.dart';
+import '../../engines/xray/xray_engine_macos.dart';
 import '../../engines/xray/xray_engine_windows.dart';
 
 /// Версии приложения и ядер — то, что первым делом спрашивают при разборе
@@ -45,8 +47,16 @@ final aboutInfoProvider = FutureProvider<AboutInfo>((ref) async {
   }
 
   final versions = await Future.wait([
-    _coreVersion(defaultXrayExecutablePath()),
-    _coreVersion(defaultSingBoxExecutablePath()),
+    _coreVersion(
+      Platform.isMacOS
+          ? defaultMacosXrayExecutablePath()
+          : defaultXrayExecutablePath(),
+    ),
+    _coreVersion(
+      Platform.isMacOS
+          ? defaultMacosSingBoxExecutablePath()
+          : defaultSingBoxExecutablePath(),
+    ),
   ]);
 
   return AboutInfo(

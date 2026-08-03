@@ -15,11 +15,10 @@ import '../../engines/xray/windows_elevation.dart';
 import '../../widgets/port_ui/port_ui.dart';
 import '../servers/flatten_leaves.dart';
 import '../servers/selected_server_provider.dart';
-import '../servers/server_icon.dart';
 import '../servers/server_list_panel.dart';
 import 'connection_controller.dart';
 import 'connection_state.dart';
-import 'connection_timer.dart';
+import 'home_tiles/home_tile_grid.dart';
 import 'off_proxy_tun_selector.dart';
 
 class ConnectPanel extends ConsumerStatefulWidget {
@@ -30,23 +29,8 @@ class ConnectPanel extends ConsumerStatefulWidget {
 }
 
 class _ConnectPanelState extends ConsumerState<ConnectPanel> {
-  // IntrinsicWidth недостаточно точен для Row из AnimatedContainer
-  // (см. историю переполнения) — вместо приближённого intrinsic-расчёта
-  // измеряем реальную отрисованную ширину переключателя после кадра и
-  // задаём её карточке сервера явно, чтобы совпадение было пиксельным.
-  final _selectorKey = GlobalKey();
-  double? _selectorWidth;
-
-  void _measureSelectorWidth(Duration _) {
-    final width = _selectorKey.currentContext?.size?.width;
-    if (width != null && width != _selectorWidth) {
-      setState(() => _selectorWidth = width);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback(_measureSelectorWidth);
     final leaves = flattenAllLeaves(ref.watch(coreConfigProvider));
     final selectedId =
         ref.watch(selectedServerIdProvider) ??
@@ -60,101 +44,26 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
         connectionState is ConnectionStopping;
 
     if (selectedLeaf == null) {
-      return Center(
-        child: Text(
-          S.selectServerHint,
-          style: PortText.muted,
-        ),
-      );
+      return Center(child: Text(S.selectServerHint, style: PortText.muted));
     }
 
-    final selection = switch (connectionState) {
-      ConnectionConnected(mode: ConnectionMode.proxy) => ConnectSelection.proxy,
-      ConnectionConnected(mode: ConnectionMode.tun) => ConnectSelection.tun,
-      _ => ConnectSelection.off,
-    };
-
-    // Android (тест-эксперимент, см. чат) — оба блока (карточка сервера и
-    // Off/On) fit-content каждый сам по себе, без общего капа ширины и без
-    // принудительного выравнивания под ширину друг друга (на десктопе
-    // карточка растягивается под измеренную ширину селектора,
-    // _selectorWidth — см. коммент у поля, чтобы совпадение было
-    // пиксельным). Сильно скруглённые — почти овалы (999 гарантированно
-    // превышает половину высоты любого из блоков, Flutter сам клэмпит до
-    // "stadium"-формы). На десктопе ничего не меняем.
-    final pillRadius = Platform.isAndroid ? 999.0 : 10.0;
-
-    final card = GestureDetector(
-      // Боковая панель со списком серверов скрыта на мобильной раскладке
-      // (см. ROADMAP.md, трек 16) — тап по карточке открывает тот же bottom
-      // sheet, что и плавающая кнопка сверху, чтобы сменить сервер было
-      // можно и отсюда.
-      onTap: isMobileLayout(context) ? () => openServerListSheet(context) : null,
-      child: Container(
-        // На Android симметричный 12/12 выглядел так, будто слева места
-        // больше, чем справа — сама иконка (см. ServerIcon) уже круглая с
-        // границей, глазу перед ней "читается" больше воздуха, чем после
-        // текста. Компенсируем чуть меньшим левым и чуть большим правым —
-        // десктоп не трогаем.
-        padding: Platform.isAndroid
-            ? const EdgeInsets.fromLTRB(10, 10, 14, 10)
-            : const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: PortColors.muted.withValues(alpha: 0.7),
-          borderRadius: BorderRadius.circular(pillRadius),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ServerIcon(icon: selectedLeaf.icon, size: 32),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    selectedLeaf.name,
-                    style: PortText.large.copyWith(fontSize: 15, height: 1),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 1),
-                  _StatusText(state: connectionState),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    final selector = OffProxyTunSelector(
-      key: _selectorKey,
-      value: selection,
+    final grid = HomeTileGrid(
+      leaf: selectedLeaf,
+      connectionState: connectionState,
       busy: busy,
-      simplifiedOnOff: Platform.isAndroid,
-      onChanged: (selection) =>
+      onModeChanged: (selection) =>
           _onSelectionChanged(context, ref, selectedLeaf, selection),
+      // Боковая панель со списком серверов скрыта на мобильной раскладке
+      // (см. ROADMAP.md, трек 16) — тап по плитке сервера открывает тот же
+      // bottom sheet, что и плавающая кнопка сверху, чтобы сменить сервер
+      // было можно и отсюда. На десктопе список всегда виден сбоку.
+      onOpenServerList:
+          isMobileLayout(context) ? () => openServerListSheet(context) : null,
     );
 
     final content = Platform.isAndroid
-        ? Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [card, const SizedBox(height: 12), selector],
-          )
-        : ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 340),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SizedBox(width: _selectorWidth, child: card),
-                const SizedBox(height: 12),
-                selector,
-              ],
-            ),
-          );
+        ? grid
+        : ConstrainedBox(constraints: const BoxConstraints(maxWidth: 340), child: grid);
 
     return Align(
       alignment: Alignment.bottomCenter,
@@ -201,7 +110,14 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
       case ConnectSelection.proxy:
         await controller.connectToServer(leaf, mode: ConnectionMode.proxy);
       case ConnectSelection.tun:
-        if (isRunningElevated()) {
+        // isRunningElevated() — Windows-only FFI (shell32.dll, см.
+        // windows_elevation.dart), падает при вызове на macOS так же, как
+        // и на Android (см. комментарий выше). На macOS TUN через
+        // NetworkExtension/System Extension (TunBridgeEngineMacOSNe) вообще
+        // не требует root/элевейта — есть системный запрос на активацию
+        // расширения (см. NetworkExtensionBridge.swift), но не Windows-style
+        // UAC-релонч всего приложения.
+        if (Platform.isMacOS || isRunningElevated()) {
           await controller.connectToServer(leaf, mode: ConnectionMode.tun);
           return;
         }
@@ -249,27 +165,6 @@ class _ConnectPanelState extends ConsumerState<ConnectPanel> {
       await windowManager.setPreventClose(false);
       await windowManager.close();
     }
-  }
-}
-
-class _StatusText extends StatelessWidget {
-  final ConnectionUiState state;
-  const _StatusText({required this.state});
-
-  @override
-  Widget build(BuildContext context) {
-    if (state case ConnectionConnected(connectedAt: final connectedAt)) {
-      return ConnectionTimer(connectedAt: connectedAt);
-    }
-
-    final text = switch (state) {
-      ConnectionIdle() => S.disconnected,
-      ConnectionConnecting() => S.connectingStatus,
-      ConnectionStopping() => S.disconnectingStatus,
-      ConnectionError(message: final message) => S.connectionError(message),
-      ConnectionConnected() => '', // обработано выше
-    };
-    return Text(text, style: PortText.muted.copyWith(height: 1));
   }
 }
 

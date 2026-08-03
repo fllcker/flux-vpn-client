@@ -1,8 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter/widgets.dart';
 
+import '../../core_abstraction/home_tile_config.dart';
 import '../../widgets/port_ui/port_ui.dart';
+import 'home_tiles/home_tile_card.dart';
 
 enum ConnectSelection { off, proxy, tun }
 
@@ -14,10 +14,17 @@ enum ConnectSelection { off, proxy, tun }
 /// Off/On (см. ROADMAP.md, трек 19, Phase 4): [simplifiedOnOff] прячет
 /// сегмент "Proxy" и подписывает TUN-сегмент как "On". `onChanged` тогда
 /// вызывается только с [ConnectSelection.off]/[ConnectSelection.tun].
+///
+/// Содержимое плитки `modeSelector` (`home_tiles/home_tile_content.dart`) —
+/// без собственного внешнего фона/скругления, это теперь даёт `HomeTileCard`
+/// снаружи с настраиваемым [radiusStyle] вместо жёсткой привязки к
+/// `Platform.isAndroid`, как было раньше. Сегменты растягиваются на всю
+/// ширину плитки ([Expanded]), а не fit-content.
 class OffProxyTunSelector extends StatelessWidget {
   final ConnectSelection value;
   final bool busy;
   final bool simplifiedOnOff;
+  final HomeTileRadiusStyle radiusStyle;
   final ValueChanged<ConnectSelection> onChanged;
 
   const OffProxyTunSelector({
@@ -25,43 +32,33 @@ class OffProxyTunSelector extends StatelessWidget {
     required this.value,
     required this.busy,
     required this.onChanged,
+    required this.radiusStyle,
     this.simplifiedOnOff = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Android (тест, см. connect_panel.dart) — трек и активный сегмент
-    // почти овалы, тот же приём (999 клэмпится Flutter'ом до половины
-    // высоты). Десктоп не трогаем.
-    final pillRadius = Platform.isAndroid ? 999.0 : 10.0;
-    // Сегменты внутри трека раньше были 8 (чуть меньше трека в 10) —
-    // сохраняем то же соотношение "чуть меньше" на десктопе, на Android оба
-    // 999 всё равно клэмпятся до формы.
-    final segmentRadius = Platform.isAndroid ? 999.0 : 8.0;
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: PortColors.muted.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(pillRadius),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _Segment(
+    // Чуть меньше радиуса самой плитки — то же соотношение, что было у
+    // "трек 10 / сегмент 8" раньше, pill остаётся pill (клэмпится Flutter'ом
+    // в любом случае).
+    final tileRadius = radiusForStyle(radiusStyle);
+    final segmentRadius = radiusStyle == HomeTileRadiusStyle.pill
+        ? tileRadius
+        : (tileRadius - 2).clamp(2.0, tileRadius);
+    return Row(
+      children: [
+        Expanded(
+          child: _Segment(
             selected: value == ConnectSelection.off,
             enabled: !busy,
             label: 'Off',
-            // Раньше здесь был увеличенный паддинг (40) — компенсировал то,
-            // что 2-сегментный вид растягивался под измеренную ширину
-            // карточки сервера сверху (см. _selectorWidth в
-            // connect_panel.dart). Теперь на Android оба блока fit-content
-            // независимо друг от друга (см. тот же файл), компенсация не
-            // нужна — сегмент снова просто в размер своего текста.
             radius: segmentRadius,
             onTap: () => onChanged(ConnectSelection.off),
           ),
-          if (!simplifiedOnOff)
-            _Segment(
+        ),
+        if (!simplifiedOnOff)
+          Expanded(
+            child: _Segment(
               selected: value == ConnectSelection.proxy,
               enabled: !busy,
               label: 'Proxy',
@@ -69,7 +66,9 @@ class OffProxyTunSelector extends StatelessWidget {
               radius: segmentRadius,
               onTap: () => onChanged(ConnectSelection.proxy),
             ),
-          _Segment(
+          ),
+        Expanded(
+          child: _Segment(
             selected: value == ConnectSelection.tun,
             enabled: !busy,
             label: simplifiedOnOff ? 'On' : 'TUN',
@@ -82,13 +81,13 @@ class OffProxyTunSelector extends StatelessWidget {
             radius: segmentRadius,
             onTap: () => onChanged(ConnectSelection.tun),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-class _Segment extends StatelessWidget {
+class _Segment extends StatefulWidget {
   final bool selected;
   final bool enabled;
   final String label;
@@ -106,25 +105,44 @@ class _Segment extends StatelessWidget {
   });
 
   @override
+  State<_Segment> createState() => _SegmentState();
+}
+
+class _SegmentState extends State<_Segment> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    final textColor = !enabled
+    final textColor = !widget.enabled
         ? PortColors.mutedForeground.withValues(alpha: 0.4)
-        : selected
-        ? (activeColor ?? PortColors.foreground)
+        : widget.selected
+        ? (widget.activeColor ?? PortColors.foreground)
         : PortColors.mutedForeground;
 
+    // Невыбранный сегмент на ховере чуть подсвечивается (та же формула, что
+    // и у выбора в дереве серверов) — иначе непонятно, что по нему вообще
+    // можно кликнуть, пока не наведёшь и не увидишь смену курсора.
+    final background = widget.selected
+        ? PortColors.background
+        : (widget.enabled && _hovered ? PortColors.accent.withValues(alpha: 0.5) : null);
+
     return MouseRegion(
-      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      cursor: widget.enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
-        onTap: enabled ? onTap : null,
+        onTap: widget.enabled ? widget.onTap : null,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          width: double.infinity,
+          alignment: Alignment.center,
+          margin: const EdgeInsets.all(1),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? PortColors.background : null,
-            borderRadius: BorderRadius.circular(radius),
-            boxShadow: selected
+            color: background,
+            borderRadius: BorderRadius.circular(widget.radius),
+            boxShadow: widget.selected
                 ? [
                     BoxShadow(
                       color: const Color(0x33000000),
@@ -138,9 +156,9 @@ class _Segment extends StatelessWidget {
             duration: const Duration(milliseconds: 180),
             style: PortText.small.copyWith(
               color: textColor,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+              fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w400,
             ),
-            child: Text(label),
+            child: Text(widget.label, overflow: TextOverflow.ellipsis),
           ),
         ),
       ),
