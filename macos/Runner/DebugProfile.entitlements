@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- App Sandbox отключён: Flux запускает xray/sing-box как дочерние процессы
+	и пишет их конфиг/лог в ~/Library/Application Support/flux (см.
+	lib/app/app_paths.dart) — оба действия запрещены сандбоксом без отдельных
+	временных/постоянных exception-энтайтлментов, которых для не-App-Store
+	VPN-клиента проще избежать, отключив сандбокс целиком (как Windows- и
+	Android-сборки этого же приложения тоже не сандбоксятся). -->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<!-- TODO(dev-account): com.apple.developer.networking.networkextension
+	нужен для настоящего TUN через NEPacketTunnelProvider (см. PLAN.md,
+	"Системная интеграция VPN на macOS") — Apple выдаёт его только платным
+	Developer-аккаунтам, добавить сюда и в Release.entitlements, как только
+	аккаунт появится. До тех пор TUN-режим на macOS — только через
+	sing-box-подпроцесс с sudo (см. lib/engines/xray/macos_elevation.dart). -->
+</dict>
+</plist>

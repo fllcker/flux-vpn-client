@@ -1,4 +1,5 @@
 import 'connection_session.dart';
+import 'home_tile_config.dart';
 
 /// Тема оформления — `system` следует настройке ОС, см. [AppSettings].
 enum AppThemeMode { system, light, dark }
@@ -145,6 +146,19 @@ class AppSettings {
   /// когда файл есть, но поля в нём нет (апгрейд с версии до онбординга).
   final bool onboardingCompleted;
 
+  /// Id активного пресета роутинга (`CoreConfig.routingPresets`) — локальное
+  /// предпочтение машины, как [lastSelectedServerId], не часть Magic JSON
+  /// профиля. `null` — специальный пресет "Роутинг сервера": каждый сервер
+  /// использует свой `ServerLeaf.routingRules` как раньше (дефолт,
+  /// воспроизводит поведение до реворка роутинга на пресеты).
+  final String? activeRoutingPresetId;
+
+  /// Раскладка плиток главного экрана (`HomeTileGrid`,
+  /// `lib/features/connection/home_tiles/`) — порядок в списке = порядок в
+  /// сетке (flow-раскладка, без явных col/row координат). Дефолт
+  /// [defaultHomeTiles] воспроизводит вид до появления кастомизации 1:1.
+  final List<HomeTileConfig> homeTiles;
+
   const AppSettings({
     this.themeMode = AppThemeMode.dark,
     this.language = AppLanguage.system,
@@ -166,6 +180,8 @@ class AppSettings {
     this.lastSelectedServerId,
     this.customVideoPath,
     this.onboardingCompleted = false,
+    this.activeRoutingPresetId,
+    this.homeTiles = defaultHomeTiles,
   });
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -231,6 +247,12 @@ class AppSettings {
     // значит "апгрейд с версии, где онбординга не было", а не "первый
     // запуск" (тот идёт через конструктор напрямую, когда файла нет вовсе).
     onboardingCompleted: json['onboardingCompleted'] as bool? ?? true,
+    activeRoutingPresetId: json['activeRoutingPresetId'] as String?,
+    homeTiles: json['homeTiles'] == null
+        ? defaultHomeTiles
+        : (json['homeTiles'] as List)
+              .map((t) => HomeTileConfig.fromJson(t as Map<String, dynamic>))
+              .toList(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -254,6 +276,9 @@ class AppSettings {
     if (lastSelectedServerId != null) 'lastSelectedServerId': lastSelectedServerId,
     if (customVideoPath != null) 'customVideoPath': customVideoPath,
     'onboardingCompleted': onboardingCompleted,
+    if (activeRoutingPresetId != null)
+      'activeRoutingPresetId': activeRoutingPresetId,
+    'homeTiles': homeTiles.map((t) => t.toJson()).toList(),
   };
 
   AppSettings copyWith({
@@ -281,6 +306,12 @@ class AppSettings {
     // видеофон (см. `settings_page.dart`, `_clearCustomVideo`).
     bool clearCustomVideoPath = false,
     bool? onboardingCompleted,
+    String? activeRoutingPresetId,
+    // Как `clearCustomVideoPath`: обычный `?? this.` не даёт вернуться к
+    // пресету "Роутинг сервера" (null), раз null здесь и так значит "не
+    // менять" — см. `settings_page.dart`.
+    bool clearActiveRoutingPresetId = false,
+    List<HomeTileConfig>? homeTiles,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -306,6 +337,10 @@ class AppSettings {
           ? null
           : (customVideoPath ?? this.customVideoPath),
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
+      activeRoutingPresetId: clearActiveRoutingPresetId
+          ? null
+          : (activeRoutingPresetId ?? this.activeRoutingPresetId),
+      homeTiles: homeTiles ?? this.homeTiles,
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core_config.dart';
 import 'profile_storage.dart';
 import 'proxy_node.dart';
+import 'routing_preset.dart';
 import 'subscription.dart';
 
 /// Профиль приложения — Magic JSON, при старте загружается с диска
@@ -22,6 +23,7 @@ class CoreConfigController extends Notifier<CoreConfig> {
         schemaVersion: config.schemaVersion,
         subscriptions: config.subscriptions,
         standaloneNodes: [...config.standaloneNodes, ...leaves],
+        routingPresets: config.routingPresets,
       ),
     );
   }
@@ -40,6 +42,7 @@ class CoreConfigController extends Notifier<CoreConfig> {
         schemaVersion: config.schemaVersion,
         subscriptions: config.subscriptions,
         standaloneNodes: [...kept, ...nodes],
+        routingPresets: config.routingPresets,
       );
     });
   }
@@ -50,6 +53,7 @@ class CoreConfigController extends Notifier<CoreConfig> {
         schemaVersion: config.schemaVersion,
         subscriptions: [...config.subscriptions, subscription],
         standaloneNodes: config.standaloneNodes,
+        routingPresets: config.routingPresets,
       ),
     );
   }
@@ -60,6 +64,7 @@ class CoreConfigController extends Notifier<CoreConfig> {
         schemaVersion: config.schemaVersion,
         subscriptions: config.subscriptions.where((s) => s.id != id).toList(),
         standaloneNodes: config.standaloneNodes,
+        routingPresets: config.routingPresets,
       ),
     );
   }
@@ -75,6 +80,7 @@ class CoreConfigController extends Notifier<CoreConfig> {
             .map((s) => s.id == updated.id ? updated : s)
             .toList(),
         standaloneNodes: config.standaloneNodes,
+        routingPresets: config.routingPresets,
       ),
     );
   }
@@ -96,6 +102,7 @@ class CoreConfigController extends Notifier<CoreConfig> {
         standaloneNodes: config.standaloneNodes
             .map((n) => replaceLeafSelection(n, leafId, variantId))
             .toList(),
+        routingPresets: config.routingPresets,
       ),
     );
   }
@@ -111,57 +118,53 @@ class CoreConfigController extends Notifier<CoreConfig> {
             .map((s) => s.copyWith(root: setNodeHidden(s.root, nodeId, hidden)))
             .toList(),
         standaloneNodes: config.standaloneNodes,
+        routingPresets: config.routingPresets,
       ),
     );
   }
 
-  /// Заменяет [ServerLeaf.routingRules] одного сервера [leafId] — где бы он
-  /// ни лежал в дереве (standalone или внутри подписки), см. ROADMAP.md,
-  /// трек 3.
-  void setRoutingRules(String leafId, List<RoutingRule> rules) {
+  /// Добавляет новый пользовательский пресет роутинга — см.
+  /// `routing_preset.dart`, `settings_page.dart`.
+  void addRoutingPreset(RoutingPreset preset) {
     _update(
       (config) => CoreConfig(
         schemaVersion: config.schemaVersion,
-        subscriptions: config.subscriptions
-            .map(
-              (s) => s.copyWith(
-                root: setLeafRoutingRules(s.root, leafId, rules),
-              ),
-            )
-            .toList(),
-        standaloneNodes: config.standaloneNodes
-            .map((n) => setLeafRoutingRules(n, leafId, rules))
+        subscriptions: config.subscriptions,
+        standaloneNodes: config.standaloneNodes,
+        routingPresets: [...config.routingPresets, preset],
+      ),
+    );
+  }
+
+  /// Заменяет пресет с тем же [RoutingPreset.id] целиком (переименование
+  /// и/или правки правил).
+  void updateRoutingPreset(RoutingPreset updated) {
+    _update(
+      (config) => CoreConfig(
+        schemaVersion: config.schemaVersion,
+        subscriptions: config.subscriptions,
+        standaloneNodes: config.standaloneNodes,
+        routingPresets: config.routingPresets
+            .map((p) => p.id == updated.id ? updated : p)
             .toList(),
       ),
     );
   }
 
-  /// Bulk-применение: перезаписывает [rules] у каждого [ServerLeaf] подписки
-  /// [subscriptionId] одним и тем же списком — см. ROADMAP.md, трек 3, "На
-  /// странице подписки".
-  void setRoutingRulesForSubscription(
-    String subscriptionId,
-    List<RoutingRule> rules,
-  ) {
-    _update((config) {
-      final subscription = config.subscriptions
-          .where((s) => s.id == subscriptionId)
-          .firstOrNull;
-      if (subscription == null) return config;
-
-      var root = subscription.root;
-      for (final leaf in _flattenLeaves(root)) {
-        root = setLeafRoutingRules(root, leaf.id, rules);
-      }
-
-      return CoreConfig(
+  /// Удаляет пресет [presetId]. Если он был активным
+  /// (`AppSettings.activeRoutingPresetId`), настройки нужно откатить на
+  /// "Роутинг сервера" отдельно — контроллер этого не знает, см.
+  /// `settings_page.dart`.
+  void deleteRoutingPreset(String presetId) {
+    _update(
+      (config) => CoreConfig(
         schemaVersion: config.schemaVersion,
-        subscriptions: config.subscriptions
-            .map((s) => s.id == subscriptionId ? s.copyWith(root: root) : s)
-            .toList(),
+        subscriptions: config.subscriptions,
         standaloneNodes: config.standaloneNodes,
-      );
-    });
+        routingPresets:
+            config.routingPresets.where((p) => p.id != presetId).toList(),
+      ),
+    );
   }
 
   /// Запоминает, что для группы [groupId] последний раз использовался
@@ -182,6 +185,7 @@ class CoreConfigController extends Notifier<CoreConfig> {
         standaloneNodes: config.standaloneNodes
             .map((n) => setGroupStrategy(n, groupId, GroupStrategy.urlTest))
             .toList(),
+        routingPresets: config.routingPresets,
       ),
     );
   }
@@ -204,6 +208,7 @@ class CoreConfigController extends Notifier<CoreConfig> {
             nodeId,
             newIndex,
           ),
+          routingPresets: config.routingPresets,
         ),
       );
       return;
@@ -220,6 +225,7 @@ class CoreConfigController extends Notifier<CoreConfig> {
             )
             .toList(),
         standaloneNodes: config.standaloneNodes,
+        routingPresets: config.routingPresets,
       ),
     );
   }
@@ -246,18 +252,4 @@ List<ProxyNode> _reorderStandalone(
   final updated = List<ProxyNode>.of(nodes)..removeAt(index);
   updated.insert(newIndex.clamp(0, updated.length), nodes[index]);
   return updated;
-}
-
-List<ServerLeaf> _flattenLeaves(ProxyNode node) {
-  return switch (node) {
-    ServerLeaf leaf => [leaf],
-    AutoSelectMarker() => const [],
-    ServerGroup group => [
-      for (final child in group.children) ..._flattenLeaves(child),
-    ],
-  };
-}
-
-extension<T> on Iterable<T> {
-  T? get firstOrNull => isEmpty ? null : first;
 }

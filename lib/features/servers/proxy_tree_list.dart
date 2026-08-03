@@ -26,9 +26,6 @@ class ProxyTreeList extends ConsumerWidget {
   // подписки (standalone-серверы скрытие не поддерживают, см. ROADMAP.md,
   // трек 2).
   final ValueChanged<String>? onHideLeaf;
-  // Пункт "Роутинг" — доступен и standalone-серверам, и серверам внутри
-  // подписки (см. ROADMAP.md, трек 3).
-  final ValueChanged<String>? onEditRoutingLeaf;
   // Пинг — доступен и standalone-серверам, и серверам внутри подписки (см.
   // ROADMAP.md, трек 4). onPingLeaf == null скрывает индикатор целиком.
   final ValueChanged<String>? onPingLeaf;
@@ -71,7 +68,6 @@ class ProxyTreeList extends ConsumerWidget {
     required this.onSelectLeaf,
     required this.onSelectVariant,
     this.onHideLeaf,
-    this.onEditRoutingLeaf,
     this.onPingLeaf,
     this.latencyForLeaf,
     this.pingingLeafIds = const {},
@@ -122,7 +118,6 @@ class ProxyTreeList extends ConsumerWidget {
                     onSelectLeaf: onSelectLeaf,
                     onSelectVariant: onSelectVariant,
                     onHideLeaf: onHideLeaf,
-                    onEditRoutingLeaf: onEditRoutingLeaf,
                     onPingLeaf: onPingLeaf,
                     latencyForLeaf: latencyForLeaf,
                     pingingLeafIds: pingingLeafIds,
@@ -169,9 +164,6 @@ class ProxyTreeList extends ConsumerWidget {
                       onHide: onHideLeaf == null
                           ? null
                           : () => onHideLeaf!(leaf.id),
-                      onEditRouting: onEditRoutingLeaf == null
-                          ? null
-                          : () => onEditRoutingLeaf!(leaf.id),
                       latencyMs: latencyForLeaf?.call(leaf.id),
                       pinging: pingingLeafIds.contains(leaf.id),
                       onPing: onPingLeaf == null

@@ -29,6 +29,31 @@ abstract final class S {
   static String get selectServerHint =>
       _en ? 'Select a server on the left to connect.' : 'Выберите сервер слева, чтобы подключиться.';
 
+  // home_tiles/home_tile_grid.dart
+  static String get customizeTiles => _en ? 'Customize' : 'Настроить';
+  static String get doneCustomizingTiles => _en ? 'Done' : 'Готово';
+  static String get addTile => _en ? 'Add tile' : 'Добавить плитку';
+  static String get removeTile => _en ? 'Remove' : 'Удалить';
+  static String get tileSizeSmall => _en ? 'Small' : 'Маленькая';
+  static String get tileSizeWide => _en ? 'Wide' : 'Широкая';
+  static String get tileSizeLarge => _en ? 'Large' : 'Большая';
+  static String get tileRadiusSharp => _en ? 'Sharp corners' : 'Острые углы';
+  static String get tileRadiusRounded => _en ? 'Rounded corners' : 'Скруглённые углы';
+  static String get tileRadiusPill => _en ? 'Pill' : 'Таблетка';
+  static String get tileTypeServerInfo => _en ? 'Server (icon + name + status)' : 'Сервер (иконка + имя + статус)';
+  static String get tileTypeServerIcon => _en ? 'Server icon' : 'Иконка сервера';
+  static String get tileTypeServerStatus => _en ? 'Server name + status' : 'Имя сервера + статус';
+  static String get tileTypeModeSelector => _en ? 'Off/Proxy/TUN switch' : 'Переключатель Off/Proxy/TUN';
+  static String get tileTypeRoutingPreset => _en ? 'Routing preset' : 'Пресет роутинга';
+  static String get tileTypeVariantSelector => _en ? 'Connection variant' : 'Вариант подключения';
+  static String get tileWidthLabel => _en ? 'Width' : 'Ширина';
+  static String get tileRadiusStyleLabel => _en ? 'Corner style' : 'Скругление';
+  static String get tileAlignLabel => _en ? 'Content alignment' : 'Расположение';
+  static String get tileAlignStart => _en ? 'Left' : 'Слева';
+  static String get tileAlignCenter => _en ? 'Center' : 'По центру';
+  static String get tileAlignEnd => _en ? 'Right' : 'Справа';
+  static String get resetTilesToDefault => _en ? 'Reset' : 'Сбросить';
+
   // app/tray.dart
   static String get trayOpen => _en ? 'Open' : 'Открыть';
   static String get trayDisconnect => _en ? 'Disconnect' : 'Отключить';
@@ -56,8 +81,6 @@ abstract final class S {
       _en ? 'Show notifications' : 'Показывать уведомления';
 
   // server_list_panel.dart
-  static String routingTitleFor(String serverName) =>
-      _en ? 'Routing — $serverName' : 'Роутинг — $serverName';
   static String get cannotPingInTun =>
       _en ? "Can't ping in TUN mode" : 'Нельзя пинговать в TUN-режиме';
   static String get pingBlocksTunDescription => _en
@@ -68,7 +91,6 @@ abstract final class S {
       _en ? 'No servers yet — add a subscription or a link.' : 'Пока нет серверов — добавьте подписку или ссылку.';
 
   // server_row.dart
-  static String get routing => _en ? 'Routing' : 'Роутинг';
   static String get hide => _en ? 'Hide' : 'Скрыть';
 
   // subscription_info_panel.dart
@@ -87,12 +109,6 @@ abstract final class S {
   static String get hiddenServers => _en ? 'Hidden servers' : 'Скрытые серверы';
   static String get restore => _en ? 'Restore' : 'Вернуть';
   static String get deleteSubscription => _en ? 'Delete subscription' : 'Удалить подписку';
-  static String get rulesDifferBetweenServers =>
-      _en ? 'Rules differ between servers' : 'Правила различаются по серверам';
-  static String get setSameRulesForAll =>
-      _en ? 'Set the same rules for all' : 'Задать одинаковые правила для всех';
-  static String get noRulesAllViaProxy =>
-      _en ? 'No rules — all traffic goes through the proxy' : 'Правил нет — весь трафик через прокси';
   static String get expired => _en ? 'expired' : 'истекла';
   static String get lessThanADay => _en ? 'less than a day' : 'меньше дня';
 
@@ -112,11 +128,41 @@ abstract final class S {
   static String get direct => _en ? 'Direct' : 'Напрямую';
   static String get block => _en ? 'Block' : 'Блокировать';
   static String get save => _en ? 'Save' : 'Сохранить';
+  static String get presetNameLabel => _en ? 'Preset name' : 'Название пресета';
+  static String get presetNamePlaceholder =>
+      _en ? 'e.g. Gaming mode' : 'например, Gaming mode';
+  static String get defaultOutboundLabel =>
+      _en ? 'Other traffic' : 'Остальной трафик';
+
+  // import_routing_preset_dialog.dart / routing_preset_exchange.dart
+  static String get importPresetLabel =>
+      _en ? 'Import from link' : 'Импортировать по ссылке';
+  static String get presetLinkPlaceholder =>
+      _en ? 'https://...' : 'https://...';
+  static String get importPresetFailed =>
+      _en ? 'Could not import:' : 'Не удалось импортировать:';
+  static String get presetExportedToClipboard =>
+      _en ? 'Preset copied to clipboard' : 'Пресет скопирован в буфер обмена';
+  static String get importFromClipboardLabel =>
+      _en ? 'Import from clipboard' : 'Импортировать из буфера';
+  static String get presetClipboardEmpty =>
+      _en ? 'Clipboard is empty' : 'Буфер обмена пуст';
+  static String get presetImportedFromClipboard =>
+      _en ? 'Preset imported' : 'Пресет импортирован';
+
+  // settings_page.dart — секция "Роутинг"
+  static String get activeRoutingLabel => _en ? 'Active routing' : 'Активный роутинг';
+  static String get serverRoutingPreset => _en ? 'Server routing' : 'Роутинг сервера';
+  static String get serverRoutingPresetDescription => _en
+      ? 'Each server uses its own routing, if it has one — same as before.'
+      : 'Каждый сервер использует свой роутинг, если он есть — как и раньше.';
+  static String get createPresetLabel => _en ? 'Create preset' : 'Создать пресет';
 
   // settings_page.dart — навигация секций
   static String get sectionPersonalization => _en ? 'Personalization' : 'Персонализация';
   static String get sectionPing => _en ? 'Ping' : 'Пинг';
   static String get sectionSubscription => _en ? 'Subscription' : 'Подписка';
+  static String get sectionRoutingPresets => _en ? 'Routing' : 'Роутинг';
   static String get sectionRouting => _en ? 'Routing databases' : 'Базы роутинга';
   static String get sectionSystem => _en ? 'System' : 'Система';
   static String get sectionLogs => _en ? 'Logs' : 'Логи';

@@ -1,0 +1,41 @@
+{
+  "name": "gaming-simple",
+  "rules": [
+    {
+      "type": "domain",
+      "values": [
+        "geosite:telegram"
+      ],
+      "outboundTag": "proxy"
+    },
+    {
+      "type": "domain",
+      "values": [
+        "geosite:discord"
+      ],
+      "outboundTag": "proxy"
+    },
+    {
+      "type": "domain",
+      "values": [
+        "geosite:soundcloud"
+      ],
+      "outboundTag": "proxy"
+    },
+    {
+      "type": "domain",
+      "values": [
+        "geosite:youtube"
+      ],
+      "outboundTag": "proxy"
+    },
+    {
+      "type": "ip",
+      "values": [
+        "geoip:telegram"
+      ],
+      "outboundTag": "proxy"
+    }
+  ],
+  "defaultOutboundTag": "direct"
+}

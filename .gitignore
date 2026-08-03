@@ -6,6 +6,7 @@
 .DS_Store
 .atom/
 .build/
+.build-tools/
 .buildlog/
 .history
 .svn/
@@ -53,6 +54,13 @@ app.*.map.json
 # git (see assets/sing-box/SOURCE.md).
 /assets/sing-box/*
 !/assets/sing-box/SOURCE.md
+
+# macOS-варианты обоих — fetched by scripts/fetch_xray_macos.sh /
+# fetch_sing_box_macos.sh, тот же повод.
+/assets/xray-macos/*
+!/assets/xray-macos/SOURCE.md
+/assets/sing-box-macos/*
+!/assets/sing-box-macos/SOURCE.md
 
 # libv2ray.aar (xray-core for Android) — built by scripts/build_android_xray.ps1,
 # not checked into git (see android/app/libs/SOURCE.md).

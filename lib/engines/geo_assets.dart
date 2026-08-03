@@ -6,8 +6,10 @@ import 'package:http/http.dart' as http;
 import '../app/app_paths.dart';
 import '../core_abstraction/geo_dat_format.dart';
 
-String geoipFilePath() => '${ensureFluxGeoDirectory()}\\geoip.dat';
-String geositeFilePath() => '${ensureFluxGeoDirectory()}\\geosite.dat';
+String geoipFilePath() =>
+    '${ensureFluxGeoDirectory()}${Platform.pathSeparator}geoip.dat';
+String geositeFilePath() =>
+    '${ensureFluxGeoDirectory()}${Platform.pathSeparator}geosite.dat';
 
 /// Докачивает `geoip.dat`/`geosite.dat`, если их ещё нет на диске —
 /// вызывается при каждом старте приложения (не только "при первом запуске":
@@ -73,7 +75,10 @@ Future<void> _downloadTo(
     );
   }
   if (response.bodyBytes.isEmpty) {
-    throw HttpException('Пустой ответ при скачивании $url', uri: Uri.parse(url));
+    throw HttpException(
+      'Пустой ответ при скачивании $url',
+      uri: Uri.parse(url),
+    );
   }
   validate(response.bodyBytes);
   final tmp = File('$path.tmp');

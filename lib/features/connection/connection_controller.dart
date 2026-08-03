@@ -7,20 +7,25 @@ import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
 import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config.dart';
+import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/core_engine.dart';
+import '../../core_abstraction/effective_routing.dart';
 import '../../core_abstraction/engine_manager_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../engines/singbox/singbox_engine_windows.dart';
 import '../../engines/singbox/tun_bridge_engine.dart';
+import '../../engines/singbox/tun_bridge_engine_macos_ne.dart';
 import '../../engines/xray/xray_engine_android.dart';
+import '../../engines/xray/xray_engine_macos.dart';
 import '../../engines/xray/xray_engine_windows.dart';
 import '../../l10n/strings.dart';
+import '../servers/flatten_leaves.dart';
 import 'connection_state.dart';
 
 final connectionControllerProvider =
     NotifierProvider<ConnectionController, ConnectionUiState>(
-  ConnectionController.new,
-);
+      ConnectionController.new,
+    );
 
 /// Первый сквозной сценарий из PLAN.md ("Ближайшие шаги", п.4): выбрать
 /// сервер → подключиться через движок конкретного режима → увидеть статус.
@@ -52,12 +57,35 @@ class ConnectionController extends Notifier<ConnectionUiState> {
   @override
   ConnectionUiState build() {
     ref.onDispose(() => _statusSub?.cancel());
+    // Роутинг разрешается один раз при старте движка (см. комментарий у
+    // `connectToServer` про `effectiveRoutingRules`/`effectiveDefaultOutboundTag`)
+    // — сам движок не знает о пресетах и не следит за их сменой, поэтому
+    // смена активного пресета во время уже установленного соединения молча
+    // не подхватилась бы иначе. `forceReconnect: true` в обход no-op-проверки
+    // ниже — тут сервер/вариант/режим не меняются, только правила.
+    ref.listen(appSettingsProvider, (previous, next) {
+      if (previous?.activeRoutingPresetId == next.activeRoutingPresetId) return;
+      final current = state;
+      if (current is! ConnectionConnected) return;
+      ServerLeaf? leaf;
+      for (final candidate in flattenAllLeaves(ref.read(coreConfigProvider))) {
+        if (candidate.id == current.leafId) {
+          leaf = candidate;
+          break;
+        }
+      }
+      if (leaf == null) return;
+      unawaited(
+        connectToServer(leaf, mode: current.mode, forceReconnect: true),
+      );
+    });
     return const ConnectionIdle();
   }
 
   Future<void> connectToServer(
     ServerLeaf leaf, {
     ConnectionMode mode = ConnectionMode.proxy,
+    bool forceReconnect = false,
   }) async {
     // Клик по уже активному серверу/варианту/режиму (напр. повторный тап по
     // тому же серверу в списке, см. ROADMAP.md) не должен приводить к
@@ -66,8 +94,12 @@ class ConnectionController extends Notifier<ConnectionUiState> {
     // любого из них — это осознанный реконнект (см. `server_list_panel.dart`
     // `reconnectToLeafIfActive`, `connect_panel.dart` `_onSelectionChanged`),
     // а вот "тот же сервер, тот же вариант, тот же режим" — no-op.
+    // [forceReconnect] обходит эту проверку — используется сменой активного
+    // пресета роутинга (см. `build()`), где сервер/вариант/режим не меняются
+    // вовсе, но конфиг всё равно нужно перегенерировать и перезапустить.
     final current = state;
-    if (current is ConnectionConnected &&
+    if (!forceReconnect &&
+        current is ConnectionConnected &&
         current.leafId == leaf.id &&
         current.variantId == leaf.activeVariant?.id &&
         current.mode == mode) {
@@ -107,6 +139,22 @@ class ConnectionController extends Notifier<ConnectionUiState> {
           geoipUrl: settings.geoipUrl,
           geositeUrl: settings.geositeUrl,
         );
+      }
+      if (Platform.isMacOS) {
+        return switch (mode) {
+          ConnectionMode.proxy => XrayEngineMacOS(
+            id: id,
+            xrayExecutablePath: defaultMacosXrayExecutablePath(),
+            logLevel: settings.coreLogLevel,
+          ),
+          ConnectionMode.tun => switch (settings.tunCoreType) {
+            TunCoreType.singBox => TunBridgeEngineMacOSNe(
+              id: id,
+              upstreamDns: settings.tunDnsServer,
+              logLevel: settings.coreLogLevel,
+            ),
+          },
+        };
       }
       return switch (mode) {
         ConnectionMode.proxy => XrayEngineWindows(
@@ -151,10 +199,36 @@ class ConnectionController extends Notifier<ConnectionUiState> {
       }
     });
 
-    final config = CoreConfig(standaloneNodes: [leaf]);
+    // Разрешаем эффективные правила роутинга ровно один раз тут, до передачи
+    // в движок: активный пресет (`AppSettings.activeRoutingPresetId`)
+    // подменяет `leaf.routingRules` для всех серверов сразу, кроме пресета
+    // "Роутинг сервера" (null) — см. `effective_routing.dart`. Движки
+    // (`XrayEngineWindows` и т.д.) продолжают читать `routingRules` прямо с
+    // листа в `CoreConfig`, не зная о пресетах вовсе.
+    final coreConfig = ref.read(coreConfigProvider);
+    final effectiveLeaf = leaf.withRoutingRules(
+      effectiveRoutingRules(
+        leaf: leaf,
+        activePresetId: settings.activeRoutingPresetId,
+        presets: coreConfig.routingPresets,
+      ),
+    );
+    final defaultOutboundTag = effectiveDefaultOutboundTag(
+      activePresetId: settings.activeRoutingPresetId,
+      presets: coreConfig.routingPresets,
+    );
+    final routingLabel = effectiveRoutingLabel(
+      activePresetId: settings.activeRoutingPresetId,
+      presets: coreConfig.routingPresets,
+    );
+    final config = CoreConfig(standaloneNodes: [effectiveLeaf]);
 
     try {
-      await engine.start(config);
+      await engine.start(
+        config,
+        defaultOutboundTag: defaultOutboundTag,
+        routingLabel: routingLabel,
+      );
     } catch (e) {
       if (generation == _generation) state = ConnectionError('$e');
     }

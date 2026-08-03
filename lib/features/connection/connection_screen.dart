@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -12,6 +13,7 @@ import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../engines/geo_assets.dart';
+import '../../engines/geo_category_index.dart';
 import '../../engines/singbox/geo_ruleset_cache.dart';
 import '../../engines/xray/windows_elevation.dart';
 import '../../l10n/strings.dart';
@@ -113,22 +115,36 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   /// само делает эту конвертацию и заметно тормозит (проверено — секунд
   /// пять на реальных файлах).
   Future<void> _ensureGeoAssets() async {
-    if (!Platform.isWindows) return;
+    if (!(Platform.isWindows || Platform.isMacOS)) return;
     final settings = ref.read(appSettingsProvider);
-    await ensureGeoAssets(geoipUrl: settings.geoipUrl, geositeUrl: settings.geositeUrl);
+    await ensureGeoAssets(
+      geoipUrl: settings.geoipUrl,
+      geositeUrl: settings.geositeUrl,
+    );
     if (!mounted) return;
     // ensureGeoAssets — best-effort, сама не сообщает об успехе/неудаче
     // (см. её doc-комментарий) — единственный внешний способ узнать,
     // получилось ли, это проверить сами файлы после вызова. Не меняем её
     // сигнатуру ради одного уведомления — трек 25.
-    if (!File(geoipFilePath()).existsSync() || !File(geositeFilePath()).existsSync()) {
+    if (!File(geoipFilePath()).existsSync() ||
+        !File(geositeFilePath()).existsSync()) {
       showFluxNotification(title: S.notificationGeoAssetsFailedTitle);
     }
+    // Прогреваем geo-ассеты и правил с листьев (пресет "Роутинг сервера"),
+    // и всех сохранённых пресетов — активный пресет может смениться в
+    // настройках без пересоздания этого экрана, дешевле прогреть всё сразу.
+    final coreConfig = ref.read(coreConfigProvider);
     final allRoutingRules = [
-      for (final leaf in flattenAllLeaves(ref.read(coreConfigProvider)))
-        ...leaf.routingRules,
+      for (final leaf in flattenAllLeaves(coreConfig)) ...leaf.routingRules,
+      for (final preset in coreConfig.routingPresets) ...preset.rules,
     ];
     await pregenerateGeoRuleSets(allRoutingRules);
+    // Прогреваем мемоизированный кэш имён категорий для автокомплита в
+    // `routing_rules_dialog.dart` — не дожидаясь, чтобы не задерживать
+    // остальной `_runStartupSequence`: к моменту, когда пользователь
+    // реально откроет диалог пресета, парсинг почти наверняка уже закончен.
+    unawaited(geositeCategoryNames());
+    unawaited(geoipCategoryNames());
   }
 
   /// Windows-only (ROADMAP.md, трек 24) — Android и так всегда TUN через
@@ -136,7 +152,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   /// последним в `_runStartupSequence()`, когда дерево серверов и
   /// `lastSelectedServerId` уже точно актуальны.
   Future<void> _autoConnectOnStartup() async {
-    if (!Platform.isWindows) return;
+    if (!(Platform.isWindows || Platform.isMacOS)) return;
     final settings = ref.read(appSettingsProvider);
     if (!settings.autoConnectOnStartup) return;
 
@@ -156,7 +172,14 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     // `TunBridgeEngine.start()` и так бросил бы `StateError` без прав
     // администратора, но лучше подключиться в Proxy, чем не подключиться
     // вовсе.
-    final mode = settings.autoConnectMode == ConnectionMode.tun && isRunningElevated()
+    // isRunningElevated() — Windows-only FFI (shell32.dll), на macOS у
+    // приложения в целом нет понятия "elevated" (см. connect_panel.dart) —
+    // TUN там идёт через NetworkExtension/System Extension
+    // (TunBridgeEngineMacOSNe), без root вообще, поэтому проверку тут
+    // пропускаем через Platform.isMacOS, а не вызываем функцию вовсе.
+    final mode =
+        settings.autoConnectMode == ConnectionMode.tun &&
+            (Platform.isMacOS || isRunningElevated())
         ? ConnectionMode.tun
         : ConnectionMode.proxy;
 

@@ -1,24 +1,40 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../app/app_paths.dart';
 import '../../app/layout_breakpoints.dart';
-import '../../app/windows_autostart.dart';
+import '../../app/autostart.dart';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/app_settings_provider.dart';
 import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config_provider.dart';
+import '../../core_abstraction/routing_preset.dart';
 import '../../engines/geo_assets.dart';
 import '../../engines/singbox/geo_ruleset_cache.dart';
 import '../../l10n/strings.dart';
 import '../../widgets/port_ui/port_ui.dart';
 import '../servers/flatten_leaves.dart';
+import '../servers/import_routing_preset_dialog.dart';
+import '../servers/routing_preset_exchange.dart';
+import '../servers/routing_rules_dialog.dart';
 import 'about_info.dart';
 import 'custom_video_storage.dart';
+
+const _uuid = Uuid();
+
+/// Sentinel-значение для [PortSelect] пресета "Роутинг сервера" —
+/// `AppSettings.activeRoutingPresetId == null` уже занят семантикой "не
+/// менять" внутри самого `PortSelect` (см. его doc-комментарий про
+/// `_value == null`), поэтому в UI используем отдельную нешаримую строку и
+/// конвертируем её в/из `null` на границе.
+const _serverRoutingPresetId = '__server_routing__';
 
 enum _SettingsSection {
   personalization(LucideIcons.palette),
@@ -26,6 +42,7 @@ enum _SettingsSection {
   tun(LucideIcons.network),
   subscription(LucideIcons.rss),
   routing(LucideIcons.map),
+  routingDatabases(LucideIcons.database),
   system(LucideIcons.settings),
   logs(LucideIcons.fileText),
   about(LucideIcons.info);
@@ -38,7 +55,8 @@ enum _SettingsSection {
     _SettingsSection.ping => S.sectionPing,
     _SettingsSection.tun => 'TUN',
     _SettingsSection.subscription => S.sectionSubscription,
-    _SettingsSection.routing => S.sectionRouting,
+    _SettingsSection.routing => S.sectionRoutingPresets,
+    _SettingsSection.routingDatabases => S.sectionRouting,
     _SettingsSection.system => S.sectionSystem,
     _SettingsSection.logs => S.sectionLogs,
     _SettingsSection.about => S.sectionAbout,
@@ -313,9 +331,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             _SettingRow(
               label: settings.customVideoPath == null
                   ? S.noVideoFileSelected
-                  : settings.customVideoPath!.split(
-                      Platform.isWindows ? '\\' : '/',
-                    ).last,
+                  : settings.customVideoPath!
+                        .split(Platform.pathSeparator)
+                        .last,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -456,7 +474,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         onChanged: (value) =>
             notifier.update((s) => s.copyWith(autoGroupSubscriptions: value)),
       ),
-      _SettingsSection.routing => Column(
+      _SettingsSection.routing => _RoutingPresetsSection(
+        settings: settings,
+        notifier: notifier,
+      ),
+      _SettingsSection.routingDatabases => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(S.geoipUrlLabel, style: PortText.small),
@@ -467,7 +489,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onSubmitted: (value) {
               final url = value.trim();
               notifier.update(
-                (s) => s.copyWith(geoipUrl: url.isEmpty ? defaultGeoipUrl : url),
+                (s) =>
+                    s.copyWith(geoipUrl: url.isEmpty ? defaultGeoipUrl : url),
               );
             },
           ),
@@ -480,8 +503,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onSubmitted: (value) {
               final url = value.trim();
               notifier.update(
-                (s) =>
-                    s.copyWith(geositeUrl: url.isEmpty ? defaultGeositeUrl : url),
+                (s) => s.copyWith(
+                  geositeUrl: url.isEmpty ? defaultGeositeUrl : url,
+                ),
               );
             },
           ),
@@ -567,7 +591,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   // только если автозапуск настроен как elevated (иначе на
                   // старте автоподключение всё равно откатится на Proxy,
                   // см. connection_screen.dart).
-                  if (settings.autoStartPrivilege == AppAutoStartPrivilege.elevated)
+                  if (settings.autoStartPrivilege ==
+                      AppAutoStartPrivilege.elevated)
                     const PortSelectOption(
                       value: ConnectionMode.tun,
                       child: Text('TUN'),
@@ -651,7 +676,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }) {
     setAutoStartOnBoot(privilege: privilege, showWindow: showWindow);
     notifier.update(
-      (s) => s.copyWith(autoStartPrivilege: privilege, autoStartShowWindow: showWindow),
+      (s) => s.copyWith(
+        autoStartPrivilege: privilege,
+        autoStartShowWindow: showWindow,
+      ),
     );
     if (privilege == AppAutoStartPrivilege.elevated) {
       _confirmElevatedAutoStart();
@@ -665,19 +693,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     PortToaster.of(context).show(
       PortToast(
         title: Text(
-          registered ? S.elevatedAutoStartConfirmed : S.elevatedAutoStartDeclined,
+          registered
+              ? S.elevatedAutoStartConfirmed
+              : S.elevatedAutoStartDeclined,
         ),
       ),
     );
   }
 
-  String _autoStartPrivilegeLabel(AppAutoStartPrivilege privilege) => switch (privilege) {
-    AppAutoStartPrivilege.none => S.autoStartPrivilegeNone,
-    AppAutoStartPrivilege.standard => S.autoStartPrivilegeStandard,
-    AppAutoStartPrivilege.elevated => S.autoStartPrivilegeElevated,
-  };
+  String _autoStartPrivilegeLabel(AppAutoStartPrivilege privilege) =>
+      switch (privilege) {
+        AppAutoStartPrivilege.none => S.autoStartPrivilegeNone,
+        AppAutoStartPrivilege.standard => S.autoStartPrivilegeStandard,
+        AppAutoStartPrivilege.elevated => S.autoStartPrivilegeElevated,
+      };
 
-  Future<void> _updateGeoAssets(BuildContext context, AppSettings settings) async {
+  Future<void> _updateGeoAssets(
+    BuildContext context,
+    AppSettings settings,
+  ) async {
     setState(() => _updatingGeoAssets = true);
     try {
       await forceUpdateGeoAssets(
@@ -692,7 +726,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ];
       await pregenerateGeoRuleSets(allRoutingRules);
       if (!context.mounted) return;
-      PortToaster.of(context).show(PortToast(title: Text(S.geoAssetsUpdateSuccess)));
+      PortToaster.of(
+        context,
+      ).show(PortToast(title: Text(S.geoAssetsUpdateSuccess)));
     } catch (e) {
       if (!context.mounted) return;
       PortToaster.of(
@@ -722,7 +758,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       );
     } catch (e) {
       if (!context.mounted) return;
-      PortToaster.of(context).show(PortToast(title: Text(S.videoImportFailure(e))));
+      PortToaster.of(
+        context,
+      ).show(PortToast(title: Text(S.videoImportFailure(e))));
     } finally {
       if (mounted) setState(() => _importingVideo = false);
     }
@@ -995,4 +1033,203 @@ class _SettingRow extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Выбор активного пресета роутинга + управление списком пресетов —
+/// заменяет собой прежние per-server/per-subscription диалоги
+/// (`server_row.dart`, `subscription_info_panel.dart`): теперь роутинг
+/// настраивается один раз здесь и применяется ко всем серверам сразу.
+class _RoutingPresetsSection extends ConsumerWidget {
+  final AppSettings settings;
+  final AppSettingsController notifier;
+
+  const _RoutingPresetsSection({required this.settings, required this.notifier});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final presets = ref.watch(coreConfigProvider).routingPresets;
+    final activeId = settings.activeRoutingPresetId ?? _serverRoutingPresetId;
+
+    void selectPreset(String? value) {
+      if (value == null) return;
+      notifier.update(
+        (s) => value == _serverRoutingPresetId
+            ? s.copyWith(clearActiveRoutingPresetId: true)
+            : s.copyWith(activeRoutingPresetId: value),
+      );
+    }
+
+    void createPreset() {
+      showRoutingRulesDialog(
+        context,
+        title: S.createPresetLabel,
+        initialName: '',
+        initialRules: const [],
+        initialDefaultOutboundTag: 'proxy',
+        onSave: (name, rules, defaultOutboundTag) => ref
+            .read(coreConfigProvider.notifier)
+            .addRoutingPreset(RoutingPreset(
+              id: _uuid.v4(),
+              name: name,
+              rules: rules,
+              defaultOutboundTag: defaultOutboundTag,
+            )),
+      );
+    }
+
+    void editPreset(RoutingPreset preset) {
+      showRoutingRulesDialog(
+        context,
+        title: preset.name,
+        initialName: preset.name,
+        initialRules: preset.rules,
+        initialDefaultOutboundTag: preset.defaultOutboundTag,
+        onSave: (name, rules, defaultOutboundTag) => ref
+            .read(coreConfigProvider.notifier)
+            .updateRoutingPreset(preset.copyWith(
+              name: name,
+              rules: rules,
+              defaultOutboundTag: defaultOutboundTag,
+            )),
+      );
+    }
+
+    void deletePreset(RoutingPreset preset) {
+      if (settings.activeRoutingPresetId == preset.id) {
+        notifier.update((s) => s.copyWith(clearActiveRoutingPresetId: true));
+      }
+      ref.read(coreConfigProvider.notifier).deleteRoutingPreset(preset.id);
+    }
+
+    Future<void> exportPreset(RoutingPreset preset) async {
+      final json = const JsonEncoder.withIndent(
+        '  ',
+      ).convert(exportRoutingPresetJson(preset));
+      await Clipboard.setData(ClipboardData(text: json));
+      if (!context.mounted) return;
+      PortToaster.of(
+        context,
+      ).show(PortToast(title: Text(S.presetExportedToClipboard)));
+    }
+
+    Future<void> importFromClipboard() async {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final text = data?.text?.trim();
+      if (!context.mounted) return;
+      if (text == null || text.isEmpty) {
+        PortToaster.of(
+          context,
+        ).show(PortToast.destructive(title: Text(S.presetClipboardEmpty)));
+        return;
+      }
+      try {
+        final blueprints = parseRoutingPresetBlueprints(jsonDecode(text));
+        final coreNotifier = ref.read(coreConfigProvider.notifier);
+        for (final blueprint in blueprints) {
+          coreNotifier.addRoutingPreset(
+            RoutingPreset(
+              id: _uuid.v4(),
+              name: blueprint.name,
+              rules: blueprint.rules,
+              defaultOutboundTag: blueprint.defaultOutboundTag,
+            ),
+          );
+        }
+        if (!context.mounted) return;
+        PortToaster.of(
+          context,
+        ).show(PortToast(title: Text(S.presetImportedFromClipboard)));
+      } catch (e) {
+        if (!context.mounted) return;
+        PortToaster.of(context).show(
+          PortToast.destructive(title: Text('${S.importPresetFailed} $e')),
+        );
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(S.activeRoutingLabel, style: PortText.small),
+        const SizedBox(height: 6),
+        PortSelect<String>(
+          initialValue: activeId,
+          onChanged: selectPreset,
+          options: [
+            PortSelectOption(
+              value: _serverRoutingPresetId,
+              child: Text(S.serverRoutingPreset),
+            ),
+            for (final preset in presets)
+              PortSelectOption(value: preset.id, child: Text(preset.name)),
+          ],
+          selectedOptionBuilder: (context, value) => Text(
+            value == _serverRoutingPresetId
+                ? S.serverRoutingPreset
+                : _presetName(presets, value) ?? S.serverRoutingPreset,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(S.serverRoutingPresetDescription, style: PortText.muted),
+        if (presets.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          for (final preset in presets)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: [
+                  Expanded(child: Text(preset.name, style: PortText.small)),
+                  PortIconButton.ghost(
+                    icon: const Icon(LucideIcons.copy, size: 14),
+                    onPressed: () => exportPreset(preset),
+                  ),
+                  PortIconButton.ghost(
+                    icon: const Icon(LucideIcons.pencil, size: 14),
+                    onPressed: () => editPreset(preset),
+                  ),
+                  PortIconButton.ghost(
+                    icon: const Icon(LucideIcons.trash2, size: 14),
+                    onPressed: () => deletePreset(preset),
+                  ),
+                ],
+              ),
+            ),
+        ],
+        const SizedBox(height: 12),
+        // Wrap, не Row+Expanded — на узких окнах интринсик-ширина трёх
+        // подписанных кнопок не влезает в равные доли строки, и Expanded не
+        // ужимает контент ниже его собственной ширины, а просто обрезает
+        // (ROADMAP.md — узкие окна). Wrap вместо обрезания переносит лишние
+        // кнопки на следующую строку.
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            PortButton.outline(
+              leading: const Icon(LucideIcons.plus, size: 16),
+              onPressed: createPreset,
+              child: Text(S.createPresetLabel),
+            ),
+            PortButton.outline(
+              leading: const Icon(LucideIcons.link, size: 16),
+              onPressed: () => showImportRoutingPresetDialog(context),
+              child: Text(S.importPresetLabel),
+            ),
+            PortButton.outline(
+              leading: const Icon(LucideIcons.clipboard, size: 16),
+              onPressed: importFromClipboard,
+              child: Text(S.importFromClipboardLabel),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+String? _presetName(List<RoutingPreset> presets, String id) {
+  for (final preset in presets) {
+    if (preset.id == id) return preset.name;
+  }
+  return null;
 }

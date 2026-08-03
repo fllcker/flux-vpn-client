@@ -1,8 +1,13 @@
 import 'dart:io';
 
-/// Каталог данных приложения — тот же `%AppData%\flux`, в котором лежат
-/// профиль и настройки (см. `profile_storage.dart`, `app_settings_storage.dart`).
+/// Каталог данных приложения — `%AppData%\flux` на Windows,
+/// `~/Library/Application Support/flux` на macOS (стандартное место для
+/// пользовательских данных приложения там), в котором лежат профиль и
+/// настройки (см. `profile_storage.dart`, `app_settings_storage.dart`).
 String fluxDataDirectoryPath() {
+  if (Platform.isMacOS) {
+    return '${Platform.environment['HOME']}/Library/Application Support/flux';
+  }
   final appData = Platform.environment['APPDATA'];
   return appData != null
       ? '$appData\\flux'
@@ -14,7 +19,7 @@ String fluxDataDirectoryPath() {
 /// бы открыть свалку на несколько тысяч файлов. Отдельный каталог рядом с
 /// профилем решает это и заодно переживает очистку `%TEMP%` уборщиком диска.
 Directory fluxLogDirectory() =>
-    Directory('${fluxDataDirectoryPath()}\\logs');
+    Directory('${fluxDataDirectoryPath()}${Platform.pathSeparator}logs');
 
 /// Создаёт каталог логов, если его ещё нет, и возвращает путь. Вызывается
 /// перед открытием файла лога — иначе первый же запуск ядра падал бы на
@@ -25,19 +30,21 @@ String ensureFluxLogDirectory() {
   return dir.path;
 }
 
-/// Открывает каталог логов в проводнике. Не ждём результата и не считаем
-/// ненулевой код ошибкой: `explorer.exe` возвращает 1 даже когда окно
-/// открылось, так что проверять тут нечего.
+/// Открывает каталог логов в системном файловом менеджере — `explorer.exe`
+/// на Windows, `open` на macOS. Не ждём результата и не считаем ненулевой
+/// код ошибкой: `explorer.exe` возвращает 1 даже когда окно открылось, так
+/// что проверять тут нечего.
 Future<void> openFluxLogDirectory() async {
   final path = ensureFluxLogDirectory();
-  await Process.start('explorer.exe', [path]);
+  await Process.start(Platform.isMacOS ? 'open' : 'explorer.exe', [path]);
 }
 
 /// Каталог geoip/geosite баз и сгенерированных из них sing-box rule-set'ов
 /// (ROADMAP.md, треки 20/21) — раньше эти файлы были вшиты в сборку рядом с
 /// `xray.exe`, теперь качаются в рантайме и живут вместе с остальными
 /// пользовательскими данными.
-Directory fluxGeoDirectory() => Directory('${fluxDataDirectoryPath()}\\geo');
+Directory fluxGeoDirectory() =>
+    Directory('${fluxDataDirectoryPath()}${Platform.pathSeparator}geo');
 
 /// Создаёт каталог geoip/geosite, если его ещё нет, и возвращает путь — тот
 /// же паттерн, что и [ensureFluxLogDirectory].
@@ -53,7 +60,9 @@ String ensureFluxGeoDirectory() {
 /// которые можно целиком удалить и перегенерировать, в отличие от самих
 /// `.dat`.
 String ensureFluxGeoRuleSetDirectory() {
-  final dir = Directory('${ensureFluxGeoDirectory()}\\rulesets');
+  final dir = Directory(
+    '${ensureFluxGeoDirectory()}${Platform.pathSeparator}rulesets',
+  );
   dir.createSync(recursive: true);
   return dir.path;
 }

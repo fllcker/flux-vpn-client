@@ -25,11 +25,8 @@ class ConnectionNotifications {
   ConnectionNotifications(this.container);
 
   void init() {
-    if (!Platform.isWindows) return;
-    container.listen<ConnectionUiState>(
-      connectionControllerProvider,
-      _handle,
-    );
+    if (!Platform.isWindows && !Platform.isMacOS) return;
+    container.listen<ConnectionUiState>(connectionControllerProvider, _handle);
   }
 
   void _handle(ConnectionUiState? previous, ConnectionUiState next) {
@@ -48,10 +45,7 @@ class ConnectionNotifications {
           showFluxNotification(title: S.notificationDisconnectedTitle);
         }
       case ConnectionError(:final message):
-        showFluxNotification(
-          title: S.notificationErrorTitle,
-          body: message,
-        );
+        showFluxNotification(title: S.notificationErrorTitle, body: message);
       case ConnectionConnecting():
       case ConnectionStopping():
         break;

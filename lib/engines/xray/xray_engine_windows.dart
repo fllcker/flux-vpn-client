@@ -8,6 +8,7 @@ import '../../core_abstraction/core_config.dart';
 import '../../core_abstraction/core_engine.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/server_config.dart';
+import '../routing_debug_header.dart';
 import 'child_process_job.dart';
 import 'windows_system_proxy.dart';
 import 'xray_config_mapper.dart';
@@ -59,11 +60,17 @@ class XrayEngineWindows implements CoreEngine {
   ServerConfig? get activeServer => _activeServer;
 
   List<RoutingRule> _activeRoutingRules = const [];
+  String _activeDefaultOutboundTag = 'proxy';
 
   /// Правила роутинга активного листа — нужны [TunBridgeEngine], чтобы
   /// сгенерировать те же правила ещё и в конфиге sing-box (см.
   /// `singbox_config_mapper.dart`, ROADMAP.md трек 21).
   List<RoutingRule> get activeRoutingRules => _activeRoutingRules;
+
+  /// Куда уходит непомеченный трафик активного подключения — та же причина,
+  /// что и у [activeRoutingRules]: нужна [TunBridgeEngine] для конфига
+  /// sing-box.
+  String get activeDefaultOutboundTag => _activeDefaultOutboundTag;
 
   final _statusController = StreamController<EngineStatus>.broadcast();
   final _statsController = StreamController<EngineStats>.broadcast();
@@ -75,7 +82,12 @@ class XrayEngineWindows implements CoreEngine {
   Stream<EngineStats> get statsStream => _statsController.stream;
 
   @override
-  Future<void> start(CoreConfig config, {bool manageSystemProxy = true}) async {
+  Future<void> start(
+    CoreConfig config, {
+    bool manageSystemProxy = true,
+    String defaultOutboundTag = 'proxy',
+    String routingLabel = 'server-routing',
+  }) async {
     _statusController.add(EngineStatus.starting);
     _manageSystemProxy = manageSystemProxy;
 
@@ -88,12 +100,14 @@ class XrayEngineWindows implements CoreEngine {
 
     _activeServer = server;
     _activeRoutingRules = leaf.routingRules;
+    _activeDefaultOutboundTag = defaultOutboundTag;
 
     final xrayConfig = buildXrayConfig(
       server,
       socksPort: socksPort,
       httpPort: httpPort,
       routingRules: leaf.routingRules,
+      defaultOutboundTag: defaultOutboundTag,
       logLevel: logLevel,
     );
 
@@ -109,7 +123,16 @@ class XrayEngineWindows implements CoreEngine {
     );
     _process = process;
     tieChildProcessLifetimeToApp(process);
-    unawaited(_pipeLogs(process));
+    unawaited(
+      _pipeLogs(
+        process,
+        routingDebugHeader(
+          routingLabel: routingLabel,
+          defaultOutboundTag: defaultOutboundTag,
+          ruleCount: leaf.routingRules.length,
+        ),
+      ),
+    );
 
     unawaited(
       process.exitCode.then((_) {
@@ -151,9 +174,10 @@ class XrayEngineWindows implements CoreEngine {
   /// no trace to diagnose from. Mirror both streams into a log file next
   /// to the generated config so a failed session can be inspected
   /// afterwards.
-  Future<void> _pipeLogs(Process process) async {
+  Future<void> _pipeLogs(Process process, String debugHeader) async {
     final logFile = File('${ensureFluxLogDirectory()}/flux_xray_$id.log');
     final sink = logFile.openWrite(mode: FileMode.write);
+    sink.write(debugHeader);
     try {
       await Future.wait([
         process.stdout.transform(const SystemEncoding().decoder).forEach(sink.write),

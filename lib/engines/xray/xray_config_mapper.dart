@@ -11,6 +11,7 @@ Map<String, dynamic> buildXrayConfig(
   required int socksPort,
   required int httpPort,
   List<RoutingRule> routingRules = const [],
+  String defaultOutboundTag = 'proxy',
   CoreLogLevel logLevel = CoreLogLevel.warn,
 }) {
   return {
@@ -28,7 +29,7 @@ Map<String, dynamic> buildXrayConfig(
         'protocol': 'http',
       },
     ],
-    'outbounds': [_outbound(server), _directOutbound, _blockOutbound],
+    'outbounds': _orderedOutbounds(server, defaultOutboundTag),
     if (routingRules.isNotEmpty) 'routing': _routing(routingRules),
   };
 }
@@ -43,6 +44,7 @@ Map<String, dynamic> buildXrayConfig(
 Map<String, dynamic> buildXrayTunConfig(
   ServerConfig server, {
   List<RoutingRule> routingRules = const [],
+  String defaultOutboundTag = 'proxy',
   CoreLogLevel logLevel = CoreLogLevel.warn,
   int mtu = 1500,
 }) {
@@ -67,13 +69,31 @@ Map<String, dynamic> buildXrayTunConfig(
         },
       },
     ],
-    'outbounds': [_outbound(server), _directOutbound, _blockOutbound],
+    'outbounds': _orderedOutbounds(server, defaultOutboundTag),
     if (routingRules.isNotEmpty) 'routing': _routing(routingRules),
   };
 }
 
 const _directOutbound = {'protocol': 'freedom', 'tag': 'direct'};
 const _blockOutbound = {'protocol': 'blackhole', 'tag': 'block'};
+
+/// xray-core берёт **первый** outbound из массива как дефолт для трафика, не
+/// попавшего ни под одно `routing`-правило (в т.ч. когда `routing` вообще не
+/// задан) — отдельного поля "final"/"default" у xray нет. Поэтому единственный
+/// способ управлять "остальным трафиком" (`RoutingPreset.defaultOutboundTag`,
+/// см. ROADMAP.md трек 3) — переставить нужный outbound на первое место.
+List<Map<String, dynamic>> _orderedOutbounds(
+  ServerConfig server,
+  String defaultOutboundTag,
+) {
+  final byTag = {
+    'proxy': _outbound(server),
+    'direct': _directOutbound,
+    'block': _blockOutbound,
+  };
+  final first = byTag.remove(defaultOutboundTag) ?? byTag.remove('proxy')!;
+  return [first, ...byTag.values];
+}
 
 /// `outboundTag` в [RoutingRule] — `"direct"`/`"block"`/`"proxy"` (см.
 /// ROADMAP.md, трек 3) — совпадает с тегами outbound'ов один в один, кроме

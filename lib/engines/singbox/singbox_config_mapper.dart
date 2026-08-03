@@ -1,10 +1,17 @@
+import 'dart:io';
+
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/proxy_node.dart';
 
 /// Фиксированное имя TUN-адаптера — та же причина, что была у
 /// одноимённой xray-константы: без него имя генерируется случайно при
 /// каждом запуске, и адаптеры-призраки от прошлых сессий накапливаются
-/// вместо переиспользования одного и того же.
+/// вместо переиспользования одного и того же. Актуально только для
+/// Windows/Linux — на macOS этой проблемы вообще нет (Darwin-ядро само
+/// выдаёт и освобождает `utunN` при закрытии интерфейса, копиться нечему),
+/// а кастомное имя там и не разрешено: `sing-box` с любым значением, кроме
+/// `utunN`, падает на старте (`bad tun name`), поэтому `interface_name` на
+/// macOS не задаём вовсе (см. [buildSingBoxTunBridgeConfig]).
 const tunInterfaceName = 'flux-tun0';
 
 /// Публичные резолверы, к которым браузеры ходят своим DoH (Chrome — «Secure
@@ -132,6 +139,7 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
   CoreLogLevel logLevel = CoreLogLevel.warn,
   List<RoutingRule> routingRules = const [],
   Map<String, String> ruleSetPaths = const {},
+  String defaultOutboundTag = 'proxy',
 }) {
   return {
     'log': {'level': logLevel.singBoxName},
@@ -177,7 +185,7 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
       {
         'type': 'tun',
         'tag': 'tun-in',
-        'interface_name': tunInterfaceName,
+        if (!Platform.isMacOS) 'interface_name': tunInterfaceName,
         'address': ['172.19.0.1/30', 'fdfe:dcba:9876::1/126'],
         'mtu': 1500,
         'auto_route': true,
@@ -207,6 +215,7 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
         'version': '5',
       },
       {'type': 'direct', 'tag': 'direct'},
+      {'type': 'block', 'tag': 'block'},
     ],
     'route': {
       'rules': [
@@ -235,11 +244,7 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
         // сразу, а не по таймауту. Наш собственный DoT к тому же 8.8.8.8 идёт по
         // 853 и под правило не попадает; DNS-серверы вдобавок дозваниваются в
         // обход route-правил, так что задеть их тут нечем.
-        {
-          'ip_cidr': _knownDohEndpoints,
-          'port': 443,
-          'action': 'reject',
-        },
+        {'ip_cidr': _knownDohEndpoints, 'port': 443, 'action': 'reject'},
         // QUIC здесь СОЗНАТЕЛЬНО не блокируется, хотя напрашивается: какое-то
         // время тут стоял `{network: udp, port: 443, action: reject}`. Поводом
         // был шторм — 313 UDP-сессий за 70 секунд, все до одной на порт 443, из
@@ -277,7 +282,7 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
         // инфраструктурные страховки (мультикаст, DoH, hijack-dns, обход
         // адреса сервера), которые не должны переопределяться конфигом
         // сервиса.
-        ..._userRoutingRules(routingRules),
+        ..._userRoutingRules(routingRules, defaultOutboundTag),
       ],
       if (geoRuleSetReferences(routingRules).isNotEmpty)
         'rule_set': [
@@ -286,7 +291,8 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
               'type': 'local',
               'tag': tag,
               'format': 'source',
-              'path': ruleSetPaths[tag] ??
+              'path':
+                  ruleSetPaths[tag] ??
                   (throw StateError('No rule_set path resolved for $tag')),
             },
         ],
@@ -297,10 +303,32 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
       // `bootstrap` по той же причине, по которой он вообще появился — резолв
       // для outbound'ов не должен зависеть от ещё не поднятого тоннеля.
       'default_domain_resolver': 'bootstrap',
-      'final': 'xray-socks-out',
+      'final': _finalOutboundTag(defaultOutboundTag),
     },
   };
 }
+
+/// [defaultOutboundTag] — `RoutingPreset.defaultOutboundTag`
+/// (`"proxy"`/`"direct"`/`"block"`, см. ROADMAP.md трек 3). `route.final`
+/// требует именно тег outbound'а, а не `action` — поэтому у `"block"` тут
+/// нет короткого пути через `reject`, как у обычных `route.rules`
+/// (`_outboundOrAction`): вместо этого выше в `outbounds` заведён отдельный
+/// `{type: "block", tag: "block"}`.
+String _finalOutboundTag(String defaultOutboundTag) => _outboundTagForSingBox(defaultOutboundTag);
+
+/// `outboundTag` в терминологии `RoutingRule`/`RoutingPreset` —
+/// `"proxy"`/`"direct"`/`"block"` — сам по себе не тег ни одного outbound'а
+/// в этом конфиге: реальный прокси-outbound называется `xray-socks-out`
+/// (см. `buildSingBoxTunBridgeConfig`, `outbounds`), тега `"proxy"` там
+/// физически нет. И `route.final`, и обычные `route.rules` должны сначала
+/// пройти через этот маппинг, а не подставлять `"proxy"` напрямую — иначе
+/// sing-box получает правило/`final`, ссылающиеся на несуществующий
+/// outbound.
+String _outboundTagForSingBox(String outboundTag) => switch (outboundTag) {
+  'direct' => 'direct',
+  'block' => 'block',
+  _ => 'xray-socks-out',
+};
 
 /// Теги `geosite-<category>`/`geoip-<category>`, на которые нужно завести
 /// `route.rule_set` — вызывающая сторона (`SingBoxEngineWindows.start`)
@@ -325,15 +353,27 @@ Set<String> geoRuleSetReferences(List<RoutingRule> rules) {
 }
 
 /// `outboundTag` из [RoutingRule] — `"direct"`/`"block"`/`"proxy"` (см.
-/// ROADMAP.md, трек 3). `"proxy"` не даёт отдельного правила — `route.final`
-/// уже шлёт туда всё непойманное, лишнее правило было бы балластом.
-/// `"block"` — не outbound-тег в sing-box, а `action: "reject"`.
-List<Map<String, dynamic>> _userRoutingRules(List<RoutingRule> rules) {
+/// ROADMAP.md, трек 3). Правило пропускается, только если его тег СОВПАДАЕТ
+/// с [defaultOutboundTag] — тогда оно и правда избыточно, `route.final` уже
+/// шлёт туда всё непойманное. Раньше тут был жёстко зашит пропуск при
+/// `outboundTag == 'proxy'`, из расчёта, что "непойманное" всегда шло в
+/// прокси — это было верно, пока `defaultOutboundTag` был всегда `'proxy'`
+/// (до ROADMAP.md, трек 3). С тех пор, как дефолт стал настраиваемым, эта
+/// проверка молча роняла ЛЮБОЕ правило "домен → proxy" всякий раз, когда
+/// дефолт выставлен на `direct`/`block` — то есть ровно тот сценарий, где
+/// правило нужнее всего (пресет "весь трафик напрямую, кроме этих доменов
+/// — через прокси" в реальности отправлял вообще всё напрямую, ни одно
+/// исключение не применялось). `"block"` — не outbound-тег в sing-box, а
+/// `action: "reject"`.
+List<Map<String, dynamic>> _userRoutingRules(
+  List<RoutingRule> rules,
+  String defaultOutboundTag,
+) {
   final result = <Map<String, dynamic>>[];
   for (final rule in rules) {
     switch (rule) {
       case DomainRule(:final values, :final outboundTag):
-        if (outboundTag == 'proxy') continue;
+        if (outboundTag == defaultOutboundTag) continue;
         final domain = <String>[];
         final domainSuffix = <String>[];
         final domainKeyword = <String>[];
@@ -365,10 +405,13 @@ List<Map<String, dynamic>> _userRoutingRules(List<RoutingRule> rules) {
           });
         }
         if (geositeTags.isNotEmpty) {
-          result.add({'rule_set': geositeTags, ..._outboundOrAction(outboundTag)});
+          result.add({
+            'rule_set': geositeTags,
+            ..._outboundOrAction(outboundTag),
+          });
         }
       case IpRule(:final values, :final outboundTag):
-        if (outboundTag == 'proxy') continue;
+        if (outboundTag == defaultOutboundTag) continue;
         final ipCidr = <String>[];
         final geoipTags = <String>[];
         for (final v in values) {
@@ -382,15 +425,23 @@ List<Map<String, dynamic>> _userRoutingRules(List<RoutingRule> rules) {
           result.add({'ip_cidr': ipCidr, ..._outboundOrAction(outboundTag)});
         }
         if (geoipTags.isNotEmpty) {
-          result.add({'rule_set': geoipTags, ..._outboundOrAction(outboundTag)});
+          result.add({
+            'rule_set': geoipTags,
+            ..._outboundOrAction(outboundTag),
+          });
         }
     }
   }
   return result;
 }
 
-Map<String, dynamic> _outboundOrAction(String outboundTag) =>
-    outboundTag == 'block' ? {'action': 'reject'} : {'outbound': outboundTag};
+Map<String, dynamic> _outboundOrAction(String outboundTag) => outboundTag == 'block'
+    ? {'action': 'reject'}
+    // `outboundTag` здесь в терминологии `RoutingRule` (`"proxy"`/`"direct"`)
+    // — нужно смэппить через `_outboundTagForSingBox`, а не подставлять
+    // напрямую: реальный outbound-тег прокси в этом конфиге — `xray-socks-out`,
+    // тега `"proxy"` среди `outbounds` нет вообще (см. `_outboundTagForSingBox`).
+    : {'outbound': _outboundTagForSingBox(outboundTag)};
 
 /// `ip_cidr` требует именно префикс, а не голый адрес. Маска зависит от
 /// семейства адреса: /32 для IPv4, /128 для IPv6.
