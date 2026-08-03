@@ -73,7 +73,7 @@ class TunBridgeEngine implements CoreEngine {
   Stream<EngineStats> get statsStream => _statsController.stream;
 
   @override
-  Future<void> start(CoreConfig config) async {
+  Future<void> start(CoreConfig config, {String defaultOutboundTag = 'proxy'}) async {
     _statusController.add(EngineStatus.starting);
 
     if (!isRunningElevated()) {
@@ -92,7 +92,11 @@ class TunBridgeEngine implements CoreEngine {
 
     // sing-box's socks-out дозванивается на socksPort сразу при старте —
     // xray должен уже слушать его к этому моменту.
-    await _xray.start(config, manageSystemProxy: false);
+    await _xray.start(
+      config,
+      manageSystemProxy: false,
+      defaultOutboundTag: defaultOutboundTag,
+    );
 
     final serverHost = _xray.activeServer!.address;
     await _singBox.start(
@@ -102,6 +106,7 @@ class TunBridgeEngine implements CoreEngine {
       upstreamDns: upstreamDns,
       logLevel: logLevel,
       routingRules: _xray.activeRoutingRules,
+      defaultOutboundTag: _xray.activeDefaultOutboundTag,
     );
 
     _statusController.add(EngineStatus.connected);

@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -19,6 +21,8 @@ import '../../engines/singbox/geo_ruleset_cache.dart';
 import '../../l10n/strings.dart';
 import '../../widgets/port_ui/port_ui.dart';
 import '../servers/flatten_leaves.dart';
+import '../servers/import_routing_preset_dialog.dart';
+import '../servers/routing_preset_exchange.dart';
 import '../servers/routing_rules_dialog.dart';
 import 'about_info.dart';
 import 'custom_video_storage.dart';
@@ -38,6 +42,7 @@ enum _SettingsSection {
   tun(LucideIcons.network),
   subscription(LucideIcons.rss),
   routing(LucideIcons.map),
+  routingDatabases(LucideIcons.database),
   system(LucideIcons.settings),
   logs(LucideIcons.fileText),
   about(LucideIcons.info);
@@ -50,7 +55,8 @@ enum _SettingsSection {
     _SettingsSection.ping => S.sectionPing,
     _SettingsSection.tun => 'TUN',
     _SettingsSection.subscription => S.sectionSubscription,
-    _SettingsSection.routing => S.sectionRouting,
+    _SettingsSection.routing => S.sectionRoutingPresets,
+    _SettingsSection.routingDatabases => S.sectionRouting,
     _SettingsSection.system => S.sectionSystem,
     _SettingsSection.logs => S.sectionLogs,
     _SettingsSection.about => S.sectionAbout,
@@ -468,11 +474,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         onChanged: (value) =>
             notifier.update((s) => s.copyWith(autoGroupSubscriptions: value)),
       ),
-      _SettingsSection.routing => Column(
+      _SettingsSection.routing => _RoutingPresetsSection(
+        settings: settings,
+        notifier: notifier,
+      ),
+      _SettingsSection.routingDatabases => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _RoutingPresetsSection(settings: settings, notifier: notifier),
-          const SizedBox(height: 24),
           Text(S.geoipUrlLabel, style: PortText.small),
           const SizedBox(height: 6),
           PortInput(
@@ -1057,9 +1065,15 @@ class _RoutingPresetsSection extends ConsumerWidget {
         title: S.createPresetLabel,
         initialName: '',
         initialRules: const [],
-        onSave: (name, rules) => ref
+        initialDefaultOutboundTag: 'proxy',
+        onSave: (name, rules, defaultOutboundTag) => ref
             .read(coreConfigProvider.notifier)
-            .addRoutingPreset(RoutingPreset(id: _uuid.v4(), name: name, rules: rules)),
+            .addRoutingPreset(RoutingPreset(
+              id: _uuid.v4(),
+              name: name,
+              rules: rules,
+              defaultOutboundTag: defaultOutboundTag,
+            )),
       );
     }
 
@@ -1069,9 +1083,14 @@ class _RoutingPresetsSection extends ConsumerWidget {
         title: preset.name,
         initialName: preset.name,
         initialRules: preset.rules,
-        onSave: (name, rules) => ref
+        initialDefaultOutboundTag: preset.defaultOutboundTag,
+        onSave: (name, rules, defaultOutboundTag) => ref
             .read(coreConfigProvider.notifier)
-            .updateRoutingPreset(preset.copyWith(name: name, rules: rules)),
+            .updateRoutingPreset(preset.copyWith(
+              name: name,
+              rules: rules,
+              defaultOutboundTag: defaultOutboundTag,
+            )),
       );
     }
 
@@ -1080,6 +1099,52 @@ class _RoutingPresetsSection extends ConsumerWidget {
         notifier.update((s) => s.copyWith(clearActiveRoutingPresetId: true));
       }
       ref.read(coreConfigProvider.notifier).deleteRoutingPreset(preset.id);
+    }
+
+    Future<void> exportPreset(RoutingPreset preset) async {
+      final json = const JsonEncoder.withIndent(
+        '  ',
+      ).convert(exportRoutingPresetJson(preset));
+      await Clipboard.setData(ClipboardData(text: json));
+      if (!context.mounted) return;
+      PortToaster.of(
+        context,
+      ).show(PortToast(title: Text(S.presetExportedToClipboard)));
+    }
+
+    Future<void> importFromClipboard() async {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final text = data?.text?.trim();
+      if (!context.mounted) return;
+      if (text == null || text.isEmpty) {
+        PortToaster.of(
+          context,
+        ).show(PortToast.destructive(title: Text(S.presetClipboardEmpty)));
+        return;
+      }
+      try {
+        final blueprints = parseRoutingPresetBlueprints(jsonDecode(text));
+        final coreNotifier = ref.read(coreConfigProvider.notifier);
+        for (final blueprint in blueprints) {
+          coreNotifier.addRoutingPreset(
+            RoutingPreset(
+              id: _uuid.v4(),
+              name: blueprint.name,
+              rules: blueprint.rules,
+              defaultOutboundTag: blueprint.defaultOutboundTag,
+            ),
+          );
+        }
+        if (!context.mounted) return;
+        PortToaster.of(
+          context,
+        ).show(PortToast(title: Text(S.presetImportedFromClipboard)));
+      } catch (e) {
+        if (!context.mounted) return;
+        PortToaster.of(context).show(
+          PortToast.destructive(title: Text('${S.importPresetFailed} $e')),
+        );
+      }
     }
 
     return Column(
@@ -1115,6 +1180,10 @@ class _RoutingPresetsSection extends ConsumerWidget {
                 children: [
                   Expanded(child: Text(preset.name, style: PortText.small)),
                   PortIconButton.ghost(
+                    icon: const Icon(LucideIcons.copy, size: 14),
+                    onPressed: () => exportPreset(preset),
+                  ),
+                  PortIconButton.ghost(
                     icon: const Icon(LucideIcons.pencil, size: 14),
                     onPressed: () => editPreset(preset),
                   ),
@@ -1127,10 +1196,31 @@ class _RoutingPresetsSection extends ConsumerWidget {
             ),
         ],
         const SizedBox(height: 12),
-        PortButton.outline(
-          leading: const Icon(LucideIcons.plus, size: 16),
-          onPressed: createPreset,
-          child: Text(S.createPresetLabel),
+        // Wrap, не Row+Expanded — на узких окнах интринсик-ширина трёх
+        // подписанных кнопок не влезает в равные доли строки, и Expanded не
+        // ужимает контент ниже его собственной ширины, а просто обрезает
+        // (ROADMAP.md — узкие окна). Wrap вместо обрезания переносит лишние
+        // кнопки на следующую строку.
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            PortButton.outline(
+              leading: const Icon(LucideIcons.plus, size: 16),
+              onPressed: createPreset,
+              child: Text(S.createPresetLabel),
+            ),
+            PortButton.outline(
+              leading: const Icon(LucideIcons.link, size: 16),
+              onPressed: () => showImportRoutingPresetDialog(context),
+              child: Text(S.importPresetLabel),
+            ),
+            PortButton.outline(
+              leading: const Icon(LucideIcons.clipboard, size: 16),
+              onPressed: importFromClipboard,
+              child: Text(S.importFromClipboardLabel),
+            ),
+          ],
         ),
       ],
     );

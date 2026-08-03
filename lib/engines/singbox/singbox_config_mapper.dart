@@ -132,6 +132,7 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
   CoreLogLevel logLevel = CoreLogLevel.warn,
   List<RoutingRule> routingRules = const [],
   Map<String, String> ruleSetPaths = const {},
+  String defaultOutboundTag = 'proxy',
 }) {
   return {
     'log': {'level': logLevel.singBoxName},
@@ -207,6 +208,7 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
         'version': '5',
       },
       {'type': 'direct', 'tag': 'direct'},
+      {'type': 'block', 'tag': 'block'},
     ],
     'route': {
       'rules': [
@@ -297,10 +299,22 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
       // `bootstrap` по той же причине, по которой он вообще появился — резолв
       // для outbound'ов не должен зависеть от ещё не поднятого тоннеля.
       'default_domain_resolver': 'bootstrap',
-      'final': 'xray-socks-out',
+      'final': _finalOutboundTag(defaultOutboundTag),
     },
   };
 }
+
+/// [defaultOutboundTag] — `RoutingPreset.defaultOutboundTag`
+/// (`"proxy"`/`"direct"`/`"block"`, см. ROADMAP.md трек 3). `route.final`
+/// требует именно тег outbound'а, а не `action` — поэтому у `"block"` тут
+/// нет короткого пути через `reject`, как у обычных `route.rules`
+/// (`_outboundOrAction`): вместо этого выше в `outbounds` заведён отдельный
+/// `{type: "block", tag: "block"}`.
+String _finalOutboundTag(String defaultOutboundTag) => switch (defaultOutboundTag) {
+  'direct' => 'direct',
+  'block' => 'block',
+  _ => 'xray-socks-out',
+};
 
 /// Теги `geosite-<category>`/`geoip-<category>`, на которые нужно завести
 /// `route.rule_set` — вызывающая сторона (`SingBoxEngineWindows.start`)

@@ -59,11 +59,17 @@ class XrayEngineWindows implements CoreEngine {
   ServerConfig? get activeServer => _activeServer;
 
   List<RoutingRule> _activeRoutingRules = const [];
+  String _activeDefaultOutboundTag = 'proxy';
 
   /// Правила роутинга активного листа — нужны [TunBridgeEngine], чтобы
   /// сгенерировать те же правила ещё и в конфиге sing-box (см.
   /// `singbox_config_mapper.dart`, ROADMAP.md трек 21).
   List<RoutingRule> get activeRoutingRules => _activeRoutingRules;
+
+  /// Куда уходит непомеченный трафик активного подключения — та же причина,
+  /// что и у [activeRoutingRules]: нужна [TunBridgeEngine] для конфига
+  /// sing-box.
+  String get activeDefaultOutboundTag => _activeDefaultOutboundTag;
 
   final _statusController = StreamController<EngineStatus>.broadcast();
   final _statsController = StreamController<EngineStats>.broadcast();
@@ -75,7 +81,11 @@ class XrayEngineWindows implements CoreEngine {
   Stream<EngineStats> get statsStream => _statsController.stream;
 
   @override
-  Future<void> start(CoreConfig config, {bool manageSystemProxy = true}) async {
+  Future<void> start(
+    CoreConfig config, {
+    bool manageSystemProxy = true,
+    String defaultOutboundTag = 'proxy',
+  }) async {
     _statusController.add(EngineStatus.starting);
     _manageSystemProxy = manageSystemProxy;
 
@@ -88,12 +98,14 @@ class XrayEngineWindows implements CoreEngine {
 
     _activeServer = server;
     _activeRoutingRules = leaf.routingRules;
+    _activeDefaultOutboundTag = defaultOutboundTag;
 
     final xrayConfig = buildXrayConfig(
       server,
       socksPort: socksPort,
       httpPort: httpPort,
       routingRules: leaf.routingRules,
+      defaultOutboundTag: defaultOutboundTag,
       logLevel: logLevel,
     );
 

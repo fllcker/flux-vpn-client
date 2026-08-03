@@ -26,7 +26,7 @@ abstract class CoreEngine {
   Stream<EngineStatus> get statusStream;
   Stream<EngineStats> get statsStream;
 
-  Future<void> start(CoreConfig config);
+  Future<void> start(CoreConfig config, {String defaultOutboundTag = 'proxy'});
   Future<void> stop();
   Future<EngineStats> currentStats();
 }

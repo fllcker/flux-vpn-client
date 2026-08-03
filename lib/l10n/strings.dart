@@ -106,6 +106,24 @@ abstract final class S {
   static String get presetNameLabel => _en ? 'Preset name' : 'Название пресета';
   static String get presetNamePlaceholder =>
       _en ? 'e.g. Gaming mode' : 'например, Gaming mode';
+  static String get defaultOutboundLabel =>
+      _en ? 'Other traffic' : 'Остальной трафик';
+
+  // import_routing_preset_dialog.dart / routing_preset_exchange.dart
+  static String get importPresetLabel =>
+      _en ? 'Import from link' : 'Импортировать по ссылке';
+  static String get presetLinkPlaceholder =>
+      _en ? 'https://...' : 'https://...';
+  static String get importPresetFailed =>
+      _en ? 'Could not import:' : 'Не удалось импортировать:';
+  static String get presetExportedToClipboard =>
+      _en ? 'Preset copied to clipboard' : 'Пресет скопирован в буфер обмена';
+  static String get importFromClipboardLabel =>
+      _en ? 'Import from clipboard' : 'Импортировать из буфера';
+  static String get presetClipboardEmpty =>
+      _en ? 'Clipboard is empty' : 'Буфер обмена пуст';
+  static String get presetImportedFromClipboard =>
+      _en ? 'Preset imported' : 'Пресет импортирован';
 
   // settings_page.dart — секция "Роутинг"
   static String get activeRoutingLabel => _en ? 'Active routing' : 'Активный роутинг';
@@ -119,6 +137,7 @@ abstract final class S {
   static String get sectionPersonalization => _en ? 'Personalization' : 'Персонализация';
   static String get sectionPing => _en ? 'Ping' : 'Пинг';
   static String get sectionSubscription => _en ? 'Subscription' : 'Подписка';
+  static String get sectionRoutingPresets => _en ? 'Routing' : 'Роутинг';
   static String get sectionRouting => _en ? 'Routing databases' : 'Базы роутинга';
   static String get sectionSystem => _en ? 'System' : 'Система';
   static String get sectionLogs => _en ? 'Logs' : 'Логи';

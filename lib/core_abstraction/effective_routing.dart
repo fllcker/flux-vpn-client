@@ -18,3 +18,18 @@ List<RoutingRule> effectiveRoutingRules({
   }
   return leaf.routingRules;
 }
+
+/// Симметричный [effectiveRoutingRules] — куда уходит трафик, не попавший ни
+/// под одно правило. Пресет "Роутинг сервера" ([activePresetId] `null`) не
+/// имеет собственного поля под это — раньше поведение было жёстко зашито в
+/// движках, оставляем как есть: `"proxy"`.
+String effectiveDefaultOutboundTag({
+  required String? activePresetId,
+  required List<RoutingPreset> presets,
+}) {
+  if (activePresetId == null) return 'proxy';
+  for (final preset in presets) {
+    if (preset.id == activePresetId) return preset.defaultOutboundTag;
+  }
+  return 'proxy';
+}

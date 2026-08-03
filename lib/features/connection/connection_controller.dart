@@ -20,6 +20,7 @@ import '../../engines/xray/xray_engine_android.dart';
 import '../../engines/xray/xray_engine_macos.dart';
 import '../../engines/xray/xray_engine_windows.dart';
 import '../../l10n/strings.dart';
+import '../servers/flatten_leaves.dart';
 import 'connection_state.dart';
 
 final connectionControllerProvider =
@@ -57,12 +58,35 @@ class ConnectionController extends Notifier<ConnectionUiState> {
   @override
   ConnectionUiState build() {
     ref.onDispose(() => _statusSub?.cancel());
+    // Роутинг разрешается один раз при старте движка (см. комментарий у
+    // `connectToServer` про `effectiveRoutingRules`/`effectiveDefaultOutboundTag`)
+    // — сам движок не знает о пресетах и не следит за их сменой, поэтому
+    // смена активного пресета во время уже установленного соединения молча
+    // не подхватилась бы иначе. `forceReconnect: true` в обход no-op-проверки
+    // ниже — тут сервер/вариант/режим не меняются, только правила.
+    ref.listen(appSettingsProvider, (previous, next) {
+      if (previous?.activeRoutingPresetId == next.activeRoutingPresetId) return;
+      final current = state;
+      if (current is! ConnectionConnected) return;
+      ServerLeaf? leaf;
+      for (final candidate in flattenAllLeaves(ref.read(coreConfigProvider))) {
+        if (candidate.id == current.leafId) {
+          leaf = candidate;
+          break;
+        }
+      }
+      if (leaf == null) return;
+      unawaited(
+        connectToServer(leaf, mode: current.mode, forceReconnect: true),
+      );
+    });
     return const ConnectionIdle();
   }
 
   Future<void> connectToServer(
     ServerLeaf leaf, {
     ConnectionMode mode = ConnectionMode.proxy,
+    bool forceReconnect = false,
   }) async {
     // Клик по уже активному серверу/варианту/режиму (напр. повторный тап по
     // тому же серверу в списке, см. ROADMAP.md) не должен приводить к
@@ -71,8 +95,12 @@ class ConnectionController extends Notifier<ConnectionUiState> {
     // любого из них — это осознанный реконнект (см. `server_list_panel.dart`
     // `reconnectToLeafIfActive`, `connect_panel.dart` `_onSelectionChanged`),
     // а вот "тот же сервер, тот же вариант, тот же режим" — no-op.
+    // [forceReconnect] обходит эту проверку — используется сменой активного
+    // пресета роутинга (см. `build()`), где сервер/вариант/режим не меняются
+    // вовсе, но конфиг всё равно нужно перегенерировать и перезапустить.
     final current = state;
-    if (current is ConnectionConnected &&
+    if (!forceReconnect &&
+        current is ConnectionConnected &&
         current.leafId == leaf.id &&
         current.variantId == leaf.activeVariant?.id &&
         current.mode == mode) {
@@ -188,10 +216,14 @@ class ConnectionController extends Notifier<ConnectionUiState> {
         presets: coreConfig.routingPresets,
       ),
     );
+    final defaultOutboundTag = effectiveDefaultOutboundTag(
+      activePresetId: settings.activeRoutingPresetId,
+      presets: coreConfig.routingPresets,
+    );
     final config = CoreConfig(standaloneNodes: [effectiveLeaf]);
 
     try {
-      await engine.start(config);
+      await engine.start(config, defaultOutboundTag: defaultOutboundTag);
     } catch (e) {
       if (generation == _generation) state = ConnectionError('$e');
     }

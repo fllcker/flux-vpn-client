@@ -65,7 +65,7 @@ class TunBridgeEngineMacOS implements CoreEngine {
   Stream<EngineStats> get statsStream => _statsController.stream;
 
   @override
-  Future<void> start(CoreConfig config) async {
+  Future<void> start(CoreConfig config, {String defaultOutboundTag = 'proxy'}) async {
     _statusController.add(EngineStatus.starting);
 
     // См. TunBridgeEngine (Windows): падение любой стороны после старта
@@ -77,7 +77,11 @@ class TunBridgeEngineMacOS implements CoreEngine {
       if (status == EngineStatus.error && !_stopping) _failAndTeardown();
     });
 
-    await _xray.start(config, manageSystemProxy: false);
+    await _xray.start(
+      config,
+      manageSystemProxy: false,
+      defaultOutboundTag: defaultOutboundTag,
+    );
 
     final serverHost = _xray.activeServer!.address;
     await _singBox.start(
@@ -87,6 +91,7 @@ class TunBridgeEngineMacOS implements CoreEngine {
       upstreamDns: upstreamDns,
       logLevel: logLevel,
       routingRules: _xray.activeRoutingRules,
+      defaultOutboundTag: _xray.activeDefaultOutboundTag,
     );
 
     _statusController.add(EngineStatus.connected);

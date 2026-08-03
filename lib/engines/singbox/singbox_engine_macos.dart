@@ -38,6 +38,7 @@ class SingBoxEngineMacOS {
     String upstreamDns = defaultTunDnsServer,
     CoreLogLevel logLevel = CoreLogLevel.warn,
     List<RoutingRule> routingRules = const [],
+    String defaultOutboundTag = 'proxy',
   }) async {
     _statusController.add(EngineStatus.starting);
 
@@ -51,6 +52,7 @@ class SingBoxEngineMacOS {
       logLevel: logLevel,
       routingRules: routingRules,
       ruleSetPaths: ruleSetPaths,
+      defaultOutboundTag: defaultOutboundTag,
     );
     final configFile = await File(
       '${ensureFluxLogDirectory()}/flux_singbox_$id.json',

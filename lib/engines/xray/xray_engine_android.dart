@@ -55,7 +55,7 @@ class XrayEngineAndroid implements CoreEngine {
   Stream<EngineStats> get statsStream => _statsController.stream;
 
   @override
-  Future<void> start(CoreConfig config) async {
+  Future<void> start(CoreConfig config, {String defaultOutboundTag = 'proxy'}) async {
     _statusController.add(EngineStatus.starting);
     _listenToNativeStatus();
 
@@ -96,6 +96,7 @@ class XrayEngineAndroid implements CoreEngine {
     final xrayConfig = buildXrayTunConfig(
       pinnedServer,
       routingRules: leaf.routingRules,
+      defaultOutboundTag: defaultOutboundTag,
       logLevel: logLevel,
     );
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -12,6 +13,7 @@ import '../../core_abstraction/connection_session.dart';
 import '../../core_abstraction/core_config_provider.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../engines/geo_assets.dart';
+import '../../engines/geo_category_index.dart';
 import '../../engines/singbox/geo_ruleset_cache.dart';
 import '../../engines/xray/windows_elevation.dart';
 import '../../l10n/strings.dart';
@@ -137,6 +139,12 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
       for (final preset in coreConfig.routingPresets) ...preset.rules,
     ];
     await pregenerateGeoRuleSets(allRoutingRules);
+    // Прогреваем мемоизированный кэш имён категорий для автокомплита в
+    // `routing_rules_dialog.dart` — не дожидаясь, чтобы не задерживать
+    // остальной `_runStartupSequence`: к моменту, когда пользователь
+    // реально откроет диалог пресета, парсинг почти наверняка уже закончен.
+    unawaited(geositeCategoryNames());
+    unawaited(geoipCategoryNames());
   }
 
   /// Windows-only (ROADMAP.md, трек 24) — Android и так всегда TUN через
