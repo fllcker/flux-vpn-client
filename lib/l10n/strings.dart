@@ -29,6 +29,31 @@ abstract final class S {
   static String get selectServerHint =>
       _en ? 'Select a server on the left to connect.' : 'Выберите сервер слева, чтобы подключиться.';
 
+  // home_tiles/home_tile_grid.dart
+  static String get customizeTiles => _en ? 'Customize' : 'Настроить';
+  static String get doneCustomizingTiles => _en ? 'Done' : 'Готово';
+  static String get addTile => _en ? 'Add tile' : 'Добавить плитку';
+  static String get removeTile => _en ? 'Remove' : 'Удалить';
+  static String get tileSizeSmall => _en ? 'Small' : 'Маленькая';
+  static String get tileSizeWide => _en ? 'Wide' : 'Широкая';
+  static String get tileSizeLarge => _en ? 'Large' : 'Большая';
+  static String get tileRadiusSharp => _en ? 'Sharp corners' : 'Острые углы';
+  static String get tileRadiusRounded => _en ? 'Rounded corners' : 'Скруглённые углы';
+  static String get tileRadiusPill => _en ? 'Pill' : 'Таблетка';
+  static String get tileTypeServerInfo => _en ? 'Server (icon + name + status)' : 'Сервер (иконка + имя + статус)';
+  static String get tileTypeServerIcon => _en ? 'Server icon' : 'Иконка сервера';
+  static String get tileTypeServerStatus => _en ? 'Server name + status' : 'Имя сервера + статус';
+  static String get tileTypeModeSelector => _en ? 'Off/Proxy/TUN switch' : 'Переключатель Off/Proxy/TUN';
+  static String get tileTypeRoutingPreset => _en ? 'Routing preset' : 'Пресет роутинга';
+  static String get tileTypeVariantSelector => _en ? 'Connection variant' : 'Вариант подключения';
+  static String get tileWidthLabel => _en ? 'Width' : 'Ширина';
+  static String get tileRadiusStyleLabel => _en ? 'Corner style' : 'Скругление';
+  static String get tileAlignLabel => _en ? 'Content alignment' : 'Расположение';
+  static String get tileAlignStart => _en ? 'Left' : 'Слева';
+  static String get tileAlignCenter => _en ? 'Center' : 'По центру';
+  static String get tileAlignEnd => _en ? 'Right' : 'Справа';
+  static String get resetTilesToDefault => _en ? 'Reset' : 'Сбросить';
+
   // app/tray.dart
   static String get trayOpen => _en ? 'Open' : 'Открыть';
   static String get trayDisconnect => _en ? 'Disconnect' : 'Отключить';

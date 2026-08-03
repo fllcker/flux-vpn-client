@@ -6,6 +6,7 @@ import '../../app/app_paths.dart';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/core_engine.dart';
 import '../../core_abstraction/proxy_node.dart';
+import '../routing_debug_header.dart';
 import '../xray/macos_elevation.dart';
 import 'geo_ruleset_cache.dart';
 import 'singbox_config_mapper.dart';
@@ -39,6 +40,7 @@ class SingBoxEngineMacOS {
     CoreLogLevel logLevel = CoreLogLevel.warn,
     List<RoutingRule> routingRules = const [],
     String defaultOutboundTag = 'proxy',
+    String routingLabel = 'server-routing',
   }) async {
     _statusController.add(EngineStatus.starting);
 
@@ -65,7 +67,16 @@ class SingBoxEngineMacOS {
       configFile.path,
     ]);
     _process = process;
-    unawaited(_pipeLogs(process));
+    unawaited(
+      _pipeLogs(
+        process,
+        routingDebugHeader(
+          routingLabel: routingLabel,
+          defaultOutboundTag: defaultOutboundTag,
+          ruleCount: routingRules.length,
+        ),
+      ),
+    );
 
     unawaited(
       process.exitCode.then((_) {
@@ -101,9 +112,10 @@ class SingBoxEngineMacOS {
   }
 
   /// См. `SingBoxEngineWindows._pipeLogs`.
-  Future<void> _pipeLogs(Process process) async {
+  Future<void> _pipeLogs(Process process, String debugHeader) async {
     final logFile = File('${ensureFluxLogDirectory()}/flux_singbox_$id.log');
     final sink = logFile.openWrite(mode: FileMode.write);
+    sink.write(debugHeader);
     try {
       await Future.wait([
         process.stdout

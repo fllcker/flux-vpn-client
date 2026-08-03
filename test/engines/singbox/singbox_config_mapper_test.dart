@@ -11,6 +11,7 @@ Map<String, dynamic> buildConfig({
   CoreLogLevel logLevel = CoreLogLevel.warn,
   List<RoutingRule> routingRules = const [],
   Map<String, String> ruleSetPaths = const {},
+  String defaultOutboundTag = 'proxy',
 }) => buildSingBoxTunBridgeConfig(
   socksInPort: socksInPort,
   serverHost: serverHost,
@@ -19,6 +20,7 @@ Map<String, dynamic> buildConfig({
   logLevel: logLevel,
   routingRules: routingRules,
   ruleSetPaths: ruleSetPaths,
+  defaultOutboundTag: defaultOutboundTag,
 );
 
 List<Map> routeRules(Map<String, dynamic> config) =>
@@ -276,28 +278,53 @@ void main() {
       expect(rule['domain_regex'], ['^ad']);
     });
 
-    test('maps "direct"/"block" tags to outbound/action, skips "proxy"', () {
+    test(
+      'maps "direct"/"block" tags to outbound/action, skips "proxy" when it matches the default',
+      () {
+        final config = buildConfig(
+          // Дефолт остаётся 'proxy' (см. buildConfig) — правило "proxy" тут
+          // действительно избыточно относительно route.final.
+          routingRules: const [
+            DomainRule(values: ['direct.example'], outboundTag: 'direct'),
+            DomainRule(values: ['blocked.example'], outboundTag: 'block'),
+            DomainRule(values: ['proxied.example'], outboundTag: 'proxy'),
+          ],
+        );
+
+        final rules = routeRules(config);
+        final direct = rules.firstWhere((r) => _listEquals(r['domain_keyword'], ['direct.example']));
+        expect(direct['outbound'], 'direct');
+        expect(direct.containsKey('action'), isFalse);
+
+        final blocked = rules.firstWhere((r) => _listEquals(r['domain_keyword'], ['blocked.example']));
+        expect(blocked['action'], 'reject');
+        expect(blocked.containsKey('outbound'), isFalse);
+
+        expect(rules.any((r) => _listEquals(r['domain_keyword'], ['proxied.example'])), isFalse);
+      },
+    );
+
+    // Regression: `_userRoutingRules` used to hardcode "skip whenever
+    // outboundTag == 'proxy'", assuming the fallback was always proxy. Once
+    // `defaultOutboundTag` became configurable (ROADMAP.md, трек 3), that
+    // silently dropped every "→ proxy" rule whenever the preset's default
+    // was direct/block — exactly the opposite of what such a preset needs
+    // (e.g. "everything direct, except these domains through the tunnel").
+    test('keeps a "proxy" rule when the default outbound is NOT proxy, mapped to xray-socks-out', () {
       final config = buildConfig(
+        defaultOutboundTag: 'direct',
         routingRules: const [
-          DomainRule(values: ['direct.example'], outboundTag: 'direct'),
-          DomainRule(values: ['blocked.example'], outboundTag: 'block'),
           DomainRule(values: ['proxied.example'], outboundTag: 'proxy'),
         ],
       );
 
       final rules = routeRules(config);
-      final direct = rules.firstWhere((r) => _listEquals(r['domain_keyword'], ['direct.example']));
-      expect(direct['outbound'], 'direct');
-      expect(direct.containsKey('action'), isFalse);
-
-      final blocked = rules.firstWhere((r) => _listEquals(r['domain_keyword'], ['blocked.example']));
-      expect(blocked['action'], 'reject');
-      expect(blocked.containsKey('outbound'), isFalse);
-
-      expect(rules.any((r) => _listEquals(r['domain_keyword'], ['proxied.example'])), isFalse);
+      final proxied = rules.firstWhere((r) => _listEquals(r['domain_keyword'], ['proxied.example']));
+      expect(proxied['outbound'], 'xray-socks-out');
+      expect((config['route'] as Map)['final'], 'direct');
     });
 
-    test('IpRule maps ip_cidr values and skips "proxy"', () {
+    test('IpRule maps ip_cidr values and skips "proxy" when it matches the default', () {
       final config = buildConfig(
         routingRules: const [
           IpRule(values: ['1.2.3.0/24'], outboundTag: 'direct'),

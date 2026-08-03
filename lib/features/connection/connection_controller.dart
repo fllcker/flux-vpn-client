@@ -220,10 +220,18 @@ class ConnectionController extends Notifier<ConnectionUiState> {
       activePresetId: settings.activeRoutingPresetId,
       presets: coreConfig.routingPresets,
     );
+    final routingLabel = effectiveRoutingLabel(
+      activePresetId: settings.activeRoutingPresetId,
+      presets: coreConfig.routingPresets,
+    );
     final config = CoreConfig(standaloneNodes: [effectiveLeaf]);
 
     try {
-      await engine.start(config, defaultOutboundTag: defaultOutboundTag);
+      await engine.start(
+        config,
+        defaultOutboundTag: defaultOutboundTag,
+        routingLabel: routingLabel,
+      );
     } catch (e) {
       if (generation == _generation) state = ConnectionError('$e');
     }

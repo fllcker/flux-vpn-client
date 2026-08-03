@@ -33,3 +33,17 @@ String effectiveDefaultOutboundTag({
   }
   return 'proxy';
 }
+
+/// Человекочитаемое имя действующего пресета — только для диагностики
+/// (заголовок в лог-файле движка, см. [CoreEngine.start]), не для UI (там
+/// свои локализованные строки, `S.serverRoutingPreset`).
+String effectiveRoutingLabel({
+  required String? activePresetId,
+  required List<RoutingPreset> presets,
+}) {
+  if (activePresetId == null) return 'server-routing';
+  for (final preset in presets) {
+    if (preset.id == activePresetId) return preset.name;
+  }
+  return 'server-routing';
+}

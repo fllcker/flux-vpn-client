@@ -73,7 +73,11 @@ class TunBridgeEngine implements CoreEngine {
   Stream<EngineStats> get statsStream => _statsController.stream;
 
   @override
-  Future<void> start(CoreConfig config, {String defaultOutboundTag = 'proxy'}) async {
+  Future<void> start(
+    CoreConfig config, {
+    String defaultOutboundTag = 'proxy',
+    String routingLabel = 'server-routing',
+  }) async {
     _statusController.add(EngineStatus.starting);
 
     if (!isRunningElevated()) {
@@ -92,10 +96,26 @@ class TunBridgeEngine implements CoreEngine {
 
     // sing-box's socks-out дозванивается на socksPort сразу при старте —
     // xray должен уже слушать его к этому моменту.
+    //
+    // `defaultOutboundTag` этому внутреннему xray НЕ передаём — здесь он
+    // всегда `'proxy'` (дефолт параметра), не значение пресета. Реальное
+    // доменное решение (через тоннель или нет) в TUN-режиме принимает
+    // sing-box: он сниффит SNI/домен из TLS-пакета и уже сам решает, слать
+    // ли конкретное соединение на `xray-socks-out`. Когда решает "да", он
+    // дозванивается до xray по голому IP (SOCKS5-запрос видно в логе как
+    // `tcp:IP:port`, без домена) — у xray в этой роли нет домена, чтобы
+    // сравнить с его же `routing.rules`, так что для КАЖДОГО такого запроса
+    // срабатывает xray-шный дефолт. Раньше это было безобидно, потому что
+    // дефолт всегда был `'proxy'`; после того как он стал настраиваться
+    // пресетом, при `defaultOutboundTag: 'direct'` внутренний xray начинал
+    // молча заворачивать в `direct` ровно то, что sing-box только что
+    // осознанно отправил в тоннель — двойное, противоречащее друг другу
+    // решение. Здесь xray — чистая труба до VLESS-сервера, а не второй
+    // уровень роутинга.
     await _xray.start(
       config,
       manageSystemProxy: false,
-      defaultOutboundTag: defaultOutboundTag,
+      routingLabel: routingLabel,
     );
 
     final serverHost = _xray.activeServer!.address;
@@ -106,7 +126,8 @@ class TunBridgeEngine implements CoreEngine {
       upstreamDns: upstreamDns,
       logLevel: logLevel,
       routingRules: _xray.activeRoutingRules,
-      defaultOutboundTag: _xray.activeDefaultOutboundTag,
+      defaultOutboundTag: defaultOutboundTag,
+      routingLabel: routingLabel,
     );
 
     _statusController.add(EngineStatus.connected);

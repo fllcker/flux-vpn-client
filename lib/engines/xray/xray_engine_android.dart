@@ -55,7 +55,14 @@ class XrayEngineAndroid implements CoreEngine {
   Stream<EngineStats> get statsStream => _statsController.stream;
 
   @override
-  Future<void> start(CoreConfig config, {String defaultOutboundTag = 'proxy'}) async {
+  Future<void> start(
+    CoreConfig config, {
+    String defaultOutboundTag = 'proxy',
+    // Не используется — на Android нет своего `_pipeLogs` (xray-core живёт
+    // внутри `FluxVpnService.kt`, логи там свои, нативные), см.
+    // `CoreEngine.start`.
+    String routingLabel = 'server-routing',
+  }) async {
     _statusController.add(EngineStatus.starting);
     _listenToNativeStatus();
 

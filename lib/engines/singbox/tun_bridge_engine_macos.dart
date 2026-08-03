@@ -65,7 +65,11 @@ class TunBridgeEngineMacOS implements CoreEngine {
   Stream<EngineStats> get statsStream => _statsController.stream;
 
   @override
-  Future<void> start(CoreConfig config, {String defaultOutboundTag = 'proxy'}) async {
+  Future<void> start(
+    CoreConfig config, {
+    String defaultOutboundTag = 'proxy',
+    String routingLabel = 'server-routing',
+  }) async {
     _statusController.add(EngineStatus.starting);
 
     // См. TunBridgeEngine (Windows): падение любой стороны после старта
@@ -77,10 +81,16 @@ class TunBridgeEngineMacOS implements CoreEngine {
       if (status == EngineStatus.error && !_stopping) _failAndTeardown();
     });
 
+    // См. `TunBridgeEngine` (Windows) — тот же приём и та же причина:
+    // внутренний xray тут только труба до VLESS-сервера, реальное доменное
+    // решение в TUN-режиме принимает sing-box (сниффинг SNI), у xray на
+    // этом пути нет домена, чтобы сравнить со своими `routing.rules`, так
+    // что его собственный `defaultOutboundTag` всегда должен быть `'proxy'`,
+    // а не значение пресета.
     await _xray.start(
       config,
       manageSystemProxy: false,
-      defaultOutboundTag: defaultOutboundTag,
+      routingLabel: routingLabel,
     );
 
     final serverHost = _xray.activeServer!.address;
@@ -91,7 +101,8 @@ class TunBridgeEngineMacOS implements CoreEngine {
       upstreamDns: upstreamDns,
       logLevel: logLevel,
       routingRules: _xray.activeRoutingRules,
-      defaultOutboundTag: _xray.activeDefaultOutboundTag,
+      defaultOutboundTag: defaultOutboundTag,
+      routingLabel: routingLabel,
     );
 
     _statusController.add(EngineStatus.connected);

@@ -8,6 +8,7 @@ import '../../core_abstraction/core_config.dart';
 import '../../core_abstraction/core_engine.dart';
 import '../../core_abstraction/proxy_node.dart';
 import '../../core_abstraction/server_config.dart';
+import '../routing_debug_header.dart';
 import 'child_process_lifecycle_macos.dart';
 import 'macos_system_proxy.dart';
 import 'xray_config_mapper.dart';
@@ -67,6 +68,7 @@ class XrayEngineMacOS implements CoreEngine {
     CoreConfig config, {
     bool manageSystemProxy = true,
     String defaultOutboundTag = 'proxy',
+    String routingLabel = 'server-routing',
   }) async {
     _statusController.add(EngineStatus.starting);
     _manageSystemProxy = manageSystemProxy;
@@ -103,7 +105,16 @@ class XrayEngineMacOS implements CoreEngine {
     );
     _process = process;
     tieChildProcessLifetimeToApp(process);
-    unawaited(_pipeLogs(process));
+    unawaited(
+      _pipeLogs(
+        process,
+        routingDebugHeader(
+          routingLabel: routingLabel,
+          defaultOutboundTag: defaultOutboundTag,
+          ruleCount: leaf.routingRules.length,
+        ),
+      ),
+    );
 
     unawaited(
       process.exitCode.then((_) async {
@@ -138,9 +149,10 @@ class XrayEngineMacOS implements CoreEngine {
   }
 
   /// См. `XrayEngineWindows._pipeLogs`.
-  Future<void> _pipeLogs(Process process) async {
+  Future<void> _pipeLogs(Process process, String debugHeader) async {
     final logFile = File('${ensureFluxLogDirectory()}/flux_xray_$id.log');
     final sink = logFile.openWrite(mode: FileMode.write);
+    sink.write(debugHeader);
     try {
       await Future.wait([
         process.stdout

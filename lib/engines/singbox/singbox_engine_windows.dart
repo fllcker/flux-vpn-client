@@ -6,6 +6,7 @@ import '../../app/app_paths.dart';
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/core_engine.dart';
 import '../../core_abstraction/proxy_node.dart';
+import '../routing_debug_header.dart';
 import '../xray/child_process_job.dart';
 import 'geo_ruleset_cache.dart';
 import 'singbox_config_mapper.dart';
@@ -36,6 +37,7 @@ class SingBoxEngineWindows {
     CoreLogLevel logLevel = CoreLogLevel.warn,
     List<RoutingRule> routingRules = const [],
     String defaultOutboundTag = 'proxy',
+    String routingLabel = 'server-routing',
   }) async {
     _statusController.add(EngineStatus.starting);
 
@@ -63,7 +65,16 @@ class SingBoxEngineWindows {
     ]);
     _process = process;
     tieChildProcessLifetimeToApp(process);
-    unawaited(_pipeLogs(process));
+    unawaited(
+      _pipeLogs(
+        process,
+        routingDebugHeader(
+          routingLabel: routingLabel,
+          defaultOutboundTag: defaultOutboundTag,
+          ruleCount: routingRules.length,
+        ),
+      ),
+    );
 
     unawaited(
       process.exitCode.then((_) {
@@ -105,9 +116,10 @@ class SingBoxEngineWindows {
   /// См. аналогичный комментарий в `XrayEngineWindows._pipeLogs` — без этого
   /// ошибки поднятия TUN-адаптера (недостающие права, занятое имя интерфейса,
   /// конфликт с существующим wintun-адаптером) некуда посмотреть постфактум.
-  Future<void> _pipeLogs(Process process) async {
+  Future<void> _pipeLogs(Process process, String debugHeader) async {
     final logFile = File('${ensureFluxLogDirectory()}/flux_singbox_$id.log');
     final sink = logFile.openWrite(mode: FileMode.write);
+    sink.write(debugHeader);
     try {
       await Future.wait([
         process.stdout.transform(const SystemEncoding().decoder).forEach(sink.write),

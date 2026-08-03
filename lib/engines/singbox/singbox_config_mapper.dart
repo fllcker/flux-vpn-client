@@ -279,7 +279,7 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
         // инфраструктурные страховки (мультикаст, DoH, hijack-dns, обход
         // адреса сервера), которые не должны переопределяться конфигом
         // сервиса.
-        ..._userRoutingRules(routingRules),
+        ..._userRoutingRules(routingRules, defaultOutboundTag),
       ],
       if (geoRuleSetReferences(routingRules).isNotEmpty)
         'rule_set': [
@@ -310,7 +310,17 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
 /// нет короткого пути через `reject`, как у обычных `route.rules`
 /// (`_outboundOrAction`): вместо этого выше в `outbounds` заведён отдельный
 /// `{type: "block", tag: "block"}`.
-String _finalOutboundTag(String defaultOutboundTag) => switch (defaultOutboundTag) {
+String _finalOutboundTag(String defaultOutboundTag) => _outboundTagForSingBox(defaultOutboundTag);
+
+/// `outboundTag` в терминологии `RoutingRule`/`RoutingPreset` —
+/// `"proxy"`/`"direct"`/`"block"` — сам по себе не тег ни одного outbound'а
+/// в этом конфиге: реальный прокси-outbound называется `xray-socks-out`
+/// (см. `buildSingBoxTunBridgeConfig`, `outbounds`), тега `"proxy"` там
+/// физически нет. И `route.final`, и обычные `route.rules` должны сначала
+/// пройти через этот маппинг, а не подставлять `"proxy"` напрямую — иначе
+/// sing-box получает правило/`final`, ссылающиеся на несуществующий
+/// outbound.
+String _outboundTagForSingBox(String outboundTag) => switch (outboundTag) {
   'direct' => 'direct',
   'block' => 'block',
   _ => 'xray-socks-out',
@@ -339,15 +349,27 @@ Set<String> geoRuleSetReferences(List<RoutingRule> rules) {
 }
 
 /// `outboundTag` из [RoutingRule] — `"direct"`/`"block"`/`"proxy"` (см.
-/// ROADMAP.md, трек 3). `"proxy"` не даёт отдельного правила — `route.final`
-/// уже шлёт туда всё непойманное, лишнее правило было бы балластом.
-/// `"block"` — не outbound-тег в sing-box, а `action: "reject"`.
-List<Map<String, dynamic>> _userRoutingRules(List<RoutingRule> rules) {
+/// ROADMAP.md, трек 3). Правило пропускается, только если его тег СОВПАДАЕТ
+/// с [defaultOutboundTag] — тогда оно и правда избыточно, `route.final` уже
+/// шлёт туда всё непойманное. Раньше тут был жёстко зашит пропуск при
+/// `outboundTag == 'proxy'`, из расчёта, что "непойманное" всегда шло в
+/// прокси — это было верно, пока `defaultOutboundTag` был всегда `'proxy'`
+/// (до ROADMAP.md, трек 3). С тех пор, как дефолт стал настраиваемым, эта
+/// проверка молча роняла ЛЮБОЕ правило "домен → proxy" всякий раз, когда
+/// дефолт выставлен на `direct`/`block` — то есть ровно тот сценарий, где
+/// правило нужнее всего (пресет "весь трафик напрямую, кроме этих доменов
+/// — через прокси" в реальности отправлял вообще всё напрямую, ни одно
+/// исключение не применялось). `"block"` — не outbound-тег в sing-box, а
+/// `action: "reject"`.
+List<Map<String, dynamic>> _userRoutingRules(
+  List<RoutingRule> rules,
+  String defaultOutboundTag,
+) {
   final result = <Map<String, dynamic>>[];
   for (final rule in rules) {
     switch (rule) {
       case DomainRule(:final values, :final outboundTag):
-        if (outboundTag == 'proxy') continue;
+        if (outboundTag == defaultOutboundTag) continue;
         final domain = <String>[];
         final domainSuffix = <String>[];
         final domainKeyword = <String>[];
@@ -382,7 +404,7 @@ List<Map<String, dynamic>> _userRoutingRules(List<RoutingRule> rules) {
           result.add({'rule_set': geositeTags, ..._outboundOrAction(outboundTag)});
         }
       case IpRule(:final values, :final outboundTag):
-        if (outboundTag == 'proxy') continue;
+        if (outboundTag == defaultOutboundTag) continue;
         final ipCidr = <String>[];
         final geoipTags = <String>[];
         for (final v in values) {
@@ -403,8 +425,13 @@ List<Map<String, dynamic>> _userRoutingRules(List<RoutingRule> rules) {
   return result;
 }
 
-Map<String, dynamic> _outboundOrAction(String outboundTag) =>
-    outboundTag == 'block' ? {'action': 'reject'} : {'outbound': outboundTag};
+Map<String, dynamic> _outboundOrAction(String outboundTag) => outboundTag == 'block'
+    ? {'action': 'reject'}
+    // `outboundTag` здесь в терминологии `RoutingRule` (`"proxy"`/`"direct"`)
+    // — нужно смэппить через `_outboundTagForSingBox`, а не подставлять
+    // напрямую: реальный outbound-тег прокси в этом конфиге — `xray-socks-out`,
+    // тега `"proxy"` среди `outbounds` нет вообще (см. `_outboundTagForSingBox`).
+    : {'outbound': _outboundTagForSingBox(outboundTag)};
 
 /// `ip_cidr` требует именно префикс, а не голый адрес. Маска зависит от
 /// семейства адреса: /32 для IPv4, /128 для IPv6.
