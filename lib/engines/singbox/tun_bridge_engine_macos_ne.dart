@@ -66,8 +66,17 @@ class TunBridgeEngineMacOSNe implements CoreEngine {
   @override
   Stream<EngineStats> get statsStream => _statsController.stream;
 
+  // `routingLabel` не используется здесь — в отличие от процесс-based
+  // движков (`XrayEngineWindows`/`SingBoxEngineWindows` и т.д., см.
+  // `routing_debug_header.dart`), у этого моста нет своего файлового лога на
+  // Dart-стороне: конфиги уходят в System Extension через `MethodChannel`
+  // как есть, логи (если есть) — целиком на нативной/Swift стороне.
   @override
-  Future<void> start(CoreConfig config) async {
+  Future<void> start(
+    CoreConfig config, {
+    String defaultOutboundTag = 'proxy',
+    String routingLabel = 'server-routing',
+  }) async {
     _statusController.add(EngineStatus.starting);
     _listenToNativeStatus();
 
@@ -85,6 +94,14 @@ class TunBridgeEngineMacOSNe implements CoreEngine {
       throw StateError('System Extension activation was not granted');
     }
 
+    // `defaultOutboundTag` внутреннему xray НЕ передаём (остаётся дефолтным
+    // 'proxy') — та же причина, что в `TunBridgeEngine`/`TunBridgeEngineMacOS`
+    // (Windows/osascript-мост): здесь xray лишь труба до VLESS-сервера,
+    // реальное доменное решение (через тоннель или нет) принимает sing-box
+    // (сниффинг SNI внутри `PacketTunnelProvider`), у xray на этом пути нет
+    // домена, чтобы сравнить со своими `routing.rules` — если дать ему
+    // собственный `defaultOutboundTag`, он молча переигрывает уже принятое
+    // sing-box'ом решение для немаршрутизированного (по домену) IP-трафика.
     final xrayConfig = buildXrayConfig(
       server,
       socksPort: socksPort,
@@ -103,6 +120,7 @@ class TunBridgeEngineMacOSNe implements CoreEngine {
       logLevel: logLevel,
       routingRules: leaf.routingRules,
       ruleSetPaths: ruleSetPaths,
+      defaultOutboundTag: defaultOutboundTag,
     );
 
     await _channel.invokeMethod('start', {
