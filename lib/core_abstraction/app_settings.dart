@@ -70,6 +70,8 @@ const defaultGeoipUrl =
 const defaultGeositeUrl =
     'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat';
 
+const defaultServerPanelWidth = 260.0;
+
 /// Настройки приложения — отдельно от [CoreConfig] (серверы/подписки):
 /// это предпочтения интерфейса и поведения, не часть профиля, которым можно
 /// было бы поделиться. Хранятся в своём файле, см. `app_settings_storage.dart`.
@@ -81,6 +83,7 @@ class AppSettings {
   final String pingTestUrl;
   final bool pingAllOnStartup;
   final bool autoGroupSubscriptions;
+  final double serverPanelWidth;
   final AppAutoStartPrivilege autoStartPrivilege;
 
   /// Показывать окно при автозапуске — `false` (дефолт) означает окно
@@ -167,6 +170,7 @@ class AppSettings {
     this.pingTestUrl = _defaultPingTestUrl,
     this.pingAllOnStartup = false,
     this.autoGroupSubscriptions = true,
+    this.serverPanelWidth = defaultServerPanelWidth,
     this.autoStartPrivilege = AppAutoStartPrivilege.none,
     this.autoStartShowWindow = false,
     this.autoConnectOnStartup = false,
@@ -208,6 +212,8 @@ class AppSettings {
     pingTestUrl: json['pingTestUrl'] as String? ?? _defaultPingTestUrl,
     pingAllOnStartup: json['pingAllOnStartup'] as bool? ?? false,
     autoGroupSubscriptions: json['autoGroupSubscriptions'] as bool? ?? true,
+    serverPanelWidth:
+        (json['serverPanelWidth'] as num?)?.toDouble() ?? defaultServerPanelWidth,
     autoStartPrivilege: json['autoStartPrivilege'] != null
         ? _enumFromJson(
             AppAutoStartPrivilege.values,
@@ -263,6 +269,7 @@ class AppSettings {
     'pingTestUrl': pingTestUrl,
     'pingAllOnStartup': pingAllOnStartup,
     'autoGroupSubscriptions': autoGroupSubscriptions,
+    'serverPanelWidth': serverPanelWidth,
     'autoStartPrivilege': autoStartPrivilege.name,
     'autoStartShowWindow': autoStartShowWindow,
     'autoConnectOnStartup': autoConnectOnStartup,
@@ -289,6 +296,7 @@ class AppSettings {
     String? pingTestUrl,
     bool? pingAllOnStartup,
     bool? autoGroupSubscriptions,
+    double? serverPanelWidth,
     AppAutoStartPrivilege? autoStartPrivilege,
     bool? autoStartShowWindow,
     bool? autoConnectOnStartup,
@@ -322,6 +330,7 @@ class AppSettings {
       pingAllOnStartup: pingAllOnStartup ?? this.pingAllOnStartup,
       autoGroupSubscriptions:
           autoGroupSubscriptions ?? this.autoGroupSubscriptions,
+      serverPanelWidth: serverPanelWidth ?? this.serverPanelWidth,
       autoStartPrivilege: autoStartPrivilege ?? this.autoStartPrivilege,
       autoStartShowWindow: autoStartShowWindow ?? this.autoStartShowWindow,
       autoConnectOnStartup: autoConnectOnStartup ?? this.autoConnectOnStartup,

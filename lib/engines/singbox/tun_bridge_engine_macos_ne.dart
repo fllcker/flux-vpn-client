@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/services.dart';
 
@@ -12,6 +11,7 @@ import '../xray/xray_config_mapper.dart';
 import '../xray/xray_engine_macos.dart' show defaultMacosXrayExecutablePath;
 import 'geo_ruleset_cache.dart';
 import 'singbox_config_mapper.dart';
+import 'tun_server_endpoints.dart';
 
 /// macOS TUN через `NetworkExtension`/`NEPacketTunnelProvider` — правильный
 /// долгосрочный дизайн (см. docs/internal/macos/ROADMAP.md), заменяет
@@ -110,12 +110,13 @@ class TunBridgeEngineMacOSNe implements CoreEngine {
       logLevel: logLevel,
     );
 
-    final serverIps = await _resolveServerIps(server.address);
+    final endpoints = await resolveTunServerEndpoints(server);
     final ruleSetPaths = await _resolveRuleSetPaths(leaf.routingRules);
     final singboxConfig = buildSingBoxTunBridgeConfig(
       socksInPort: socksPort,
       serverHost: server.address,
-      serverIps: serverIps,
+      additionalServerHosts: endpoints.additionalHosts,
+      serverIps: endpoints.ips,
       upstreamDns: upstreamDns,
       logLevel: logLevel,
       routingRules: leaf.routingRules,
@@ -158,17 +159,6 @@ class TunBridgeEngineMacOSNe implements CoreEngine {
           _statusController.add(EngineStatus.error);
       }
     });
-  }
-
-  /// См. `TunBridgeEngineMacOS._resolveServerIps` — тот же повод
-  /// (route_exclude_address на реальном IP сервера).
-  Future<List<String>> _resolveServerIps(String host) async {
-    try {
-      final addresses = await InternetAddress.lookup(host);
-      return [for (final address in addresses) address.address];
-    } on SocketException {
-      return const [];
-    }
   }
 
   /// См. `SingBoxEngineMacOS._resolveRuleSetPaths` — тот же приём.

@@ -1,6 +1,6 @@
 #Requires -Version 5
 <#
-Downloads the latest stable Xray-core Windows release into assets/xray/.
+Downloads the pinned Xray-core Windows release into assets/xray/.
 See assets/xray/SOURCE.md.
 #>
 
@@ -10,21 +10,18 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $destDir = Join-Path $repoRoot "assets\xray"
 $zipPath = Join-Path $env:TEMP "Xray-windows-64.zip"
 
-$release = Invoke-RestMethod -Uri "https://api.github.com/repos/XTLS/Xray-core/releases/latest"
-$asset = $release.assets | Where-Object { $_.name -eq "Xray-windows-64.zip" }
-if (-not $asset) {
-    throw "Xray-windows-64.zip not found in latest release $($release.tag_name)"
-}
+$versions = ConvertFrom-StringData (Get-Content -Raw (Join-Path $PSScriptRoot "core_versions.env"))
+$version = $versions.XRAY_VERSION
 
-Write-Output "Downloading Xray-core $($release.tag_name)..."
-Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zipPath
+Write-Output "Downloading Xray-core $version..."
+Invoke-WebRequest -Uri "https://github.com/XTLS/Xray-core/releases/download/$version/Xray-windows-64.zip" -OutFile $zipPath
 
 New-Item -ItemType Directory -Path $destDir -Force | Out-Null
 Expand-Archive -Path $zipPath -DestinationPath $destDir -Force
 Remove-Item $zipPath
 
 # geoip.dat/geosite.dat больше не часть сборки (ROADMAP.md, трек 20) — они
-# качаются в рантайме приложением (lib/engines/geo_assets.dat) в
+# качаются в рантайме приложением (lib/engines/geo_assets.dart) в
 # %AppData%\flux\geo, чтобы обновляться независимо от релизов и без
 # необходимости пересобирать/переустанавливать Flux. Xray-windows-64.zip всё
 # равно их содержит (это апстримный набор от Loyalsoldier/v2ray-rules-dat),
@@ -37,4 +34,4 @@ foreach ($name in @("geoip.dat", "geosite.dat")) {
     }
 }
 
-Write-Output "Xray-core $($release.tag_name) extracted to $destDir"
+Write-Output "Xray-core $version extracted to $destDir"

@@ -162,30 +162,42 @@ class XrayEngineAndroid implements CoreEngine {
     return const EngineStats(uploadBytes: 0, downloadBytes: 0);
   }
 
-  ServerConfig _pinToResolvedIp(ServerConfig server, String ip) => switch (server) {
-    VlessConfig s => VlessConfig(
-      address: ip,
-      port: s.port,
-      uuid: s.uuid,
-      flow: s.flow,
-      network: s.network,
-      security: s.security,
-      sni: s.sni ?? s.address,
-      publicKey: s.publicKey,
-      shortId: s.shortId,
-      fingerprint: s.fingerprint,
-      xhttpPath: s.xhttpPath,
-      xhttpHost: s.xhttpHost ?? s.address,
-    ),
-    Hysteria2Config s => Hysteria2Config(
-      address: ip,
-      port: s.port,
-      auth: s.auth,
-      sni: s.sni ?? s.address,
-      insecure: s.insecure,
-      obfsPassword: s.obfsPassword,
-    ),
-  };
+  ServerConfig _pinToResolvedIp(ServerConfig server, String ip) =>
+      switch (server) {
+        VlessConfig s => VlessConfig(
+          address: ip,
+          port: s.port,
+          uuid: s.uuid,
+          flow: s.flow,
+          network: s.network,
+          security: s.security,
+          sni: s.sni ?? s.address,
+          publicKey: s.publicKey,
+          shortId: s.shortId,
+          fingerprint: s.fingerprint,
+          pinnedPeerCertSha256: s.pinnedPeerCertSha256,
+          verifyPeerCertByName: s.verifyPeerCertByName,
+          xhttpPath: s.xhttpPath,
+          xhttpHost:
+              s.xhttpHost ??
+              (s.security == VlessSecurity.none
+                  ? s.address
+                  : s.sni ?? s.address),
+          xhttpMode: s.xhttpMode,
+          xhttpExtra: s.xhttpExtra,
+          alpn: s.alpn,
+        ),
+        Hysteria2Config s => Hysteria2Config(
+          address: ip,
+          port: s.port,
+          auth: s.auth,
+          sni: s.sni ?? s.address,
+          insecure: s.insecure,
+          pinnedPeerCertSha256: s.pinnedPeerCertSha256,
+          verifyPeerCertByName: s.verifyPeerCertByName,
+          obfsPassword: s.obfsPassword,
+        ),
+      };
 
   /// Только IPv4 — `RouteExclusion.kt` умеет считать исключающие маршруты
   /// только для него (128-битная арифметика для IPv6 не реализована, см.

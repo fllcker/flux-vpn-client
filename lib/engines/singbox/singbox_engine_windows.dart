@@ -32,6 +32,7 @@ class SingBoxEngineWindows {
   Future<void> start({
     required int socksInPort,
     required String serverHost,
+    List<String> additionalServerHosts = const [],
     List<String> serverIps = const [],
     String upstreamDns = defaultTunDnsServer,
     CoreLogLevel logLevel = CoreLogLevel.warn,
@@ -46,6 +47,7 @@ class SingBoxEngineWindows {
     final config = buildSingBoxTunBridgeConfig(
       socksInPort: socksInPort,
       serverHost: serverHost,
+      additionalServerHosts: additionalServerHosts,
       serverIps: serverIps,
       upstreamDns: upstreamDns,
       logLevel: logLevel,

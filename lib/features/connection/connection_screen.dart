@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -52,6 +53,16 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   // чтобы звёздное поле и глобус двигались синхронно по одному и тому же
   // углу поворота — см. sphere_globe.dart, GlobeRotationController.
   final _rotation = GlobeRotationController();
+  double? _draggedServerPanelWidth;
+
+  void _finishServerPanelResize() {
+    final width = _draggedServerPanelWidth;
+    if (width == null) return;
+    ref
+        .read(appSettingsProvider.notifier)
+        .update((settings) => settings.copyWith(serverPanelWidth: width));
+    setState(() => _draggedServerPanelWidth = null);
+  }
 
   @override
   void initState() {
@@ -304,10 +315,48 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
             );
           }
 
-          return Row(
+          const resizeHandleWidth = 8.0;
+          final maxPanelWidth = math.min(
+            600.0,
+            constraints.maxWidth - 300,
+          );
+          final panelWidth =
+              (_draggedServerPanelWidth ?? settings.serverPanelWidth)
+                  .clamp(200.0, maxPanelWidth);
+          return Stack(
+            fit: StackFit.expand,
             children: [
-              const ServerListPanel(),
-              Expanded(child: mainContent),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ServerListPanel(width: panelWidth),
+                  Expanded(child: mainContent),
+                ],
+              ),
+              Positioned(
+                // The panel's last pixel is its border. Keep the grip off
+                // the scrollbar, which runs immediately inside that border.
+                left: panelWidth - 1,
+                top: 0,
+                bottom: 0,
+                width: resizeHandleWidth,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.resizeLeftRight,
+                  child: GestureDetector(
+                    key: const ValueKey('server-panel-resize'),
+                    behavior: HitTestBehavior.opaque,
+                    onHorizontalDragUpdate: (details) {
+                      setState(() {
+                        _draggedServerPanelWidth = (panelWidth + details.delta.dx)
+                            .clamp(200.0, maxPanelWidth);
+                      });
+                    },
+                    onHorizontalDragEnd: (_) => _finishServerPanelResize(),
+                    onHorizontalDragCancel: _finishServerPanelResize,
+                    child: const SizedBox.expand(),
+                  ),
+                ),
+              ),
             ],
           );
         },

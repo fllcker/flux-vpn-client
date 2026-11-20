@@ -306,6 +306,10 @@ abstract final class S {
   static String get linkMissingUuid => _en ? 'The link is missing a UUID' : 'В ссылке отсутствует UUID';
   static String get linkMissingAddressOrPort =>
       _en ? 'The link is missing an address or port' : 'В ссылке отсутствует адрес или порт';
+  static String get invalidXhttpExtra => _en
+      ? 'XHTTP extra must be a JSON object'
+      : 'Параметр extra для XHTTP должен быть JSON-объектом';
+
   static String unsupportedTransport(String value) =>
       _en ? 'Unsupported transport: $value' : 'Неподдерживаемый транспорт: $value';
   static String unsupportedSecurity(String value) =>

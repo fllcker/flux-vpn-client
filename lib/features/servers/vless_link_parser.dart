@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../core_abstraction/server_config.dart';
 import '../../l10n/strings.dart';
 
@@ -40,8 +42,8 @@ ParsedVlessLink parseVlessLink(String link) {
 
   final networkParam = params['type'] ?? 'tcp';
   final network = switch (networkParam) {
-    'tcp' => VlessNetwork.tcp,
-    'xhttp' => VlessNetwork.xhttp,
+    'tcp' || 'raw' => VlessNetwork.tcp,
+    'xhttp' || 'splithttp' => VlessNetwork.xhttp,
     _ => throw VlessLinkFormatException(S.unsupportedTransport(networkParam)),
   };
 
@@ -54,7 +56,10 @@ ParsedVlessLink parseVlessLink(String link) {
   };
 
   final flow = params['flow'];
-  final name = uri.fragment.isNotEmpty ? Uri.decodeComponent(uri.fragment) : host;
+  final name = uri.fragment.isNotEmpty
+      ? Uri.decodeComponent(uri.fragment)
+      : host;
+  final isXhttp = network == VlessNetwork.xhttp;
 
   return ParsedVlessLink(
     name: name,
@@ -69,8 +74,27 @@ ParsedVlessLink parseVlessLink(String link) {
       publicKey: params['pbk'],
       shortId: params['sid'],
       fingerprint: params['fp'],
-      xhttpPath: params['path'],
-      xhttpHost: params['host'],
+      pinnedPeerCertSha256: params['pcs'],
+      verifyPeerCertByName: params['vcn'],
+      xhttpPath: isXhttp ? params['path'] : null,
+      xhttpHost: isXhttp ? params['host'] : null,
+      xhttpMode: isXhttp ? params['mode'] : null,
+      xhttpExtra: isXhttp ? _parseXhttpExtra(params['extra']) : null,
+      alpn: params['alpn']
+          ?.split(',')
+          .where((value) => value.isNotEmpty)
+          .toList(),
     ),
   );
+}
+
+Map<String, dynamic>? _parseXhttpExtra(String? value) {
+  if (value == null || value.trim().isEmpty) return null;
+  try {
+    final decoded = jsonDecode(value);
+    if (decoded is Map<String, dynamic>) return decoded;
+  } on FormatException {
+    // Report malformed JSON and non-object values with the same import error.
+  }
+  throw VlessLinkFormatException(S.invalidXhttpExtra);
 }

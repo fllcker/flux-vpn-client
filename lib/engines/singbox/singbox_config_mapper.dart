@@ -134,6 +134,7 @@ const _knownDohEndpoints = [
 Map<String, dynamic> buildSingBoxTunBridgeConfig({
   required int socksInPort,
   required String serverHost,
+  List<String> additionalServerHosts = const [],
   List<String> serverIps = const [],
   String upstreamDns = defaultTunDnsServer,
   CoreLogLevel logLevel = CoreLogLevel.warn,
@@ -176,7 +177,7 @@ Map<String, dynamic> buildSingBoxTunBridgeConfig({
       ],
       'rules': [
         {
-          'domain': [serverHost],
+          'domain': {serverHost, ...additionalServerHosts}.toList(),
           'server': 'bootstrap',
         },
       ],

@@ -12,12 +12,11 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 work_dir="$repo_root/.build-tools"
-sing_box_dir="$work_dir/sing-box"
-# Версия должна совпадать (или быть близкой) с той, что фактически
-# используется как CLI-бинарник — см. assets/sing-box-macos/SOURCE.md.
-sing_box_ref="${SING_BOX_REF:-v1.13.15}"
+source "$repo_root/scripts/core_versions.env"
+sing_box_ref="${SING_BOX_REF:-$SING_BOX_VERSION}"
+sing_box_dir="$work_dir/sing-box/$sing_box_ref"
 
-mkdir -p "$work_dir"
+mkdir -p "$(dirname "$sing_box_dir")"
 
 echo "Installing sing-box's gomobile/gobind fork (v0.1.12)..."
 go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.12

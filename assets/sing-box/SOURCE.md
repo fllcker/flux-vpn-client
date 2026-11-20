@@ -9,7 +9,7 @@
 ./scripts/fetch_sing_box.ps1
 ```
 
-Скрипт скачивает последний stable-релиз `sing-box-*-windows-amd64.zip` с
+Скрипт скачивает `sing-box-*-windows-amd64.zip` для версии из `scripts/core_versions.env` с
 [SagerNet/sing-box](https://github.com/SagerNet/sing-box/releases). В
 отличие от Xray, отдельный `wintun.dll` рядом не нужен — sing-box сам
 извлекает драйвер во время работы (проверено эмпирически: без единого

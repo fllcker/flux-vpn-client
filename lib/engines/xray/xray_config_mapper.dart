@@ -154,9 +154,10 @@ Map<String, dynamic> _streamSettings(VlessConfig server) {
 
   if (server.network == VlessNetwork.xhttp) {
     settings['xhttpSettings'] = {
+      ...?server.xhttpExtra,
       if (server.xhttpPath != null) 'path': server.xhttpPath,
       if (server.xhttpHost != null) 'host': server.xhttpHost,
-      'mode': 'auto',
+      'mode': server.xhttpMode ?? 'auto',
     };
   }
 
@@ -166,8 +167,13 @@ Map<String, dynamic> _streamSettings(VlessConfig server) {
     case VlessSecurity.tls:
       settings['security'] = 'tls';
       settings['tlsSettings'] = {
+        if (server.alpn?.isNotEmpty ?? false) 'alpn': server.alpn,
         if (server.sni != null) 'serverName': server.sni,
         if (server.fingerprint != null) 'fingerprint': server.fingerprint,
+        if (server.pinnedPeerCertSha256 != null)
+          'pinnedPeerCertSha256': server.pinnedPeerCertSha256,
+        if (server.verifyPeerCertByName != null)
+          'verifyPeerCertByName': server.verifyPeerCertByName,
       };
     case VlessSecurity.reality:
       settings['security'] = 'reality';
@@ -204,7 +210,10 @@ Map<String, dynamic> _hysteria2Outbound(Hysteria2Config server) => {
     'security': 'tls',
     'tlsSettings': {
       'serverName': server.sni ?? server.address,
-      if (server.insecure) 'allowInsecure': true,
+      if (server.pinnedPeerCertSha256 != null)
+        'pinnedPeerCertSha256': server.pinnedPeerCertSha256,
+      if (server.verifyPeerCertByName != null)
+        'verifyPeerCertByName': server.verifyPeerCertByName,
     },
     'hysteriaSettings': {
       'version': 2,

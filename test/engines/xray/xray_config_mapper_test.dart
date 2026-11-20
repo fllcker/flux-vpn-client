@@ -103,4 +103,18 @@ void main() {
     final outbound = (config['outbounds'] as List).first as Map;
     expect((outbound['streamSettings'] as Map).containsKey('finalmask'), isFalse);
   });
+
+  test('uses a certificate pin for legacy Hysteria2 insecure profiles', () {
+    final server = Hysteria2Config(
+      address: 'hy2.example.com',
+      port: 443,
+      auth: 'secret',
+      insecure: true,
+      pinnedPeerCertSha256: 'a' * 64,
+    );
+    final config = buildXrayConfig(server, socksPort: 10808, httpPort: 10809);
+    final tls = config['outbounds'].first['streamSettings']['tlsSettings'];
+    expect(tls['pinnedPeerCertSha256'], 'a' * 64);
+    expect(tls.containsKey('allowInsecure'), isFalse);
+  });
 }

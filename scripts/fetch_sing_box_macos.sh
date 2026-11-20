@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Downloads the latest stable sing-box macOS release into assets/sing-box-macos/.
+# Downloads the pinned sing-box macOS release into assets/sing-box-macos/.
 # Mirrors fetch_sing_box.ps1 (Windows) — see assets/sing-box/SOURCE.md. Meant
 # to run on an actual Mac; not exercised by CI yet (see fetch_xray_macos.sh
 # for why).
@@ -16,12 +16,9 @@ case "$(uname -m)" in
   *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
 esac
 
-release_json="$(curl -fsSL https://api.github.com/repos/SagerNet/sing-box/releases/latest)"
-download_url="$(echo "$release_json" | grep -o "\"browser_download_url\": *\"[^\"]*darwin-$arch\\.tar\\.gz\"" | sed 's/.*"\(https[^"]*\)"/\1/' | head -n1)"
-if [ -z "$download_url" ]; then
-  echo "sing-box darwin-$arch release asset not found" >&2
-  exit 1
-fi
+source "$repo_root/scripts/core_versions.env"
+asset_name="sing-box-${SING_BOX_VERSION#v}-darwin-$arch.tar.gz"
+download_url="https://github.com/SagerNet/sing-box/releases/download/$SING_BOX_VERSION/$asset_name"
 
 echo "Downloading sing-box ($download_url)..."
 curl -fsSL "$download_url" -o "$tmp_tar"

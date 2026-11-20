@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Downloads the latest stable Xray-core macOS release into assets/xray-macos/.
+# Downloads the pinned Xray-core macOS release into assets/xray-macos/.
 # Mirrors fetch_xray.ps1 (Windows) — see assets/xray/SOURCE.md. Meant to run
 # on an actual Mac (uses `uname -m` to pick arm64/x86_64); not exercised by
 # CI yet, see PLAN.md/scripts note on the macOS build job being deferred
@@ -16,12 +16,8 @@ case "$(uname -m)" in
   *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
 esac
 
-release_json="$(curl -fsSL https://api.github.com/repos/XTLS/Xray-core/releases/latest)"
-download_url="$(echo "$release_json" | grep -o "\"browser_download_url\": *\"[^\"]*$asset_name\"" | sed 's/.*"\(https[^"]*\)"/\1/')"
-if [ -z "$download_url" ]; then
-  echo "$asset_name not found in latest Xray-core release" >&2
-  exit 1
-fi
+source "$repo_root/scripts/core_versions.env"
+download_url="https://github.com/XTLS/Xray-core/releases/download/$XRAY_VERSION/$asset_name"
 
 echo "Downloading Xray-core ($asset_name)..."
 curl -fsSL "$download_url" -o "$tmp_zip"

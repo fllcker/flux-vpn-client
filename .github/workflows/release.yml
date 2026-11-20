@@ -147,13 +147,14 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-android-xray-${{ hashFiles('tool/android-xray-lite/src/go.sum') }}
+          key: go-android-xray-${{ hashFiles('scripts/core_versions.env') }}
           restore-keys: go-android-xray-
 
       - name: Install gomobile
         run: |
-          go install golang.org/x/mobile/cmd/gomobile@latest
-          go install golang.org/x/mobile/cmd/gobind@latest
+          set -euo pipefail
+          source scripts/core_versions.env
+          go install "golang.org/x/mobile/cmd/gomobile@$ANDROID_GOMOBILE_VERSION" "golang.org/x/mobile/cmd/gobind@$ANDROID_GOMOBILE_VERSION"
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - uses: nttld/setup-ndk@v1
@@ -166,7 +167,10 @@ jobs:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           set -euo pipefail
-          git clone --depth 1 https://github.com/2dust/AndroidLibXrayLite.git tool/android-xray-lite/src
+          source scripts/core_versions.env
+          mkdir -p tool/android-xray-lite/src
+          curl -fsSL "https://codeload.github.com/2dust/AndroidLibXrayLite/tar.gz/$ANDROID_XRAY_REF" \
+            | tar -xz --strip-components=1 -C tool/android-xray-lite/src
           cd tool/android-xray-lite/src
           go mod tidy -v
           gomobile bind -v -target=android/arm64 -androidapi 24 -trimpath \

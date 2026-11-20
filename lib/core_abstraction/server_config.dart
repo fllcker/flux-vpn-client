@@ -50,10 +50,15 @@ class VlessConfig extends ServerConfig {
   final String? publicKey;
   final String? shortId;
   final String? fingerprint;
+  final List<String>? alpn;
+  final String? pinnedPeerCertSha256;
+  final String? verifyPeerCertByName;
 
   // xhttp-транспорт
   final String? xhttpPath;
   final String? xhttpHost;
+  final String? xhttpMode;
+  final Map<String, dynamic>? xhttpExtra;
 
   const VlessConfig({
     required this.address,
@@ -66,9 +71,24 @@ class VlessConfig extends ServerConfig {
     this.publicKey,
     this.shortId,
     this.fingerprint,
+    this.alpn,
+    this.pinnedPeerCertSha256,
+    this.verifyPeerCertByName,
     this.xhttpPath,
     this.xhttpHost,
+    this.xhttpMode,
+    this.xhttpExtra,
   });
+
+  String? get xhttpDownloadAddress {
+    if (network != VlessNetwork.xhttp) return null;
+    final settings = xhttpExtra?['extra'] ?? xhttpExtra;
+    if (settings is! Map) return null;
+    final download = settings['downloadSettings'];
+    if (download is! Map) return null;
+    final address = download['address'];
+    return address is String && address.isNotEmpty ? address : null;
+  }
 
   factory VlessConfig.fromJson(Map<String, dynamic> json) {
     return VlessConfig(
@@ -84,8 +104,13 @@ class VlessConfig extends ServerConfig {
       publicKey: json['publicKey'] as String?,
       shortId: json['shortId'] as String?,
       fingerprint: json['fingerprint'] as String?,
+      alpn: (json['alpn'] as List?)?.cast<String>(),
+      pinnedPeerCertSha256: json['pinnedPeerCertSha256'] as String?,
+      verifyPeerCertByName: json['verifyPeerCertByName'] as String?,
       xhttpPath: json['xhttpPath'] as String?,
       xhttpHost: json['xhttpHost'] as String?,
+      xhttpMode: json['xhttpMode'] as String?,
+      xhttpExtra: json['xhttpExtra'] as Map<String, dynamic>?,
     );
   }
 
@@ -102,8 +127,14 @@ class VlessConfig extends ServerConfig {
     if (publicKey != null) 'publicKey': publicKey,
     if (shortId != null) 'shortId': shortId,
     if (fingerprint != null) 'fingerprint': fingerprint,
+    if (alpn != null) 'alpn': alpn,
+    if (pinnedPeerCertSha256 != null)
+      'pinnedPeerCertSha256': pinnedPeerCertSha256,
+    if (verifyPeerCertByName != null) 'verifyPeerCertByName': verifyPeerCertByName,
     if (xhttpPath != null) 'xhttpPath': xhttpPath,
     if (xhttpHost != null) 'xhttpHost': xhttpHost,
+    if (xhttpMode != null) 'xhttpMode': xhttpMode,
+    if (xhttpExtra != null) 'xhttpExtra': xhttpExtra,
   };
 }
 
@@ -119,6 +150,8 @@ class Hysteria2Config extends ServerConfig {
   final String auth;
   final String? sni;
   final bool insecure;
+  final String? pinnedPeerCertSha256;
+  final String? verifyPeerCertByName;
   final String? obfsPassword;
 
   const Hysteria2Config({
@@ -127,6 +160,8 @@ class Hysteria2Config extends ServerConfig {
     required this.auth,
     this.sni,
     this.insecure = false,
+    this.pinnedPeerCertSha256,
+    this.verifyPeerCertByName,
     this.obfsPassword,
   });
 
@@ -137,6 +172,8 @@ class Hysteria2Config extends ServerConfig {
       auth: json['auth'] as String,
       sni: json['sni'] as String?,
       insecure: json['insecure'] as bool? ?? false,
+      pinnedPeerCertSha256: json['pinnedPeerCertSha256'] as String?,
+      verifyPeerCertByName: json['verifyPeerCertByName'] as String?,
       obfsPassword: json['obfsPassword'] as String?,
     );
   }
@@ -149,6 +186,9 @@ class Hysteria2Config extends ServerConfig {
     'auth': auth,
     if (sni != null) 'sni': sni,
     if (insecure) 'insecure': insecure,
+    if (pinnedPeerCertSha256 != null)
+      'pinnedPeerCertSha256': pinnedPeerCertSha256,
+    if (verifyPeerCertByName != null) 'verifyPeerCertByName': verifyPeerCertByName,
     if (obfsPassword != null) 'obfsPassword': obfsPassword,
   };
 }

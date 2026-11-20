@@ -9,7 +9,9 @@ import 'package:flux/core_abstraction/core_config.dart';
 import 'package:flux/core_abstraction/core_config_provider.dart';
 import 'package:flux/core_abstraction/proxy_node.dart';
 import 'package:flux/core_abstraction/server_config.dart';
+import 'package:flux/features/servers/server_list_panel.dart';
 import 'package:flux/main.dart';
+import 'package:flux/widgets/globe/starfield.dart';
 
 void main() {
   // AppTitleBar talks to the native window_manager plugin (isMaximized,
@@ -103,6 +105,45 @@ void main() {
     // флагу 🇩🇪 в icon).
     expect(find.text('Germany #1'), findsNWidgets(3));
   });
+
+  testWidgets('drags the server panel edge and saves its width', (tester) async {
+    final settings = _PresetAppSettingsController();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          coreConfigProvider.overrideWith(
+            () => _PresetCoreConfigController(const CoreConfig()),
+          ),
+          appSettingsProvider.overrideWith(() => settings),
+        ],
+        child: FluxApp(
+          navigatorKey: GlobalKey<NavigatorState>(),
+          incomingDeepLinks: const Stream.empty(),
+        ),
+      ),
+    );
+
+    final panel = find.byType(ServerListPanel);
+    final handle = find.byKey(const ValueKey('server-panel-resize'));
+    final background = find.byType(Starfield);
+    expect(tester.getSize(panel).width, 260);
+    expect(tester.getRect(panel).right, tester.getRect(background).left);
+    expect(tester.getRect(handle).left, tester.getRect(panel).right - 1);
+
+    await tester.drag(handle, const Offset(100, 0));
+    await tester.pump();
+
+    final width = tester.getSize(panel).width;
+    expect(width, greaterThan(260));
+    expect(settings.savedPanelWidth, width);
+    expect(tester.getRect(panel).right, tester.getRect(background).left);
+    expect(tester.getRect(handle).left, tester.getRect(panel).right - 1);
+
+    await tester.drag(handle, const Offset(500, 0));
+    await tester.pump();
+    expect(tester.getSize(panel).width, 500);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _PresetCoreConfigController extends CoreConfigController {
@@ -114,6 +155,13 @@ class _PresetCoreConfigController extends CoreConfigController {
 }
 
 class _PresetAppSettingsController extends AppSettingsController {
+  double get savedPanelWidth => state.serverPanelWidth;
+
+  @override
+  void update(AppSettings Function(AppSettings settings) transform) {
+    state = transform(state);
+  }
+
   // Фон задан явно, а не взят по умолчанию: тест считает вхождения имени
   // сервера, и третье из них — подпись маркера на глобусе, то есть тест
   // молча зависит от того, какой фон включён. Со сменой умолчания на galaxy

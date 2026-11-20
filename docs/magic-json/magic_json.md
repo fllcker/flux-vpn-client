@@ -178,7 +178,8 @@ Flux определяет этот формат по телу ответа: JSON
   `realitySettings`/`tlsSettings.serverName` → `sni`,
   `realitySettings.publicKey/shortId`,
   `realitySettings.fingerprint`/`tlsSettings.fingerprint`,
-  `xhttpSettings.path/host` (если `network: "xhttp"`).
+  `xhttpSettings.path/host/mode` и дополнительные настройки транспорта
+  (для `xhttp` и `splithttp`).
 
   Поля Hysteria2-outbound: `settings.address/port`,
   `hysteriaSettings.auth`, `tlsSettings.serverName` → `sni`,
@@ -395,13 +396,17 @@ Sealed-тип, диспетчер по полю `type`:
   "shortId": "0a1b2c",
   "fingerprint": "chrome",
   "xhttpPath": null,
-  "xhttpHost": null
+  "xhttpHost": null,
+  "xhttpMode": null,
+  "xhttpExtra": null,
+  "alpn": null
 }
 ```
 
 `network`: `tcp`/`xhttp`. `security`: `none`/`tls`/`reality`. Поля
 `sni`/`publicKey`/`shortId`/`fingerprint` — TLS/Reality, `xhttpPath`/
-`xhttpHost` — только при `network: "xhttp"`. Все опциональны (кроме
+`xhttpHost`, `xhttpMode` и `xhttpExtra` (объект параметров Xray) относятся
+к `network: "xhttp"`. `alpn` задаёт список протоколов для TLS. Все опциональны (кроме
 `address`/`port`/`uuid`) и не сериализуются при `null`.
 
 **`hysteria2`**:

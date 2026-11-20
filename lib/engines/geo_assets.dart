@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import '../app/app_paths.dart';
+import '../core_abstraction/app_settings.dart';
 import '../core_abstraction/geo_dat_format.dart';
 
 String geoipFilePath() =>
@@ -11,20 +12,20 @@ String geoipFilePath() =>
 String geositeFilePath() =>
     '${ensureFluxGeoDirectory()}${Platform.pathSeparator}geosite.dat';
 
-/// Докачивает `geoip.dat`/`geosite.dat`, если их ещё нет на диске —
-/// вызывается при каждом старте приложения (не только "при первом запуске":
-/// ручное удаление файла пользователем чинится тем же путём, без отдельного
-/// состояния мастера первого запуска, см. ROADMAP.md трек 20). Best-effort:
-/// сетевая ошибка не бросается наружу — приложение просто стартует без
-/// geoip/geosite-роутинга, как и раньше было единственным поведением при
-/// отсутствии этих файлов.
+/// Докачивает отсутствующие базы и обновляет стандартные базы раз в неделю.
+/// При сетевой ошибке приложение продолжает работать с локальными файлами.
 Future<void> ensureGeoAssets({
   required String geoipUrl,
   required String geositeUrl,
 }) async {
   await Future.wait([
-    _ensureFile(geoipFilePath(), geoipUrl, parseGeoIpDat),
-    _ensureFile(geositeFilePath(), geositeUrl, parseGeoSiteDat),
+    _ensureFile(geoipFilePath(), geoipUrl, parseGeoIpDat, defaultGeoipUrl),
+    _ensureFile(
+      geositeFilePath(),
+      geositeUrl,
+      parseGeoSiteDat,
+      defaultGeositeUrl,
+    ),
   ]);
 }
 
@@ -47,9 +48,17 @@ Future<void> _ensureFile(
   String path,
   String url,
   List<Object> Function(Uint8List) validate,
+  String defaultUrl,
 ) async {
-  if (File(path).existsSync()) return;
   try {
+    final stat = await File(path).stat();
+    if (stat.type == FileSystemEntityType.file &&
+        stat.size > 0 &&
+        (url != defaultUrl ||
+            DateTime.now().difference(stat.modified) <
+                const Duration(days: 7))) {
+      return;
+    }
     await _downloadTo(path, url, validate);
   } catch (_) {
     // best-effort — см. doc-комментарий ensureGeoAssets
@@ -67,7 +76,9 @@ Future<void> _downloadTo(
   String url,
   List<Object> Function(Uint8List) validate,
 ) async {
-  final response = await http.get(Uri.parse(url));
+  final response = await http
+      .get(Uri.parse(url))
+      .timeout(const Duration(seconds: 15));
   if (response.statusCode != 200) {
     throw HttpException(
       'HTTP ${response.statusCode} при скачивании $url',
@@ -81,7 +92,14 @@ Future<void> _downloadTo(
     );
   }
   validate(response.bodyBytes);
-  final tmp = File('$path.tmp');
-  await tmp.writeAsBytes(response.bodyBytes);
-  await tmp.rename(path);
+  final staging = await Directory(
+    File(path).parent.path,
+  ).createTemp('.geo-download-');
+  try {
+    final tmp = File('${staging.path}${Platform.pathSeparator}data');
+    await tmp.writeAsBytes(response.bodyBytes);
+    await tmp.rename(path);
+  } finally {
+    await staging.delete(recursive: true);
+  }
 }

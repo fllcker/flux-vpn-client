@@ -50,6 +50,8 @@ ParsedHysteria2Link parseHysteria2Link(String link) {
       auth: auth,
       sni: params['sni'],
       insecure: params['insecure'] == '1' || params['insecure'] == 'true',
+      pinnedPeerCertSha256: params['pinSHA256'] ?? params['pcs'],
+      verifyPeerCertByName: params['vcn'],
       obfsPassword:
           (obfsType != null && obfsType.isNotEmpty && obfsPassword != null && obfsPassword.isNotEmpty)
               ? obfsPassword

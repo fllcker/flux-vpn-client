@@ -9,7 +9,7 @@
 ./scripts/fetch_xray.ps1
 ```
 
-Скрипт скачивает последний stable-релиз `Xray-windows-64.zip` с
+Скрипт скачивает `Xray-windows-64.zip` для версии из `scripts/core_versions.env` с
 [XTLS/Xray-core](https://github.com/XTLS/Xray-core/releases) и
 распаковывает его сюда (`xray.exe`, ...).
 

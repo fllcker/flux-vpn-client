@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/core_config.dart';
@@ -8,6 +7,7 @@ import '../../l10n/strings.dart';
 import '../xray/windows_elevation.dart';
 import '../xray/xray_engine_windows.dart';
 import 'singbox_engine_windows.dart';
+import 'tun_server_endpoints.dart';
 
 /// Реализация TUN-режима на Windows: связка двух процессов под одним
 /// [CoreEngine]-фасадом. Причина — см. `singbox_config_mapper.dart` и
@@ -118,11 +118,13 @@ class TunBridgeEngine implements CoreEngine {
       routingLabel: routingLabel,
     );
 
-    final serverHost = _xray.activeServer!.address;
+    final server = _xray.activeServer!;
+    final endpoints = await resolveTunServerEndpoints(server);
     await _singBox.start(
       socksInPort: socksPort,
-      serverHost: serverHost,
-      serverIps: await _resolveServerIps(serverHost),
+      serverHost: server.address,
+      additionalServerHosts: endpoints.additionalHosts,
+      serverIps: endpoints.ips,
       upstreamDns: upstreamDns,
       logLevel: logLevel,
       routingRules: _xray.activeRoutingRules,
@@ -131,25 +133,6 @@ class TunBridgeEngine implements CoreEngine {
     );
 
     _statusController.add(EngineStatus.connected);
-  }
-
-  /// Резолвим адрес сервера здесь, между старта xray и старта sing-box, по
-  /// одной причине: это последний момент, когда системный DNS ещё работает
-  /// как обычно. Как только sing-box поднимет TUN, `auto_route` заберёт
-  /// default route, и тот же самый lookup будет уже зависеть от тоннеля,
-  /// который мы этими адресами и пытаемся дать поднять.
-  ///
-  /// Best-effort: пустой список — не ошибка. IP-пиннинг в конфиге sing-box
-  /// это лишь страховка поверх правила по `process_name`, поэтому упавший
-  /// резолв (или адрес-литерал, которому резолв не нужен) не должен ронять
-  /// подключение целиком.
-  Future<List<String>> _resolveServerIps(String host) async {
-    try {
-      final addresses = await InternetAddress.lookup(host);
-      return [for (final address in addresses) address.address];
-    } on SocketException {
-      return const [];
-    }
   }
 
   Future<void> _failAndTeardown() async {

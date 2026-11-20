@@ -34,16 +34,16 @@ Future<void> openServerListSheet(BuildContext context) {
 
 /// Список серверов в постоянной боковой колонке — десктопная раскладка
 /// (`connection_screen.dart`). На узких окнах (см. ROADMAP.md, трек 16) тот
-/// же список показывается через [showServerListBottomSheet] вместо этой
-/// колонки — вся реальная логика вынесена в [ServerListContent], этот виджет
-/// лишь оборачивает её в боковую панель фиксированной ширины.
+/// же список показывается через [openServerListSheet] вместо этой колонки.
 class ServerListPanel extends StatelessWidget {
-  const ServerListPanel({super.key});
+  const ServerListPanel({super.key, required this.width});
+
+  final double width;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 260,
+      width: width,
       decoration: BoxDecoration(
         border: Border(right: BorderSide(color: PortColors.border)),
       ),

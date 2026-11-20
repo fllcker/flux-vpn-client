@@ -264,14 +264,34 @@ class FluxVpnService : VpnService() {
     private fun ensureGeoAssetsExtracted(geoipUrl: String, geositeUrl: String): File {
         val dir = File(filesDir, "xray-assets")
         dir.mkdirs()
-        for ((name, url) in arrayOf("geoip.dat" to geoipUrl, "geosite.dat" to geositeUrl)) {
+        val maxAgeMs = 7L * 24 * 60 * 60 * 1000
+        for ((name, url, defaultUrl) in arrayOf(
+            Triple("geoip.dat", geoipUrl, DEFAULT_GEOIP_URL),
+            Triple("geosite.dat", geositeUrl, DEFAULT_GEOSITE_URL),
+        )) {
             val dest = File(dir, name)
-            if (dest.exists()) continue
-            val tmp = File(dir, "$name.tmp")
-            URL(url).openStream().use { input ->
-                tmp.outputStream().use { output -> input.copyTo(output) }
+            val hasCache = dest.isFile && dest.length() > 0
+            if (hasCache && (url != defaultUrl ||
+                    System.currentTimeMillis() - dest.lastModified() < maxAgeMs)
+            ) continue
+            val tmp = File.createTempFile(name, ".tmp", dir)
+            try {
+                val connection = URL(url).openConnection().apply {
+                    connectTimeout = 10_000
+                    readTimeout = 10_000
+                }
+                connection.getInputStream().use { input ->
+                    tmp.outputStream().use { output -> input.copyTo(output) }
+                }
+                if (tmp.length() == 0L || !tmp.renameTo(dest)) {
+                    throw java.io.IOException("Unable to update $name")
+                }
+            } catch (error: java.io.IOException) {
+                if (!hasCache) throw error
+                Log.w(TAG, "Unable to refresh $name, using the cached file", error)
+            } finally {
+                tmp.delete()
             }
-            tmp.renameTo(dest)
         }
         return dir
     }

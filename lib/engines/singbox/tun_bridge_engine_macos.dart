@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 
 import '../../core_abstraction/app_settings.dart';
 import '../../core_abstraction/core_config.dart';
 import '../../core_abstraction/core_engine.dart';
 import '../xray/xray_engine_macos.dart';
 import 'singbox_engine_macos.dart';
+import 'tun_server_endpoints.dart';
 
 /// macOS-аналог `TunBridgeEngine` (Windows) — тот же паттерн (xray в
 /// Proxy-режиме + sing-box поверх него как чистый packet-capture мост, см.
@@ -93,11 +93,13 @@ class TunBridgeEngineMacOS implements CoreEngine {
       routingLabel: routingLabel,
     );
 
-    final serverHost = _xray.activeServer!.address;
+    final server = _xray.activeServer!;
+    final endpoints = await resolveTunServerEndpoints(server);
     await _singBox.start(
       socksInPort: socksPort,
-      serverHost: serverHost,
-      serverIps: await _resolveServerIps(serverHost),
+      serverHost: server.address,
+      additionalServerHosts: endpoints.additionalHosts,
+      serverIps: endpoints.ips,
       upstreamDns: upstreamDns,
       logLevel: logLevel,
       routingRules: _xray.activeRoutingRules,
@@ -106,16 +108,6 @@ class TunBridgeEngineMacOS implements CoreEngine {
     );
 
     _statusController.add(EngineStatus.connected);
-  }
-
-  /// См. `TunBridgeEngine._resolveServerIps` (Windows) — тот же повод.
-  Future<List<String>> _resolveServerIps(String host) async {
-    try {
-      final addresses = await InternetAddress.lookup(host);
-      return [for (final address in addresses) address.address];
-    } on SocketException {
-      return const [];
-    }
   }
 
   Future<void> _failAndTeardown() async {

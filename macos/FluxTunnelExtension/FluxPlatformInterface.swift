@@ -72,8 +72,14 @@ final class FluxPlatformInterface: NSObject, LibboxPlatformInterfaceProtocol {
       settings.ipv6Settings = ipv6
     }
 
-    if let dnsBox = try? options.getDNSServerAddress(), !dnsBox.value.isEmpty {
-      settings.dnsSettings = NEDNSSettings(servers: [dnsBox.value])
+    var dnsServers: [String] = []
+    if let iterator = try? options.getDNSServerAddress() {
+      while iterator.hasNext() {
+        dnsServers.append(iterator.next())
+      }
+    }
+    if !dnsServers.isEmpty {
+      settings.dnsSettings = NEDNSSettings(servers: dnsServers)
       // Пустой matchDomains — все DNS-запросы, а не только под конкретный
       // домен, тот же смысл, что у `hijack-dns`-правила в
       // singbox_config_mapper.dart для Windows/старого macOS-стопгэпа.
@@ -149,15 +155,48 @@ final class FluxPlatformInterface: NSObject, LibboxPlatformInterfaceProtocol {
 
   func send(_ notification: LibboxNotification?) throws {}
 
-  func startDefaultInterfaceMonitor(_ listener: LibboxInterfaceUpdateListenerProtocol?) throws {}
+  func cancelNotification(_ identifier: String?, typeID: Int32) throws {}
 
-  func systemCertificates() -> LibboxStringIteratorProtocol? { nil }
+  func startNeighborMonitor(_ listener: LibboxNeighborUpdateListenerProtocol?) throws {}
+
+  func closeNeighborMonitor(_ listener: LibboxNeighborUpdateListenerProtocol?) throws {}
+
+  func registerMyInterface(_ name: String?) {}
+
+  func startDefaultInterfaceMonitor(_ listener: LibboxInterfaceUpdateListenerProtocol?) throws {}
 
   func underNetworkExtension() -> Bool { true }
 
   func usePlatformAutoDetectControl() -> Bool { false }
 
-  func useProcFS() -> Bool { false }
+  func usePlatformShell() -> Bool { false }
+
+  func checkPlatformShell() throws { throw FluxTunnelError.notImplemented }
+
+  func openShellSession(
+    _ user: LibboxPlatformUser?,
+    command: String?,
+    environ: LibboxStringIteratorProtocol?,
+    term: String?,
+    rows: Int32,
+    cols: Int32
+  ) throws -> LibboxShellSessionProtocol { throw FluxTunnelError.notImplemented }
+
+  func lookupUser(_ username: String?) throws -> LibboxPlatformUser {
+    throw FluxTunnelError.notImplemented
+  }
+
+  func lookupSFTPServer(_ error: NSErrorPointer) -> String { "" }
+
+  func readSystemSSHHostKey(_ error: NSErrorPointer) -> String { "" }
+
+  func tailscaleHostname() -> String { "" }
+
+  func usePlatformBridge() -> Bool { false }
+
+  func createBridge(_ options: LibboxBridgeOptions?) throws -> LibboxBridgeSessionProtocol {
+    throw FluxTunnelError.notImplemented
+  }
 }
 
 /// Минимальный `LibboxCommandServerHandler` — нам не нужны Clash API/группы
@@ -170,6 +209,12 @@ final class FluxCommandServerHandler: NSObject, LibboxCommandServerHandlerProtoc
   func serviceReload() throws {}
 
   func serviceStop() throws {}
+
+  func triggerNativeCrash() throws { throw FluxTunnelError.notImplemented }
+
+  func connectSSHAgent(_ ret0_: UnsafeMutablePointer<Int32>?) throws {
+    throw FluxTunnelError.notImplemented
+  }
 
   func setSystemProxyEnabled(_ enabled: Bool) throws {
     // Системный прокси — забота Proxy-режима (`XrayEngineMacOS` +

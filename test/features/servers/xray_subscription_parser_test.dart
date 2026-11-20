@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux/core_abstraction/proxy_node.dart';
 import 'package:flux/core_abstraction/server_config.dart';
+import 'package:flux/engines/xray/xray_config_mapper.dart';
 import 'package:flux/features/servers/xray_subscription_parser.dart';
 
 /// Форма конфигов взята из реальной xray-json подписки (проверено вручную,
@@ -63,7 +64,7 @@ const _sampleXrayArray = '''
           ]
         },
         "streamSettings": {
-          "network": "xhttp",
+          "method": "splithttp",
           "security": "reality",
           "realitySettings": {
             "serverName": "example.com",
@@ -71,7 +72,10 @@ const _sampleXrayArray = '''
             "shortId": "sid2",
             "fingerprint": "chrome"
           },
-          "xhttpSettings": {"path": "/api", "host": "cdn.example.com", "mode": "auto"}
+          "splithttpSettings": {
+            "path": "/api", "host": "cdn.example.com", "mode": "packet-up",
+            "extra": {"xPaddingBytes": "100-500"}
+          }
         }
       },
       {"tag": "direct", "protocol": "freedom"}
@@ -137,6 +141,10 @@ void main() {
     expect(poland.network, VlessNetwork.xhttp);
     expect(poland.xhttpPath, '/api');
     expect(poland.xhttpHost, 'cdn.example.com');
+    expect(poland.xhttpMode, 'packet-up');
+    expect(poland.xhttpExtra, {
+      'extra': {'xPaddingBytes': '100-500'},
+    });
 
     final sweden = result.servers[2].config as Hysteria2Config;
     expect(result.servers[2].name, 'Sweden hysteria2');
@@ -153,5 +161,22 @@ void main() {
 
     expect(result.servers, hasLength(1));
     expect(result.servers.single.config.address, 'de1.example.com');
+  });
+
+  test('passes mixed-case xHTTPSettings from a provider to Xray', () {
+    final body = _sampleXrayArray
+        .replaceFirst('"method": "splithttp"', '"network": "xhttp"')
+        .replaceFirst('"splithttpSettings"', '"xHTTPSettings"');
+    final server = parseXraySubscription(body).servers[1].config;
+    final config = buildXrayConfig(server, socksPort: 10808, httpPort: 10809);
+    final stream = config['outbounds'].first['streamSettings'];
+
+    expect(stream['network'], 'xhttp');
+    expect(stream['xhttpSettings'], {
+      'path': '/api',
+      'host': 'cdn.example.com',
+      'mode': 'packet-up',
+      'extra': {'xPaddingBytes': '100-500'},
+    });
   });
 }

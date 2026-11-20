@@ -66,10 +66,12 @@ VlessConfig _parseVlessOutbound(Map<String, dynamic> outbound) {
 
   final streamSettings =
       outbound['streamSettings'] as Map<String, dynamic>? ?? const {};
-  final networkParam = streamSettings['network'] as String? ?? 'tcp';
+  final networkParam =
+      (streamSettings['method'] ?? streamSettings['network']) as String? ??
+      'tcp';
   final network = switch (networkParam) {
-    'tcp' => VlessNetwork.tcp,
-    'xhttp' => VlessNetwork.xhttp,
+    'tcp' || 'raw' => VlessNetwork.tcp,
+    'xhttp' || 'splithttp' => VlessNetwork.xhttp,
     _ => throw FormatException('Неподдерживаемый транспорт: $networkParam'),
   };
 
@@ -84,7 +86,17 @@ VlessConfig _parseVlessOutbound(Map<String, dynamic> outbound) {
   final realitySettings =
       streamSettings['realitySettings'] as Map<String, dynamic>?;
   final tlsSettings = streamSettings['tlsSettings'] as Map<String, dynamic>?;
-  final xhttpSettings = streamSettings['xhttpSettings'] as Map<String, dynamic>?;
+  // Xray accepts different casing of JSON field names, including
+  // xHTTPSettings emitted by some subscription providers.
+  final xhttpSettings = network == VlessNetwork.xhttp
+      ? _xhttpSettings(streamSettings)
+      : null;
+  final xhttpExtra = xhttpSettings == null
+      ? null
+      : (Map<String, dynamic>.of(xhttpSettings)
+          ..remove('path')
+          ..remove('host')
+          ..remove('mode'));
 
   return VlessConfig(
     address: vnext['address'] as String,
@@ -93,15 +105,42 @@ VlessConfig _parseVlessOutbound(Map<String, dynamic> outbound) {
     flow: user['flow'] as String?,
     network: network,
     security: security,
-    sni: (realitySettings?['serverName'] ?? tlsSettings?['serverName']) as String?,
-    publicKey: realitySettings?['publicKey'] as String?,
+    sni:
+        (realitySettings?['serverName'] ?? tlsSettings?['serverName'])
+            as String?,
+    publicKey:
+        (realitySettings?['password'] ?? realitySettings?['publicKey'])
+            as String?,
     shortId: realitySettings?['shortId'] as String?,
     fingerprint:
         (realitySettings?['fingerprint'] ?? tlsSettings?['fingerprint'])
             as String?,
     xhttpPath: xhttpSettings?['path'] as String?,
     xhttpHost: xhttpSettings?['host'] as String?,
+    xhttpMode: xhttpSettings?['mode'] as String?,
+    xhttpExtra: xhttpExtra?.isEmpty == false ? xhttpExtra : null,
+    pinnedPeerCertSha256: tlsSettings?['pinnedPeerCertSha256'] as String?,
+    verifyPeerCertByName: tlsSettings?['verifyPeerCertByName'] as String?,
+    alpn: switch (tlsSettings?['alpn']) {
+      String protocol => [protocol],
+      List protocols => protocols.cast<String>(),
+      _ => null,
+    },
   );
+}
+
+Map<String, dynamic>? _xhttpSettings(Map<String, dynamic> streamSettings) {
+  Map<String, dynamic>? splitHttp;
+  for (final entry in streamSettings.entries) {
+    final key = entry.key.toLowerCase();
+    if (key == 'xhttpsettings' && entry.value != null) {
+      return entry.value as Map<String, dynamic>;
+    }
+    if (key == 'splithttpsettings') {
+      splitHttp = entry.value as Map<String, dynamic>?;
+    }
+  }
+  return splitHttp;
 }
 
 Hysteria2Config _parseHysteriaOutbound(Map<String, dynamic> outbound) {
@@ -118,6 +157,8 @@ Hysteria2Config _parseHysteriaOutbound(Map<String, dynamic> outbound) {
     auth: hysteriaSettings['auth'] as String,
     sni: tlsSettings?['serverName'] as String?,
     insecure: tlsSettings?['allowInsecure'] as bool? ?? false,
+    pinnedPeerCertSha256: tlsSettings?['pinnedPeerCertSha256'] as String?,
+    verifyPeerCertByName: tlsSettings?['verifyPeerCertByName'] as String?,
     obfsPassword: _parseSalamanderPassword(streamSettings),
   );
 }

@@ -1,8 +1,9 @@
 # libv2ray.aar — xray-core for Android
 
 Этот каталог заполняется скриптом `scripts/build_android_xray.ps1` — сам
-`.aar` не хранится в git (см. `.gitignore`), как и клон исходников в
-`tool/android-xray-lite/src/`.
+`.aar` и распакованные исходники в `.build-tools/android-xray-lite/` не
+хранятся в git. Ревизия обёртки и версия gomobile указаны в
+`scripts/core_versions.env`.
 
 Запуск:
 
@@ -16,9 +17,9 @@
 XTLS/Xray-core нет. Сборка идёт через
 [2dust/AndroidLibXrayLite](https://github.com/2dust/AndroidLibXrayLite) —
 тот же путь, которым собирает xray-core под Android v2rayNG (самый
-популярный Android-клиент на этом ядре). Нужны Go + `gomobile`/`gobind`
-(`go install golang.org/x/mobile/cmd/gomobile@latest`) и Android
-SDK/NDK. Сборка долгая и требует нескольких GB свободного места под
+популярный Android-клиент на этом ядре). Нужны Go и Android SDK/NDK.
+Скрипт сам устанавливает `gomobile` и `gobind` для выбранной ревизии.
+Сборка долгая и требует нескольких GB свободного места под
 Go-кеши (`GOCACHE`/`GOMODCACHE`/`GOTMPDIR`) — если диск с `%LOCALAPPDATA%`
 забит, перенаправь их (`go env -w GOCACHE=... GOMODCACHE=... GOTMPDIR=...`)
 на диск, где есть место.
