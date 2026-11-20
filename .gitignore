@@ -70,3 +70,7 @@ app.*.map.json
 # Clone of 2dust/AndroidLibXrayLite that scripts/build_android_xray.ps1 builds
 # against — not our code, not checked into git.
 /tool/android-xray-lite/src/
+
+# Arcade runtime and game resources; source URLs remain tracked.
+/assets/doom/*
+!/assets/doom/SOURCE.md

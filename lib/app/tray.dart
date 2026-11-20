@@ -31,7 +31,7 @@ class FluxTray with TrayListener {
 
     trayManager.addListener(this);
     await _updateIcon();
-    await trayManager.setToolTip('Flux');
+    await trayManager.setToolTip('Flux Tracker');
     await _updateMenu();
 
     container.listen(connectionControllerProvider, (_, _) {

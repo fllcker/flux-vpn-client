@@ -33,8 +33,8 @@ class PingCacheStorage {
   File _file() {
     final appData = Platform.environment['APPDATA'];
     final dir = appData != null
-        ? '$appData\\flux'
-        : '${Directory.systemTemp.path}\\flux';
+        ? '$appData\\flux_tracker'
+        : '${Directory.systemTemp.path}\\flux_tracker';
     return File('$dir\\ping_cache.json');
   }
 

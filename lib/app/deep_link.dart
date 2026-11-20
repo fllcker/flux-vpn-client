@@ -6,7 +6,7 @@ import 'package:win32_registry/win32_registry.dart';
 /// Диплинк-схема приложения — как `vless://`, `sing-box://` и подобные в
 /// других клиентах. `flux://add/<url-encoded ссылка>` открывает диалог
 /// добавления сервера с уже подставленной ссылкой.
-const fluxUriScheme = 'flux';
+const fluxUriScheme = 'flux-tracker';
 
 /// Регистрирует `flux://` как обработчик URL-протокола в реестре текущего
 /// пользователя (`HKCU\Software\Classes\flux`) — не требует прав

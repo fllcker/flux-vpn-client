@@ -10,8 +10,8 @@ String fluxDataDirectoryPath() {
   }
   final appData = Platform.environment['APPDATA'];
   return appData != null
-      ? '$appData\\flux'
-      : '${Directory.systemTemp.path}\\flux';
+      ? '$appData\\flux_tracker'
+      : '${Directory.systemTemp.path}\\flux_tracker';
 }
 
 /// Каталог логов ядер. Раньше логи и временные конфиги сыпались прямо в

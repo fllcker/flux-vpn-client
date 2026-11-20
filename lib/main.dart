@@ -14,6 +14,7 @@ import 'app/tray.dart';
 import 'core_abstraction/app_settings.dart';
 import 'core_abstraction/app_settings_provider.dart';
 import 'features/connection/connection_screen.dart';
+import 'features/bkb/bkb_effect.dart';
 import 'features/onboarding/onboarding_flow.dart';
 import 'features/servers/clipboard_import_hotkey.dart';
 import 'features/servers/import_subscription_sheet.dart';
@@ -244,7 +245,8 @@ class _FluxAppState extends ConsumerState<FluxApp>
 
     return PortApp(
       navigatorKey: widget.navigatorKey,
-      title: 'Flux',
+      title: 'Flux Tracker',
+      builder: (context, child) => BkbEffect(child: child),
       home: ClipboardImportHotkey(
         // Settings — не отдельный Navigator-route, а просто переключение
         // `_settingsOpen` в этом же build (см. комментарий у AppTitleBar

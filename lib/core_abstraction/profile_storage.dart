@@ -13,25 +13,14 @@ class ProfileStorage {
   File _file() {
     final appData = Platform.environment['APPDATA'];
     final dir = appData != null
-        ? '$appData\\flux'
-        : '${Directory.systemTemp.path}\\flux';
-    return File('$dir\\profile.json');
-  }
-
-  /// Старый путь хранения от переименования проекта (vpn_client → flux) —
-  /// используется только для одноразовой миграции в [load], чтобы профиль,
-  /// уже сохранённый пользователем, не потерялся при апдейте.
-  File _legacyFile() {
-    final appData = Platform.environment['APPDATA'];
-    final dir = appData != null
-        ? '$appData\\vpn_client'
-        : '${Directory.systemTemp.path}\\vpn_client';
+        ? '$appData\\flux_tracker'
+        : '${Directory.systemTemp.path}\\flux_tracker';
     return File('$dir\\profile.json');
   }
 
   CoreConfig load() {
     final file = _file();
-    final source = file.existsSync() ? file : _legacyFile();
+    final source = file;
     if (!source.existsSync()) return const CoreConfig();
     try {
       final json =

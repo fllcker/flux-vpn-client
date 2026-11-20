@@ -71,7 +71,7 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
             children: [
               logo,
               const SizedBox(width: 8),
-              Text('Flux', style: PortText.small),
+              Text('Flux Tracker', style: PortText.small),
             ],
           )
         : Padding(
@@ -80,7 +80,7 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
               children: [
                 logo,
                 const SizedBox(width: 8),
-                Text('Flux', style: PortText.small),
+                Text('Flux Tracker', style: PortText.small),
               ],
             ),
           );

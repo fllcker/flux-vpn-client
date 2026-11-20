@@ -24,6 +24,16 @@ import '../../widgets/globe/starfield.dart';
 import '../../widgets/globe/video_background.dart';
 import '../../widgets/port_ui/port_ui.dart';
 import '../ping/ping_all.dart';
+import '../habits/habits_dialog.dart';
+import '../assistant/assistant_panel.dart';
+import '../flashlight/flashlight_page.dart';
+import '../dagon/dagon_page.dart';
+import '../boombox/boombox_page.dart';
+import '../doom/doom_page.dart';
+import '../whatsapp/open_whatsapp.dart';
+import '../bkb/bkb_controller.dart';
+import '../miner/miner_page.dart';
+import '../servers/filter_hidden_nodes.dart';
 import '../servers/flag_emoji.dart';
 import '../servers/flatten_leaves.dart';
 import '../servers/selected_server_provider.dart';
@@ -52,6 +62,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   // чтобы звёздное поле и глобус двигались синхронно по одному и тому же
   // углу поворота — см. sphere_globe.dart, GlobeRotationController.
   final _rotation = GlobeRotationController();
+  bool _assistantOpen = false;
 
   @override
   void initState() {
@@ -252,65 +263,191 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
             ),
           },
         const ConnectPanel(),
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: MediaQuery.paddingOf(context).bottom + 16,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Semantics(
+              label: S.roflFeatures,
+              button: true,
+              child: PortContextMenuButton(
+                size: 40,
+                items: [
+                  PortContextMenuItem(
+                    leading: const Icon(LucideIcons.calendarCheck),
+                    child: Text(S.habitsTitle),
+                    onPressed: () => openHabits(context),
+                  ),
+                  PortContextMenuItem(
+                    leading: const Icon(LucideIcons.sparkles),
+                    child: Text(S.assistantTitle),
+                    onPressed: () => setState(() => _assistantOpen = true),
+                  ),
+                  PortContextMenuItem(
+                    leading: const Icon(LucideIcons.flashlight),
+                    child: Text(S.flashlightTitle),
+                    onPressed: () => openFlashlight(context),
+                  ),
+                  PortContextMenuItem(
+                    leading: const Icon(LucideIcons.zap),
+                    child: Text(S.dagonTitle),
+                    onPressed: () => openDagon(context),
+                  ),
+                  PortContextMenuItem(
+                    leading: const Icon(LucideIcons.cassetteTape),
+                    child: Text(S.boomboxTitle),
+                    onPressed: () => openBoombox(context),
+                  ),
+                  PortContextMenuItem(
+                    leading: const Icon(LucideIcons.gamepad2),
+                    child: const Text('DOOM'),
+                    onPressed: () => openDoom(context),
+                  ),
+                  PortContextMenuItem(
+                    leading: const Icon(LucideIcons.messageCircle),
+                    child: const Text('WhatsApp'),
+                    onPressed: () => openWhatsapp(context),
+                  ),
+                  PortContextMenuItem(
+                    leading: const Icon(LucideIcons.pickaxe),
+                    child: Text(S.minerTitle),
+                    onPressed: () => openMiner(context),
+                  ),
+                  PortContextMenuItem(
+                    leading: const Icon(LucideIcons.gamepad2),
+                    child: const Text('GTA 6 (на виндоус)'),
+                    onPressed: () {},
+                  ),
+                  PortContextMenuItem(
+                    leading: const Icon(LucideIcons.shield),
+                    child: Text(
+                      BkbController.instance.active
+                          ? S.bkbRemaining(
+                              BkbController.instance.remainingSeconds,
+                            )
+                          : 'Black King Bar',
+                    ),
+                    onPressed:
+                        BkbController.instance.active ||
+                            BkbController.instance.busy
+                        ? null
+                        : () async {
+                            final ok = await BkbController.instance.activate();
+                            if (!ok && context.mounted) {
+                              PortToaster.of(context).show(
+                                PortToast.destructive(
+                                  title: Text(S.bkbWindowError),
+                                ),
+                              );
+                            }
+                          },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ],
     );
 
     return ColoredBox(
       color: PortColors.background,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // Узкое окно (см. ROADMAP.md, трек 16) — правая часть (фон +
-          // карточка подключения) становится главным экраном на весь
-          // размер, список серверов вместо постоянной боковой колонки
-          // прячется за кнопкой и открывается снизу листом
-          // (`showPortBottomSheet`).
-          if (constraints.maxWidth < kMobileBreakpoint) {
-            final onOpenSettings = widget.onOpenSettings;
-            // Без AppTitleBar (см. main.dart — его нет на Android) кнопки
-            // висят прямо под системным статус-баром/чёлкой, если не
-            // добавить его высоту явно — `mainContent` (фон/глобус) при этом
-            // должен оставаться на весь экран, поэтому SafeArea оборачивает
-            // только сами кнопки, а не весь Stack.
-            final topInset = MediaQuery.of(context).padding.top + 12;
-            // На Android эти две плавающие кнопки — единственный путь к
-            // списку серверов/настройкам (нет бокового меню и AppTitleBar),
-            // а дефолтный размер 36px под мышь на телефоне выглядит мелко —
-            // увеличиваем и сам квадрат, и иконку внутри, только здесь.
-            final buttonSize = Platform.isAndroid ? 44.0 : 36.0;
-            final iconSize = Platform.isAndroid ? 20.0 : 16.0;
-            return Stack(
-              children: [
-                mainContent,
-                Positioned(
-                  top: topInset,
-                  left: 12,
-                  child: PortIconButton.secondary(
-                    icon: Icon(LucideIcons.list, size: iconSize),
-                    size: buttonSize,
-                    onPressed: () => openServerListSheet(context),
-                  ),
-                ),
-                if (onOpenSettings != null)
-                  Positioned(
-                    top: topInset,
-                    right: 12,
-                    child: PortIconButton.secondary(
-                      icon: Icon(LucideIcons.settings, size: iconSize),
-                      size: buttonSize,
-                      onPressed: onOpenSettings,
+      child: Stack(
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Узкое окно (см. ROADMAP.md, трек 16) — правая часть (фон +
+              // карточка подключения) становится главным экраном на весь
+              // размер, список серверов вместо постоянной боковой колонки
+              // прячется за кнопкой и открывается снизу листом
+              // (`showPortBottomSheet`).
+              if (constraints.maxWidth < kMobileBreakpoint) {
+                final onOpenSettings = widget.onOpenSettings;
+                // Без AppTitleBar (см. main.dart — его нет на Android) кнопки
+                // висят прямо под системным статус-баром/чёлкой, если не
+                // добавить его высоту явно — `mainContent` (фон/глобус) при этом
+                // должен оставаться на весь экран, поэтому SafeArea оборачивает
+                // только сами кнопки, а не весь Stack.
+                final topInset = MediaQuery.of(context).padding.top + 12;
+                // На Android эти две плавающие кнопки — единственный путь к
+                // списку серверов/настройкам (нет бокового меню и AppTitleBar),
+                // а дефолтный размер 36px под мышь на телефоне выглядит мелко —
+                // увеличиваем и сам квадрат, и иконку внутри, только здесь.
+                final buttonSize = Platform.isAndroid ? 44.0 : 36.0;
+                final iconSize = Platform.isAndroid ? 20.0 : 16.0;
+                return Stack(
+                  children: [
+                    mainContent,
+                    Positioned(
+                      top: topInset,
+                      left: 12,
+                      child: PortIconButton.secondary(
+                        icon: Icon(LucideIcons.list, size: iconSize),
+                        size: buttonSize,
+                        onPressed: () => openServerListSheet(context),
+                      ),
+                    ),
+                    if (onOpenSettings != null)
+                      Positioned(
+                        top: topInset,
+                        right: 12,
+                        child: PortIconButton.secondary(
+                          icon: Icon(LucideIcons.settings, size: iconSize),
+                          size: buttonSize,
+                          onPressed: onOpenSettings,
+                        ),
+                      ),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  const ServerListPanel(),
+                  Expanded(child: mainContent),
+                ],
+              );
+            },
+          ),
+          Positioned(
+            top: 0,
+            bottom: 0,
+            right: 0,
+            child: IgnorePointer(
+              ignoring: !_assistantOpen,
+              child: ExcludeFocus(
+                excluding: !_assistantOpen,
+                child: ExcludeSemantics(
+                  excluding: !_assistantOpen,
+                  child: AnimatedSlide(
+                    offset: _assistantOpen ? Offset.zero : const Offset(1, 0),
+                    duration: const Duration(milliseconds: 240),
+                    curve: Curves.easeOutCubic,
+                    child: SizedBox(
+                      width: MediaQuery.sizeOf(
+                        context,
+                      ).width.clamp(0, 380).toDouble(),
+                      child: AssistantPanel(
+                        serverNames: () => [
+                          for (final subscription
+                              in ref.read(coreConfigProvider).subscriptions)
+                            for (final server in flattenLeaves(
+                              filterHiddenList([subscription.root]),
+                            ))
+                              if (server.variants.isNotEmpty)
+                                '${server.name} (${subscription.name})',
+                        ],
+                        onClose: () => setState(() => _assistantOpen = false),
+                      ),
                     ),
                   ),
-              ],
-            );
-          }
-
-          return Row(
-            children: [
-              const ServerListPanel(),
-              Expanded(child: mainContent),
-            ],
-          );
-        },
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

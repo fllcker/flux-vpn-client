@@ -19,8 +19,8 @@ import '../core_abstraction/app_settings.dart';
 /// `schtasks.exe`, а не на весь `flux.exe` — не перезапускает всё
 /// приложение только ради регистрации автозапуска). См. ROADMAP.md, трек 24.
 const _runKeyPath = r'Software\Microsoft\Windows\CurrentVersion\Run';
-const _runValueName = 'Flux';
-const _taskName = 'Flux';
+const _runValueName = 'FluxTracker';
+const _taskName = 'FluxTracker';
 
 /// Настраивает автозапуск согласно [privilege]/[showWindow] — синхронно с
 /// изменением одноимённых полей `AppSettings` (см. `settings_page.dart`).

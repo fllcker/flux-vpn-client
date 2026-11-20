@@ -13,8 +13,15 @@ class PortApp extends StatelessWidget {
   final GlobalKey<NavigatorState>? navigatorKey;
   final String title;
   final Widget home;
+  final Widget Function(BuildContext context, Widget child)? builder;
 
-  const PortApp({super.key, this.navigatorKey, this.title = '', required this.home});
+  const PortApp({
+    super.key,
+    this.navigatorKey,
+    this.title = '',
+    required this.home,
+    this.builder,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -30,10 +37,18 @@ class PortApp extends StatelessWidget {
       ],
       supportedLocales: const [Locale('en', 'US')],
       pageRouteBuilder: <T>(RouteSettings settings, WidgetBuilder builder) =>
-          PageRouteBuilder<T>(settings: settings, pageBuilder: (context, _, _) => builder(context)),
+          PageRouteBuilder<T>(
+            settings: settings,
+            pageBuilder: (context, _, _) => builder(context),
+          ),
       builder: (context, child) => DefaultTextStyle(
         style: PortText.p,
-        child: PortToastHost(child: child ?? const SizedBox.shrink()),
+        child:
+            builder?.call(
+              context,
+              PortToastHost(child: child ?? const SizedBox.shrink()),
+            ) ??
+            PortToastHost(child: child ?? const SizedBox.shrink()),
       ),
       home: home,
     );

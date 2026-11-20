@@ -99,6 +99,9 @@ dependencies:
   # от `app_paths.dart` (там хардкод под %APPDATA%, Windows-only).
   path_provider: ^2.1.6
 
+  # Native browser window for WhatsApp Web (Windows WebView2).
+  desktop_webview_window: 0.4.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -146,6 +149,11 @@ flutter:
   #   - images/a_dot_ham.jpeg
 
   assets:
+    - assets/rofl/dagon_1.png
+    - assets/rofl/dagon_2.png
+    - assets/rofl/dagon_3.png
+    - assets/rofl/dagon_4.png
+    - assets/rofl/dagon_5.png
     - assets/globe/land_mask.png
     - assets/icon.png
     - assets/tray_icon.ico

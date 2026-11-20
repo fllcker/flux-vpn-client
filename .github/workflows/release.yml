@@ -56,6 +56,9 @@ jobs:
       - name: Fetch sing-box
         run: ./scripts/fetch_sing_box.ps1
 
+      - name: Fetch and scan DOOM runtime
+        run: ./scripts/fetch_doom.ps1
+
       - name: flutter pub get
         run: flutter pub get
 

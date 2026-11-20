@@ -4,7 +4,7 @@ project(flux LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "flux")
+set(BINARY_NAME "flux_tracker")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -123,5 +123,10 @@ install(DIRECTORY "${CMAKE_SOURCE_DIR}/../assets/xray"
 # front of xray's SOCKS listener on Windows, see
 # lib/engines/singbox/tun_bridge_engine.dart.
 install(DIRECTORY "${CMAKE_SOURCE_DIR}/../assets/sing-box"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/assets"
+  COMPONENT Runtime)
+
+# Optional arcade runtime, fetched and scanned by scripts/fetch_doom.ps1.
+install(DIRECTORY "${CMAKE_SOURCE_DIR}/../assets/doom"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/assets"
   COMPONENT Runtime)

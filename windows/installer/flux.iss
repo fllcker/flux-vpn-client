@@ -16,43 +16,44 @@
 ; existing install as "the same app" and update it in place instead of
 ; creating a second, parallel installation. Never regenerate this once a
 ; version has shipped.
-AppId={{8EF5C60B-CBFC-4B32-9EF3-267C79268C4E}
-AppName=Flux
+AppId={{C7B8E5D0-23C9-4A64-B670-67B458BA064E}
+AppName=Flux Tracker
+AppUserModelID=rip.freeinternet.flux.tracker
 AppVersion={#AppVersion}
 AppPublisher=Flux
-DefaultDirName={localappdata}\Flux
+DefaultDirName={localappdata}\FluxTracker
 ; Per-user install, no admin prompt for the installer itself — TUN mode
 ; already asks for elevation separately at runtime when needed (see
 ; lib/engines/xray/windows_elevation.dart), the installer doesn't need it.
 PrivilegesRequired=lowest
 DisableProgramGroupPage=yes
-OutputBaseFilename=FluxSetup-{#AppVersion}
+OutputBaseFilename=FluxTrackerSetup-{#AppVersion}
 OutputDir=..\..\build\installer
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-; Overwriting flux.exe/DLLs while the app is running would otherwise fail —
+; Overwriting flux_tracker.exe/DLLs while the app is running would otherwise fail —
 ; Inno's Restart Manager integration detects processes holding a lock on
 ; files being replaced (no named mutex needed) and asks to close them.
 CloseApplications=force
 RestartApplications=no
-UninstallDisplayIcon={app}\flux.exe
+UninstallDisplayIcon={app}\flux_tracker.exe
 
 [Files]
 ; Whole Release output — xray-core/sing-box (assets/xray, assets/sing-box)
 ; are already copied in here by windows/CMakeLists.txt's install() rules, so
 ; this one line bundles everything the portable build has today.
-Source: "..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Excludes: "flux.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\Flux"; Filename: "{app}\flux.exe"
-Name: "{autodesktop}\Flux"; Filename: "{app}\flux.exe"; Tasks: desktopicon
+Name: "{autoprograms}\Flux Tracker"; Filename: "{app}\flux_tracker.exe"
+Name: "{autodesktop}\Flux Tracker"; Filename: "{app}\flux_tracker.exe"; Tasks: desktopicon
 
 [Tasks]
 Name: desktopicon; Description: "Создать ярлык на рабочем столе"; GroupDescription: "Дополнительные значки:"
 
 [Run]
-Filename: "{app}\flux.exe"; Description: "Запустить Flux"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\flux_tracker.exe"; Description: "Запустить Flux Tracker"; Flags: nowait postinstall skipifsilent
 
 ; Deliberately NOT removing %AppData%\flux (settings, profile.json,
 ; ping_cache.json) on uninstall — that's user data, not part of the

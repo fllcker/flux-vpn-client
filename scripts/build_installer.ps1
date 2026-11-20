@@ -1,6 +1,6 @@
 #Requires -Version 5
 <#
-Builds the Release exe and packages it into a single FluxSetup-<version>.exe
+Builds the Release exe and packages it into a single FluxTrackerSetup-<version>.exe
 installer with Inno Setup — replaces manually zipping up
 build\windows\x64\runner\Release\ for distribution (see ROADMAP.md, трек 13).
 
@@ -39,4 +39,4 @@ Write-Output "Packaging installer with Inno Setup..."
 & $iscc.Path "/DAppVersion=$version" (Join-Path $repoRoot "windows\installer\flux.iss")
 if ($LASTEXITCODE -ne 0) { throw "iscc failed" }
 
-Write-Output "Done: build\installer\FluxSetup-$version.exe"
+Write-Output "Done: build\installer\FluxTrackerSetup-$version.exe"

@@ -13,6 +13,157 @@ bool get _en => AppLocale.effective == AppLanguage.en;
 /// селектор режима Off/Proxy/TUN (`off_proxy_tun_selector.dart`), у
 /// которого лейблы уже на английском независимо от языка интерфейса.
 abstract final class S {
+  static String get minerTitle => _en ? 'Miner' : 'Шахтёр';
+  static String get minerMeters => _en ? 'm' : 'м';
+  static String get minerInstructions => _en ? 'Arrows / WASD or click a neighbouring block to move and dig. Ladders appear automatically.' : 'Стрелки / WASD или клик по соседнему блоку — идти и копать. Лестницы появляются автоматически.';
+  static String get minerUp => _en ? 'Dig up' : 'Копать вверх';
+  static String get minerDown => _en ? 'Dig down' : 'Копать вниз';
+  static String get minerLeft => _en ? 'Dig left' : 'Копать влево';
+  static String get minerRight => _en ? 'Dig right' : 'Копать вправо';
+  static String get minerSurface => _en ? 'Lift to surface' : 'Лифт на поверхность';
+  static String get minerShop => _en ? 'Upgrades' : 'Улучшения';
+  static String get minerSurfaceOnly => _en ? 'Shop and selling are on the surface.' : 'Магазин и продажа — на поверхности.';
+  static String minerSell(int value) => _en ? 'Sell ore · $value' : 'Продать руду · $value';
+  static String minerSold(int value) => _en ? 'Ore sold for $value coins.' : 'Руда продана за $value монет.';
+  static String minerPick(int level, String price) => _en ? 'Pickaxe $level → $price' : 'Кирка $level → $price';
+  static String minerBag(int capacity, String price) => _en ? 'Backpack $capacity → $price' : 'Рюкзак $capacity → $price';
+  static String get minerBagFull => _en ? 'Backpack full! Take the lift and sell your ore.' : 'Рюкзак полон! Поднимись на лифте и продай руду.';
+  static String get minerBottom => _en ? 'Mine bottom reached! Return and open a new shaft.' : 'Ты достиг дна шахты! Возвращайся и открывай новую.';
+  static String get minerNewShaft => _en ? 'New shaft' : 'Новая шахта';
+  static String get minerNewShaftHint => _en ? 'Generate a fresh mine? Coins, backpack contents, upgrades and depth record are preserved.' : 'Создать новую шахту? Монеты, содержимое рюкзака, улучшения и рекорд глубины сохранятся.';
+  static String get minerLoadError => _en ? 'Could not load the save. Original file is unchanged. Start over to replace it.' : 'Не удалось загрузить сохранение. Файл не изменён. Можно начать заново.';
+  static String get minerSaveError => _en ? 'Could not save progress. Try exiting again to retry.' : 'Не удалось сохранить прогресс. Попробуй выйти ещё раз для повторной записи.';
+  static String get minerStartOver => _en ? 'Start over' : 'Начать заново';
+  static String minerOre(int index) => (_en ? ['Air', 'Dirt', 'Stone', 'Coal', 'Copper', 'Gold', 'Crystal'] : ['Воздух', 'Земля', 'Камень', 'Уголь', 'Медь', 'Золото', 'Кристалл'])[index];
+  static String bkbRemaining(int seconds) => _en ? 'BKB · $seconds s' : 'БКБ · $seconds с';
+  static String get bkbWindowError => _en ? 'Could not resize the window.' : 'Не удалось изменить размер окна.';
+  static String get whatsappOpening => _en ? 'Opening WhatsApp Web…' : 'Открываем WhatsApp Web…';
+  static String get whatsappWindowsOnly => _en ? 'WhatsApp Web in this version is available on Windows.' : 'WhatsApp Web в этой версии доступен на Windows.';
+  static String get whatsappOpenError => _en ? 'Could not open the WhatsApp window. Try again.' : 'Не удалось открыть окно WhatsApp. Попробуй ещё раз.';
+  static String get whatsappRuntimeTitle => _en ? 'Microsoft Edge WebView2 required' : 'Нужен Microsoft Edge WebView2';
+  static String get whatsappRuntimeDescription => _en ? 'Install the WebView2 Runtime from Microsoft, then open WhatsApp again.' : 'Установи WebView2 Runtime с сайта Microsoft, затем открой WhatsApp ещё раз.';
+  static String get whatsappRuntimeDownload => _en ? 'Microsoft website' : 'Сайт Microsoft';
+  static String get whatsappBrowserError => _en ? 'Could not open the browser. Visit developer.microsoft.com/microsoft-edge/webview2/' : 'Не удалось открыть браузер. Адрес: developer.microsoft.com/microsoft-edge/webview2/';
+  static String get whatsappClose => _en ? 'Close' : 'Закрыть';
+  static String get doomTagline => _en ? 'Of course your VPN runs DOOM.' : 'Конечно, твой VPN запускает DOOM.';
+  static String get doomCampaign => _en ? 'CAMPAIGN' : 'КАМПАНИЯ';
+  static String get doomOwnWad => _en ? 'Choose own WAD' : 'Выбрать свой WAD';
+  static String get doomDescription => _en ? 'The Crispy Doom engine with the free Freedoom campaign is included. You can also select your own original DOOM or DOOM II IWAD.' : 'В комплекте движок Crispy Doom и бесплатная кампания Freedoom. Можно выбрать свой IWAD оригинального DOOM или DOOM II.';
+  static String get doomPlay => _en ? 'PLAY' : 'ИГРАТЬ';
+  static String get doomRunning => _en ? 'GAME IS RUNNING' : 'ИГРА ЗАПУЩЕНА';
+  static String get doomStarting => _en ? 'PREPARING…' : 'ПОДГОТОВКА…';
+  static String get doomWindowHint => _en ? 'Opens in a separate window. Works offline. Saves stay on this device.' : 'Откроется в отдельном окне. Работает без интернета. Сохранения остаются на этом устройстве.';
+  static String get doomRunningHint => _en ? 'Switch to the game window. Quit from its menu to return. You can keep using the VPN.' : 'Переключись в окно игры. Выход — через её меню. VPN можно продолжать пользоваться.';
+  static String get doomWindowsOnly => _en ? 'This version of DOOM is available on Windows.' : 'Эта версия DOOM доступна на Windows.';
+  static String get doomNotInstalled => _en ? 'Game files are missing from this build.' : 'В этой сборке отсутствуют файлы игры.';
+  static String get doomLaunchError => _en ? 'The game could not start or exited with an error. Try again.' : 'Игра не запустилась или завершилась с ошибкой. Попробуй ещё раз.';
+  static String get doomInvalidWad => _en ? 'Choose a complete DOOM/DOOM II IWAD, not a PWAD mod or a damaged file.' : 'Выбери полный IWAD DOOM/DOOM II, а не PWAD-мод или повреждённый файл.';
+  static String get doomImportError => _en ? 'Could not copy this WAD. Check that the file is accessible.' : 'Не удалось скопировать WAD. Проверь доступность файла.';
+  static String get doomControls => _en ? 'Controls' : 'Управление';
+  static String get doomMove => _en ? 'Move / turn' : 'Движение / поворот';
+  static String get doomFire => _en ? 'Fire' : 'Стрелять';
+  static String get doomUse => _en ? 'Open doors / use' : 'Двери / действие';
+  static String get doomWeapon => _en ? 'Select weapon' : 'Выбрать оружие';
+  static String get doomMenu => _en ? 'Menu / quit' : 'Меню / выход';
+  static String get doomSaveLoad => _en ? 'Save / load' : 'Сохранить / загрузить';
+  static String get doomControlsHint => _en ? 'Default controls. Alt+Enter toggles fullscreen.' : 'Управление по умолчанию. Alt+Enter — полный экран.';
+  static String get boomboxTitle => _en ? 'Boombox' : 'Магнитофон';
+  static String get tapeSubtitle => _en ? 'Your MP3s. A little more analogue.' : 'Твои MP3. Чуть больше аналогового тепла.';
+  static String get tapeShelf => _en ? 'Cassette collection' : 'Коллекция кассет';
+  static String get tapeShelfHint => _en ? 'Import MP3s, then drag a cassette into the deck. Drag it back here to eject. You can also click a cassette.' : 'Импортируй MP3 и перетащи кассету в деку. Чтобы вынуть — перетащи обратно сюда. Можно и просто нажать на кассету.';
+  static String get tapeImport => _en ? 'Import MP3' : 'Импорт MP3';
+  static String get tapeImporting => _en ? 'Making cassettes…' : 'Записываем кассеты…';
+  static String get tapeLoading => _en ? 'Loading cassette…' : 'Загружаем кассету…';
+  static String get tapeEmptyShelf => _en ? 'Your first mixtape starts here.' : 'Здесь начнётся твой первый микстейп.';
+  static String get tapeEmptyDeck => _en ? 'INSERT CASSETTE' : 'ВСТАВЬ КАССЕТУ';
+  static String get tapeReturnHint => _en ? 'Drop the cassette here to return it to the shelf.' : 'Перетащи кассету сюда, чтобы вернуть на полку.';
+  static String get tapeInsertHint => _en ? 'Drag to deck or click to play' : 'Перетащи в деку или нажми для воспроизведения';
+  static String get tapeEjectHint => _en ? 'Drag back to shelf to eject' : 'Перетащи на полку, чтобы вынуть';
+  static String get tapePlay => _en ? 'Play' : 'Воспроизвести';
+  static String get tapePause => _en ? 'Pause' : 'Пауза';
+  static String get tapeStop => _en ? 'Stop' : 'Стоп';
+  static String get tapeRewind => _en ? 'Rewind 10 seconds' : 'Назад на 10 секунд';
+  static String get tapeEject => _en ? 'Eject cassette' : 'Вынуть кассету';
+  static String get tapeVolume => _en ? 'Volume' : 'Громкость';
+  static String get tapeLibraryError => _en ? 'Could not open the cassette collection.' : 'Не удалось открыть коллекцию кассет.';
+  static String get tapeImportError => _en ? 'Some files could not be imported. Select readable, non-empty MP3 files.' : 'Не все файлы удалось импортировать. Выбери доступные непустые MP3.';
+  static String get tapePlaybackError => _en ? 'Could not play this cassette. Try another MP3 or eject and reinsert it.' : 'Не удалось воспроизвести кассету. Попробуй другой MP3 или вынь и вставь её снова.';
+  static String get dagonTitle => _en ? 'Dagon' : 'Дагон';
+  static String dagonLevel(int level) => _en ? 'Level $level' : 'Уровень $level';
+  static String get dagonCaption => _en ? 'You asked for Dagon in a VPN. Here it is.' : 'Просили Дагон в VPN? Вот Дагон в VPN.';
+  static String get roflFeatures => _en ? 'Fun features' : 'Рофлофункции';
+  static String get flashlightTitle => _en ? 'Flashlight' : 'Фонарик';
+  static String get flashlightSubtitle => _en ? 'Light at the end of the VPN tunnel.' : 'Свет в конце VPN-туннеля.';
+  static String get flashlightClose => _en ? 'Back' : 'Назад';
+  static String get flashlightBrightness => _en ? 'Brightness' : 'Яркость';
+  static String get flashlightLength => _en ? 'Beam length' : 'Длина луча';
+  static String get flashlightWidth => _en ? 'Beam width' : 'Ширина луча';
+  static String get flashlightHighBeam => _en ? 'High beam' : 'Дальний свет';
+  static String get flashlightOrbital => _en ? 'Orbital beam' : 'До орбиты';
+  static String get flashlightKm => _en ? 'km' : 'км';
+  static String get flashlightOff => _en ? 'OFF' : 'ВЫКЛ';
+  static String get flashlightDistanceHint => _en ? 'Imaginary range. Real commitment.' : 'Дальность выдуманная. Намерения серьёзные.';
+  static String get flashlightPower => _en ? 'Toggle flashlight' : 'Включить или выключить фонарик';
+  static String get flashlightScreen => _en ? 'Screen light' : 'Светить экраном';
+  static String get flashlightBackToBeam => _en ? 'Back to beam' : 'Вернуться к лучу';
+  static String get flashlightGestureHint => _en ? 'Drag the beam: up for distance, sideways for width.' : 'Тяни луч: вверх — дальше, в стороны — шире.';
+  // Scripted assistant
+  static String get assistantPickServer => _en ? 'Pick a server for me' : 'Подбери сервер';
+  static String get assistantNoServers => _en ? 'No servers to choose from yet. Add a subscription first, then ask me again.' : 'Пока не из чего выбирать. Добавь подписку с серверами и спроси меня ещё раз.';
+  static String assistantServerRecommendation(String name) => _en ? 'I recommend “$name” ✨ Find it in your server list and connect!' : 'Советую «$name» ✨ Найди его в списке серверов и подключайся!';
+  static String get assistantTitle => _en ? 'AI assistant' : 'ИИ помощник';
+  static String get assistantGreeting => _en ? 'Hi! I’m your Flux assistant. How can I help?' : 'Привет! Я твой помощник в Flux. С чем помочь?';
+  static String get assistantPlaceholder => _en ? 'Ask me something…' : 'Напиши что-нибудь…';
+  static String get assistantSend => _en ? 'Send message' : 'Отправить сообщение';
+  static String get assistantClose => _en ? 'Close assistant' : 'Закрыть помощника';
+  static String get assistantTyping => _en ? 'Thinking…' : 'Думаю…';
+  static String get assistantFallback => _en ? 'I can’t do that yet 😅 Try one of the questions below.' : 'Я такое ещё не умею 😅 Попробуй один из вопросов снизу.';
+  static List<({String question, List<String> answers})> get assistantPrompts => _en ? [
+    (question: 'How do I connect?', answers: [
+      'Pick a server and turn on Proxy or TUN. You’ve got this. I believe in you more than in public Wi-Fi.',
+      'Add a subscription, pick a server, then connect. Three steps. I spent 650 milliseconds thinking about this.',
+      'Choose a server and a connection mode. If it doesn’t work, try another server. My entire training paid off.',
+    ]),
+    (question: 'Motivate me', answers: [
+      'You opened a VPN and found a habit tracker. At this point, anything is possible. Start small.',
+      'One tiny step today beats a perfect plan tomorrow. Tick off a habit. I’ll be proud.',
+      'Your streak won’t build itself. Unless someone asks for that in the comments too.',
+    ]),
+    (question: 'Tell me a joke', answers: [
+      'A VPN, a habit tracker and an AI walk into a bar. The bartender says: “Another feature request?”',
+      'This used to be a VPN. Then we opened the comments.',
+      'My neural network has three layers: a button, a random number and confidence.',
+    ]),
+  ] : [
+    (question: 'Как подключиться?', answers: [
+      'Выбери сервер и включи Proxy или TUN. Ты справишься. Я верю в тебя больше, чем в публичный Wi-Fi.',
+      'Добавь подписку, выбери сервер и подключись. Всего три шага. Я думал об этом целых 650 миллисекунд.',
+      'Выбери сервер и режим подключения. Не получилось — попробуй другой сервер. Не зря меня обучали.',
+    ]),
+    (question: 'Дай мотивацию', answers: [
+      'Ты открыл VPN и нашёл трекер привычек. Значит, возможно вообще всё. Начни с малого.',
+      'Один маленький шаг сегодня лучше идеального плана на завтра. Отметь привычку — я буду гордиться.',
+      'Серия привычек сама себя не сделает. Если только в комментариях не попросят и это.',
+    ]),
+    (question: 'Расскажи шутку', answers: [
+      'Заходят как-то VPN, трекер привычек и ИИ в бар. Бармен: «Опять фичу в комментариях попросили?»',
+      'Раньше это был просто VPN. А потом мы открыли комментарии.',
+      'У моей нейросети три слоя: кнопка, рандом и уверенность в себе.',
+    ]),
+  ];
+  // Habit tracker
+  static String get habitsTitle => _en ? 'Habits' : 'Привычки';
+  static String get habitsSubtitle => _en ? 'Requested in the comments. Built into a VPN.' : 'Просили в комментариях. Сделали в VPN.';
+  static String get habitsEmpty => _en ? 'Your first habit starts here. Progress stays on this device.' : 'Начни с первой привычки. Прогресс хранится на этом устройстве.';
+  static String get habitsPlaceholder => _en ? 'New habit (up to 80 characters)' : 'Новая привычка (до 80 символов)';
+  static String get habitsAdd => _en ? 'Add habit' : 'Добавить привычку';
+  static String get habitsDelete => _en ? 'Delete habit and history?' : 'Удалить привычку и историю?';
+  static String get habitsRetry => _en ? 'Retry' : 'Повторить';
+  static String get habitsLoading => _en ? 'Loading habits…' : 'Загружаем привычки…';
+  static String get habitsLoadError => _en ? 'Could not load habits. Your file has been preserved.' : 'Не удалось загрузить привычки. Файл сохранён без изменений.';
+  static String get habitsSaveError => _en ? 'Could not save. Please try again.' : 'Не удалось сохранить. Попробуй ещё раз.';
+  static String habitsProgress(int done, int total) => _en ? 'Today: $done / $total' : 'Сегодня: $done / $total';
+  static String habitsStreak(int count) => _en ? 'Current streak: $count days' : 'Серия: $count дн. подряд';
   // connect_panel.dart
   static String get disconnected => _en ? 'Disconnected' : 'Отключено';
   static String get connectingStatus => _en ? 'Connecting...' : 'Подключение...';

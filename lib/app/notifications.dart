@@ -10,7 +10,7 @@ import 'package:local_notifier/local_notifier.dart';
 /// `ConnectionUiState` вообще.
 Future<void> initLocalNotifier() async {
   if (!Platform.isWindows && !Platform.isMacOS) return;
-  await localNotifier.setup(appName: 'Flux');
+  await localNotifier.setup(appName: 'Flux Tracker');
 }
 
 void showFluxNotification({required String title, String? body}) {
