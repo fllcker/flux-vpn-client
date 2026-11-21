@@ -81,6 +81,8 @@ class _ServerRowState extends State<ServerRow> {
 
   Widget _buildRow(Color background, {Widget? trailing}) {
     final hasVariantChoice = widget.leaf.variants.length > 1;
+    final variantLabel = widget.leaf.activeVariant?.label;
+    final showVariantLabel = variantLabel != null && variantLabel.isNotEmpty;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -120,7 +122,7 @@ class _ServerRowState extends State<ServerRow> {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
                     width: 3,
-                    height: hasVariantChoice ? 28 : 20,
+                    height: showVariantLabel ? 28 : 20,
                     decoration: BoxDecoration(
                       color: widget.selected
                           ? PortColors.primary
@@ -144,9 +146,9 @@ class _ServerRowState extends State<ServerRow> {
                           style: PortText.small,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (hasVariantChoice)
+                        if (showVariantLabel)
                           Text(
-                            widget.leaf.activeVariant?.label ?? '',
+                            variantLabel,
                             style: PortText.muted.copyWith(
                               fontSize: 11,
                               height: 1,

@@ -72,7 +72,7 @@ void main() {
       variants: [
         ConnectionVariant(
           id: 'variant-1',
-          label: 'default',
+          label: 'XHTTP Reality',
           config: VlessConfig(
             address: 'de1.example.com',
             port: 443,
@@ -104,6 +104,13 @@ void main() {
     // подключения и в подписи маркера на глобусе (страна определяется по
     // флагу 🇩🇪 в icon).
     expect(find.text('Germany #1'), findsNWidgets(3));
+    expect(
+      find.descendant(
+        of: find.byType(ServerListPanel),
+        matching: find.text('XHTTP Reality'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('drags the server panel edge and saves its width', (tester) async {
